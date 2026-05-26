@@ -2,8 +2,12 @@ import logging
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.backend.main import get_db
+from src.backend.database import create_research_paper, search_research_papers
 
 logger = logging.getLogger(__name__)
 
@@ -62,39 +66,35 @@ class SandboxHistoryResponse(BaseModel):
     runs: list[SandboxHistoryItem]
 
 
-# --- In-memory stores (use real DB in production) ---
+# --- In-memory stores (sandbox / uploads remain in-memory; papers use DB) ---
 
-_papers: list[dict] = []
 _sandbox_runs: list[dict] = []
 _uploads: list[dict] = []
 
 
-# --- Paper Endpoints ---
+# --- Paper Endpoints (DB-backed) ---
 
 @router.post("/papers", response_model=PaperSubmitResponse)
-async def submit_paper(body: PaperSubmitRequest):
+async def submit_paper(body: PaperSubmitRequest, db: AsyncSession = Depends(get_db)):
     try:
-        paper_id = str(uuid.uuid4())
-        now = datetime.utcnow().isoformat()
-        record = {
-            "paper_id": paper_id,
-            "title": body.title,
-            "authors": body.authors,
-            "journal": body.journal,
-            "year": body.year,
-            "doi": body.doi,
-            "abstract": body.abstract,
-            "keywords": [kw.strip() for kw in (body.keywords or "").split(",") if kw.strip()],
-            "status": "pending_review",
-            "submitted_at": now,
-        }
-        _papers.append(record)
-        logger.info("Paper submitted: %s (%s)", body.title, paper_id)
-        return PaperSubmitResponse(
-            paper_id=paper_id,
+        authors_list = [a.strip() for a in body.authors.split(",") if a.strip()]
+        keywords_list = [kw.strip() for kw in (body.keywords or "").split(",") if kw.strip()]
+        paper = await create_research_paper(
+            db=db,
             title=body.title,
+            authors=authors_list,
+            journal=body.journal,
+            year=body.year,
+            doi=body.doi,
+            abstract=body.abstract,
+            keywords=keywords_list,
+        )
+        logger.info("Paper submitted: %s (%s)", body.title, paper.id)
+        return PaperSubmitResponse(
+            paper_id=str(paper.id),
+            title=paper.title,
             status="pending_review",
-            submitted_at=now,
+            submitted_at=paper.created_at.isoformat(),
         )
     except Exception as e:
         logger.exception("Paper submission failed")
@@ -102,19 +102,38 @@ async def submit_paper(body: PaperSubmitRequest):
 
 
 @router.get("/papers", response_model=list[PaperSubmitResponse])
-async def list_papers():
-    return [
-        PaperSubmitResponse(
-            paper_id=p["paper_id"],
-            title=p["title"],
-            status=p["status"],
-            submitted_at=p["submitted_at"],
+async def list_papers(
+    query: str | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        papers = await search_research_papers(
+            db=db,
+            query=query,
+            year_from=year_from,
+            year_to=year_to,
+            skip=skip,
+            limit=limit,
         )
-        for p in _papers
-    ]
+        return [
+            PaperSubmitResponse(
+                paper_id=str(p.id),
+                title=p.title,
+                status="pending_review",
+                submitted_at=p.created_at.isoformat(),
+            )
+            for p in papers
+        ]
+    except Exception as e:
+        logger.exception("List papers failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-# --- Data Upload Endpoints ---
+# --- Data Upload Endpoints (in-memory) ---
 
 @router.post("/uploads", response_model=DataUploadResponse)
 async def upload_file(file: UploadFile = File(...), description: str = Form("")):
@@ -159,7 +178,7 @@ async def list_uploads():
     ]
 
 
-# --- Sandbox Endpoints ---
+# --- Sandbox Endpoints (in-memory) ---
 
 @router.post("/sandbox/run", response_model=SandboxRunResponse)
 async def sandbox_run(body: SandboxRunRequest):
@@ -209,7 +228,7 @@ async def sandbox_history():
     return SandboxHistoryResponse(
         runs=[
             SandboxHistoryItem(**r)
-            for r in _sandbox_runs[-50:]  # last 50
+            for r in _sandbox_runs[-50:]
         ]
     )
 
@@ -231,7 +250,7 @@ def _mock_drug_response(payload: dict) -> dict:
     return {
         "drug": drug,
         "IC50": round(0.042, 3),
-        "unit": "µM",
+        "unit": "\u00b5M",
         "classification": "sensitive",
     }
 

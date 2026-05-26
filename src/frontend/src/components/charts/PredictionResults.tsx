@@ -1,42 +1,79 @@
+import { useEffect, useState } from 'react'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 
-const accuracyData = [
-  { model: 'CNN', accuracy: 94.2, precision: 93.8, recall: 92.5, f1: 93.1 },
-  { model: 'ResNet50', accuracy: 96.7, precision: 95.9, recall: 95.2, f1: 95.5 },
-  { model: 'ViT', accuracy: 97.1, precision: 96.8, recall: 96.3, f1: 96.5 },
-  { model: 'EfficientNet', accuracy: 95.8, precision: 95.1, recall: 94.6, f1: 94.8 },
-  { model: 'TransUNet', accuracy: 97.8, precision: 97.3, recall: 97.0, f1: 97.1 },
-]
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-const rocData = [
-  { fpr: 0, tpr1: 0, tpr2: 0, tpr3: 0 },
-  { fpr: 0.1, tpr1: 0.72, tpr2: 0.68, tpr3: 0.75 },
-  { fpr: 0.2, tpr1: 0.85, tpr2: 0.81, tpr3: 0.87 },
-  { fpr: 0.3, tpr1: 0.91, tpr2: 0.88, tpr3: 0.93 },
-  { fpr: 0.4, tpr1: 0.94, tpr2: 0.92, tpr3: 0.96 },
-  { fpr: 0.5, tpr1: 0.96, tpr2: 0.94, tpr3: 0.97 },
-  { fpr: 0.6, tpr1: 0.97, tpr2: 0.96, tpr3: 0.98 },
-  { fpr: 0.7, tpr1: 0.98, tpr2: 0.97, tpr3: 0.99 },
-  { fpr: 0.8, tpr1: 0.99, tpr2: 0.98, tpr3: 0.99 },
-  { fpr: 0.9, tpr1: 0.99, tpr2: 0.99, tpr3: 1.0 },
-  { fpr: 1.0, tpr1: 1.0, tpr2: 1.0, tpr3: 1.0 },
-]
+interface PredictionResultsData {
+  accuracy: { model: string; accuracy: number; precision: number; recall: number; f1: number }[]
+  roc: { fpr: number; tpr1: number; tpr2: number; tpr3: number }[]
+}
 
 export default function PredictionResults() {
+  const [data, setData] = useState<PredictionResultsData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    fetch(`${API_BASE}/api/v1/charts/prediction-results`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then((res) => {
+        if (!cancelled) setData(res)
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || 'Failed to load prediction results')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {[1, 2].map((i) => (
+          <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+            <div className="h-5 w-40 bg-gray-200 rounded mb-4" />
+            <div className="h-72 bg-gray-100 rounded" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center text-red-700">
+        <p>無法載入預測結果數據</p>
+        <p className="text-sm mt-1">{error}</p>
+      </div>
+    )
+  }
+
+  if (!data) return null
+
+  const { accuracy, roc } = data
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h3 className="text-lg font-semibold mb-4 text-gray-800">模型效能比較</h3>
         <ResponsiveContainer width="100%" height={320}>
-          <BarChart data={accuracyData} barGap={4}>
+          <BarChart data={accuracy} barGap={4}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="model" tick={{ fontSize: 12 }} />
             <YAxis domain={[88, 100]} tick={{ fontSize: 12 }} />
-            <Tooltip
-              contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }}
-            />
+            <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }} />
             <Legend />
             <Bar dataKey="accuracy" name="準確率 %" fill="#6366f1" radius={[4, 4, 0, 0]} />
             <Bar dataKey="precision" name="精確率 %" fill="#22c55e" radius={[4, 4, 0, 0]} />
@@ -49,13 +86,11 @@ export default function PredictionResults() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h3 className="text-lg font-semibold mb-4 text-gray-800">ROC 曲線</h3>
         <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={rocData}>
+          <LineChart data={roc}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="fpr" tick={{ fontSize: 12 }} label={{ value: '假陽性率', position: 'bottom', fontSize: 12 }} />
             <YAxis tick={{ fontSize: 12 }} label={{ value: '真陽性率', angle: -90, position: 'insideLeft', fontSize: 12 }} />
-            <Tooltip
-              contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }}
-            />
+            <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }} />
             <Legend />
             <Line type="monotone" dataKey="tpr1" name="CNN (AUC=0.94)" stroke="#6366f1" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="tpr2" name="ResNet50 (AUC=0.96)" stroke="#22c55e" strokeWidth={2} dot={false} />

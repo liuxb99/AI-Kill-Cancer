@@ -63,3 +63,29 @@ class InfoResponse(BaseModel):
     app_name: str
     version: str
     endpoints: list[dict[str, str]]
+
+
+class CancerStatsResponse(BaseModel):
+    incidence: list[dict]
+    mortality: list[dict]
+    mortality_colors: list[str]
+
+
+class ResearchTrendsResponse(BaseModel):
+    publications: list[dict]
+    funding: list[dict]
+
+
+class PredictionResultsResponse(BaseModel):
+    accuracy: list[dict]
+    roc: list[dict]
+
+
+class DashboardKPI(BaseModel):
+    label: str
+    value: str
+    unit: str
+
+
+class DashboardKPIResponse(BaseModel):
+    kpis: list[DashboardKPI]

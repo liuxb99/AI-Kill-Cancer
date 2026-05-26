@@ -22,6 +22,16 @@ engine = None
 async_session_factory = None
 
 
+async def get_db():
+    if async_session_factory is None:
+        raise RuntimeError("Database not initialized")
+    async with async_session_factory() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global engine, async_session_factory
