@@ -157,8 +157,67 @@ class TestRecommend:
         assert resp.json()["primary_option"]["success_rate"] == 0.85
 
 
+class TestChartsAPI:
+
+    def test_cancer_stats_endpoint(self, client):
+        resp = client.get("/api/v1/charts/cancer-stats")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "incidence" in data
+        assert "mortality" in data
+        assert isinstance(data["incidence"], list)
+        assert len(data["incidence"]) > 0
+
+    def test_research_trends_endpoint(self, client):
+        resp = client.get("/api/v1/charts/research-trends")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "years" in data
+        assert "publications" in data
+        assert len(data["years"]) == len(data["publications"])
+
+    def test_prediction_results_endpoint(self, client):
+        resp = client.get("/api/v1/charts/prediction-results")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "accuracy" in data
+        assert "precision" in data
+        assert "recall" in data
+        assert "f1_score" in data
+
+    def test_dashboard_kpis_endpoint(self, client):
+        resp = client.get("/api/v1/dashboard/kpis")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "total_patients" in data
+        assert "active_treatments" in data
+        assert "models_deployed" in data
+        assert "research_papers" in data
+
+
 class TestResearchAPI:
 
     def test_research_health(self, client):
         resp = client.get("/api/v1/health")
         assert resp.status_code == 200
+
+    def test_submit_paper(self, client):
+        payload = {
+            "title": "Deep Learning for Early Cancer Detection",
+            "authors": "Chen X., Wang L.",
+            "journal": "Nature Medicine",
+            "year": 2026,
+            "doi": "10.1234/test.2026",
+            "abstract": "A deep learning model for early cancer detection.",
+            "keywords": "deep learning, cancer, early detection",
+        }
+        resp = client.post("/api/v1/research/papers", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["title"] == payload["title"]
+
+    def test_list_papers(self, client):
+        resp = client.get("/api/v1/research/papers")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
