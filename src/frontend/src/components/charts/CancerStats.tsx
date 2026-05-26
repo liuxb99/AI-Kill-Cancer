@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 interface CancerStatsData {
   incidence: { name: string; male: number; female: number }[]

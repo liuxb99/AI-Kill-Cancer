@@ -1,8 +1,7 @@
 {
   "buildCommand": "cd src/frontend && npm install && npm run build",
-  "outputDirectory": "src/frontend/dist",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" }
+    { "source": "/(.*)", "destination": "/api/index.py" }
   ],
   "env": {
     "MODEL_ENABLED": "false"

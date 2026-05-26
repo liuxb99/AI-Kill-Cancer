@@ -1,10 +1,13 @@
 import logging
+import os
 import sys
 
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from src.backend.api.routes import router
 from src.backend.api.research import router as research_router
@@ -55,6 +58,19 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
     app.include_router(research_router)
+
+    frontend_dist = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+    )
+    if os.path.isdir(frontend_dist):
+        assets = os.path.join(frontend_dist, "assets")
+        if os.path.isdir(assets):
+            app.mount("/assets", StaticFiles(directory=assets), name="assets")
+        index_html = os.path.join(frontend_dist, "index.html")
+        if os.path.isfile(index_html):
+            @app.get("/{full_path:path}")
+            async def _serve_frontend(full_path: str):
+                return FileResponse(index_html, media_type="text/html")
 
     return app
 
