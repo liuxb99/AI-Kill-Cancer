@@ -1,0 +1,111 @@
+version: "3.9"
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: cancer_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-cancer_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-cancer_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging: *default-logging
+    networks:
+      - cancer_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: cancer_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - cancer_net
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    image: cancer-api:latest
+    container_name: cancer_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-cancer_db}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:80,http://localhost:3000}
+      DEBUG: ${DEBUG:-false}
+      MODEL_ENABLED: ${MODEL_ENABLED:-true}
+      MODEL_PATH: ${MODEL_PATH:-/app/models/cancer_prediction.pkl}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - modeldata:/app/models
+      - ./data:/app/data
+    logging: *default-logging
+    networks:
+      - cancer_net
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    image: cancer-frontend:latest
+    container_name: cancer_frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    logging: *default-logging
+    networks:
+      - cancer_net
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  modeldata:
+    driver: local
+
+networks:
+  cancer_net:
+    name: cancer_network
+    driver: bridge
