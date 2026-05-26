@@ -63,7 +63,7 @@ class EncoderRNN(nn.Module):
         _, h = self.rnn(packed)
         if self.config.use_bidirectional:
             h = h.view(self.config.encoder_layers, 2, -1, self.config.encoder_hidden)
-            h = h[:, -1, :, :]
+            h = torch.cat([h[:, 0], h[:, 1]], dim=-1)
         h = h[-1]
         return self.mu(h), self.logvar(h)
 
@@ -226,16 +226,16 @@ class DTIPredictor(nn.Module):
 
     def __init__(self, config: Optional[DTIPredictorConfig] = None):
         super().__init__()
-        self.config = config or DTIPredictorConfig()
+        self.config = config if config is not None else DTIPredictorConfig()
 
         layers = []
-        prev = config.drug_fingerprint_dim + config.target_embed_dim
-        for h in config.hidden_dims:
+        prev = self.config.drug_fingerprint_dim + self.config.target_embed_dim
+        for h in self.config.hidden_dims:
             layers.append(nn.Linear(prev, h))
-            if config.use_batch_norm:
+            if self.config.use_batch_norm:
                 layers.append(nn.BatchNorm1d(h))
             layers.append(nn.ReLU(inplace=True))
-            layers.append(nn.Dropout(config.dropout))
+            layers.append(nn.Dropout(self.config.dropout))
             prev = h
         self.fusion = nn.Sequential(*layers)
         self.classifier = nn.Linear(prev, 1)

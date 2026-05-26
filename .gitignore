@@ -41,3 +41,10 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Vercel
+.vercel
+
+# DB
+test.db
+*.db

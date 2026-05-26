@@ -82,12 +82,19 @@ class TestTrainer:
         assert cfg.num_epochs == 100
 
     def test_train_epoch(self, classifier, training_config, sample_batch):
-        from torch.utils.data import DataLoader, TensorDataset
+        from torch.utils.data import DataLoader, Dataset
         X, yc, ys, yst = sample_batch
-        dataset = TensorDataset(
-            torch.tensor(X), torch.tensor(yc),
-            torch.tensor(ys), torch.tensor(yst),
-        )
+        class DictDataset(Dataset):
+            def __init__(self, X, yc, ys, yst):
+                self.X = torch.tensor(X, dtype=torch.float32)
+                self.yc = torch.tensor(yc, dtype=torch.long)
+                self.ys = torch.tensor(ys, dtype=torch.long)
+                self.yst = torch.tensor(yst, dtype=torch.long)
+            def __len__(self):
+                return len(self.X)
+            def __getitem__(self, i):
+                return {"input": self.X[i], "cancer_type": self.yc[i], "subtype": self.ys[i], "stage": self.yst[i]}
+        dataset = DictDataset(X, yc, ys, yst)
         loader = DataLoader(dataset, batch_size=2)
         trainer = Trainer(classifier, training_config)
         loss = trainer._train_epoch(loader)
@@ -95,12 +102,19 @@ class TestTrainer:
         assert loss > 0
 
     def test_validate(self, classifier, training_config, sample_batch):
-        from torch.utils.data import DataLoader, TensorDataset
+        from torch.utils.data import DataLoader, Dataset
         X, yc, ys, yst = sample_batch
-        dataset = TensorDataset(
-            torch.tensor(X), torch.tensor(yc),
-            torch.tensor(ys), torch.tensor(yst),
-        )
+        class DictDataset(Dataset):
+            def __init__(self, X, yc, ys, yst):
+                self.X = torch.tensor(X, dtype=torch.float32)
+                self.yc = torch.tensor(yc, dtype=torch.long)
+                self.ys = torch.tensor(ys, dtype=torch.long)
+                self.yst = torch.tensor(yst, dtype=torch.long)
+            def __len__(self):
+                return len(self.X)
+            def __getitem__(self, i):
+                return {"input": self.X[i], "cancer_type": self.yc[i], "subtype": self.ys[i], "stage": self.yst[i]}
+        dataset = DictDataset(X, yc, ys, yst)
         loader = DataLoader(dataset, batch_size=2)
         trainer = Trainer(classifier, training_config)
         loss, metrics = trainer._validate(loader)
@@ -354,7 +368,8 @@ class TestTreatmentRecommender:
 
     def test_recommend(self):
         cfg = TreatmentRecommenderConfig(input_dim=20, clinical_dim=5,
-                                         hidden_dims=(16, 8), num_drug_classes=64)
+                                         hidden_dims=(16, 8), num_drug_classes=64,
+                                         use_batch_norm=False)
         model = TreatmentRecommender(cfg)
         gene = torch.randn(1, 20)
         clin = torch.randn(1, 5)
@@ -364,7 +379,8 @@ class TestTreatmentRecommender:
 
     def test_recommend_unknown_cancer(self):
         cfg = TreatmentRecommenderConfig(input_dim=20, clinical_dim=5,
-                                         hidden_dims=(16, 8), num_drug_classes=64)
+                                         hidden_dims=(16, 8), num_drug_classes=64,
+                                         use_batch_norm=False)
         model = TreatmentRecommender(cfg)
         gene = torch.randn(1, 20)
         clin = torch.randn(1, 5)

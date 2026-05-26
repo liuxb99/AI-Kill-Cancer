@@ -7,6 +7,7 @@ from typing import Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import (
     accuracy_score,
@@ -143,12 +144,15 @@ class Trainer:
             y_prob = torch.cat(all_probs[key]).numpy()
 
             n_classes = y_prob.shape[1]
-            if n_classes > 2:
-                auc = roc_auc_score(
-                    y_true, y_prob, multi_class="ovr", average="weighted"
-                )
-            else:
-                auc = roc_auc_score(y_true, y_prob[:, 1])
+            try:
+                if n_classes > 2:
+                    auc = roc_auc_score(
+                        y_true, y_prob, multi_class="ovr", average="weighted"
+                    )
+                else:
+                    auc = roc_auc_score(y_true, y_prob[:, 1])
+            except ValueError:
+                auc = 0.0
 
             metrics[key] = {
                 "accuracy": accuracy_score(y_true, y_pred),

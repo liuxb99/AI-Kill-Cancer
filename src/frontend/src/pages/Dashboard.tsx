@@ -4,7 +4,7 @@ import CancerStats from '../components/charts/CancerStats'
 import PredictionResults from '../components/charts/PredictionResults'
 import ResearchTrends from '../components/charts/ResearchTrends'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 interface KPI {
   label: string

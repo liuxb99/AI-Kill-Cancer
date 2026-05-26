@@ -134,8 +134,10 @@ def compute_descriptors(smiles: str) -> Optional[dict]:
 
 
 def tanimoto_similarity(fp1: np.ndarray, fp2: np.ndarray) -> float:
-    intersection = np.sum(fp1 & fp2)
-    union = np.sum(fp1 | fp2)
+    b1 = fp1.astype(bool)
+    b2 = fp2.astype(bool)
+    intersection = np.sum(b1 & b2)
+    union = np.sum(b1 | b2)
     if union == 0:
         return 0.0
     return float(intersection / union)

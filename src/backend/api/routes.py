@@ -34,12 +34,17 @@ def _load_model():
     if _MODEL is not None:
         return True
     try:
+        import os
         import torch
         from src.models.cancer_classifier import CancerClassifier, CancerClassifierConfig
+        model_path = settings.MODEL_PATH
+        if not model_path or not os.path.isfile(model_path):
+            logger.warning("Model checkpoint %s not found, using fallback logic", model_path)
+            return False
         cfg = CancerClassifierConfig()
         _MODEL = CancerClassifier(cfg)
         _MODEL.eval()
-        logger.info("CancerClassifier loaded successfully")
+        logger.info("CancerClassifier loaded successfully from %s", model_path)
         return True
     except Exception:
         logger.warning("CancerClassifier not available, using fallback logic")

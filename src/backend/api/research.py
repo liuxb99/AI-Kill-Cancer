@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.main import get_db
+from src.backend.database.session import get_db
 from src.backend.database import create_research_paper, search_research_papers
 
 logger = logging.getLogger(__name__)
