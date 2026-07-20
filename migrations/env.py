@@ -5,6 +5,27 @@ from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.backend.database.models import Base
+from src.backend.domain import (
+    PatientModel,
+    CancerCaseModel,
+    SpecimenModel,
+    SequencingTestModel,
+    UploadedFileModel,
+    VariantModel,
+    GeneModel,
+    ProteinModel,
+    PathwayModel,
+    DrugModel,
+    DrugTargetModel,
+    EvidenceModel,
+    DrugCandidateModel,
+    PublicationModel,
+    ClinicalTrialModel,
+    AnalysisRunModel,
+    ReportModel,
+    ConsentModel,
+    AuditLogModel,
+)
 
 config = context.config
 if config.config_file_name is not None:

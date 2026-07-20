@@ -16,10 +16,15 @@ async def get_db():
 
 async def init_db(db_url: str, debug: bool = False):
     global engine, async_session_factory
-    engine = create_async_engine(db_url, echo=debug, pool_size=5, max_overflow=10)
+    engine = create_async_engine(db_url, echo=debug)
     async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with engine.begin() as conn:
         from src.backend.database.models import Base
+        from src.backend.domain import PatientModel, CancerCaseModel, SpecimenModel, \
+            SequencingTestModel, UploadedFileModel, VariantModel, GeneModel, \
+            ProteinModel, PathwayModel, DrugModel, DrugTargetModel, EvidenceModel, \
+            DrugCandidateModel, PublicationModel, ClinicalTrialModel, AnalysisRunModel, \
+            ReportModel, ConsentModel, AuditLogModel
         await conn.run_sync(Base.metadata.create_all)
 
 

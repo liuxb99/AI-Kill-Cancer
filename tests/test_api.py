@@ -52,7 +52,7 @@ class TestHealth:
         resp = client.get("/api/v1/info")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["app_name"] == "AI Kill Cancer API"
+        assert "Precision Oncology" in data["app_name"]
         assert data["mode"] == "demo"
         assert len(data["endpoints"]) > 0
 

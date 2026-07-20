@@ -3,23 +3,32 @@ import sys
 import uuid
 import pytest
 import numpy as np
-import torch
 from datetime import date
 from dataclasses import dataclass
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.models.cancer_classifier import CancerClassifier, CancerClassifierConfig
-from src.models.train import TrainingConfig
+try:
+    import torch
+    from src.models.cancer_classifier import CancerClassifier, CancerClassifierConfig
+    from src.models.train import TrainingConfig
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None
+    TORCH_AVAILABLE = False
 
 
 @pytest.fixture(scope="session")
 def device():
+    if torch is None:
+        pytest.skip("PyTorch not available")
     return torch.device("cpu")
 
 
 @pytest.fixture(scope="session")
 def classifier_config():
+    if torch is None:
+        pytest.skip("PyTorch not available")
     return CancerClassifierConfig(
         input_dim=100,
         hidden_dims=(64, 32),
@@ -33,11 +42,15 @@ def classifier_config():
 
 @pytest.fixture(scope="session")
 def classifier(classifier_config):
+    if torch is None:
+        pytest.skip("PyTorch not available")
     return CancerClassifier(classifier_config)
 
 
 @pytest.fixture(scope="session")
 def training_config():
+    if torch is None:
+        pytest.skip("PyTorch not available")
     return TrainingConfig(
         batch_size=8,
         learning_rate=1e-3,

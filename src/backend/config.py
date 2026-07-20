@@ -3,8 +3,8 @@ import logging
 
 
 class Settings:
-    APP_NAME: str = "AI Kill Cancer API"
-    APP_VERSION: str = "1.0.0"
+    APP_NAME: str = "AI-Kill-Cancer — Precision Oncology Platform"
+    APP_VERSION: str = "0.2.0"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
     # 运行模式: demo / research / production
