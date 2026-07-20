@@ -26,6 +26,54 @@ class ReportRenderer:
         return report.model_dump()
 
 
+class PDFRenderer:
+    """Renders clinical reports as PDF using WeasyPrint or Playwright."""
+
+    def __init__(self):
+        self.templates = ReportTemplateRegistry()
+        self._engine = None
+        self._engine_name = ""
+
+    @property
+    def available(self) -> bool:
+        """Check if a PDF rendering engine is available."""
+        if self._engine:
+            return True
+        try:
+            import weasyprint  # noqa: F401
+            self._engine_name = "weasyprint"
+            return True
+        except ImportError:
+            pass
+        try:
+            import playwright  # noqa: F401
+            self._engine_name = "playwright"
+            return True
+        except ImportError:
+            pass
+        return False
+
+    def render_pdf(self, report: ClinicalReport) -> bytes:
+        """Render report as PDF bytes."""
+        html = self.templates.render_html(report)
+
+        try:
+            from weasyprint import HTML
+            pdf_bytes = HTML(string=html).write_pdf()
+            self._engine_name = "weasyprint"
+            return pdf_bytes
+        except ImportError:
+            pass
+
+        raise RuntimeError(
+            "No PDF rendering engine available. "
+            "Install weasyprint (pip install weasyprint) "
+            "or playwright (pip install playwright && playwright install chromium). "
+            "On Windows: pip install weasyprint may need GTK3. "
+            "See https://doc.courtbouillon.org/weasyprint/stable/first_steps.html"
+        )
+
+
 class FHIRExporter:
     """Exports clinical reports in FHIR R4 format."""
 

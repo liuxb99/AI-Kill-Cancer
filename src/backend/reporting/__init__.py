@@ -9,7 +9,7 @@ from src.backend.reporting.builder import ReportBuilder
 from src.backend.reporting.templates import ReportTemplateRegistry
 from src.backend.reporting.validator import ReportValidator
 from src.backend.reporting.repository import ReportRepository, ClinicalReportModel
-from src.backend.reporting.renderer import ReportRenderer, FHIRExporter
+from src.backend.reporting.renderer import ReportRenderer, FHIRExporter, PDFRenderer
 
 __all__ = [
     "ReportBuilder", "ReportTemplateRegistry", "ReportValidator",

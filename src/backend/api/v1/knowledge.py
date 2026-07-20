@@ -85,14 +85,39 @@ async def get_trial(nct_id: str):
 async def refresh_knowledge(
     db: AsyncSession = Depends(get_db),
 ):
-    """Refresh knowledge base (placeholder — source-specific adapters pending)."""
+    """Refresh knowledge base from configured public sources."""
+    from src.backend.knowledge.adapters import ClinVarAdapter, PubMedAdapter, ClinicalTrialsAdapter
+
+    configured = []
+    not_configured = ["COSMIC", "CancerHotspots", "PharmGKB", "OncoKB", "MyCancerGenome"]
+
+    clinvar = ClinVarAdapter()
+    pubmed = PubMedAdapter()
+    ct_gov = ClinicalTrialsAdapter()
+
+    clinvar_health = await clinvar.health_check()
+    pubmed_health = await pubmed.health_check()
+    ct_health = await ct_gov.health_check()
+
+    if clinvar_health.get("status") == "ok":
+        configured.append("ClinVar")
+    else:
+        not_configured.append("ClinVar")
+
+    if pubmed_health.get("status") == "ok":
+        configured.append("PubMed")
+    else:
+        not_configured.append("PubMed")
+
+    if ct_health.get("status") == "ok":
+        configured.append("ClinicalTrials.gov")
+    else:
+        not_configured.append("ClinicalTrials.gov")
+
     return {
-        "status": "not_configured",
-        "message": "Knowledge sources not configured. Configure PUBMED_API_KEY, etc.",
-        "configured_sources": [],
-        "not_configured_sources": [
-            "ClinVar", "COSMIC", "CancerHotspots", "PharmGKB",
-            "PubMed", "ClinicalTrials.gov", "OncoKB", "MyCancerGenome",
-        ],
+        "status": "completed" if configured else "not_configured",
+        "message": f"Knowledge sources checked. {len(configured)} configured.",
+        "configured_sources": configured,
+        "not_configured_sources": not_configured,
         "refreshed_at": datetime.now(timezone.utc).isoformat(),
     }

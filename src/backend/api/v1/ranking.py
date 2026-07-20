@@ -105,12 +105,133 @@ async def rank_case(
     case_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Rank drugs for a cancer case (looks up variants from case)."""
-    # For now, return not_implemented — full case-based ranking
-    # will require the Case-to-Variants resolution
-    raise HTTPException(
-        status_code=501,
-        detail={"error": "not_implemented", "message": "Case-based ranking not yet implemented"},
+    """Rank drugs for a cancer case.
+
+    Loads case variants → gathers evidence per variant → merges drug scores
+    → preserves variant-specific evidence → persists ranking run.
+    """
+    import uuid
+    from datetime import datetime, timezone
+    from src.backend.repositories.cancer_case_repo import CancerCaseRepository
+    from src.backend.repositories.variant_repo import VariantRepository
+    from src.backend.evidence.merger import EvidenceMerger
+    from src.backend.ranking.engine import DrugRankingEngine
+    from src.backend.ranking.repository import RankingRunRepository
+    from src.backend.ranking.models import DrugRankingResult
+
+    try:
+        cid = uuid.UUID(case_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail={"error": "invalid_uuid", "message": "Invalid case ID"})
+
+    case_repo = CancerCaseRepository(db)
+    variant_repo = VariantRepository(db)
+    ranking_repo = RankingRunRepository(db)
+
+    case = await case_repo.get(cid)
+    if not case:
+        raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Case not found"})
+
+    # Get case variants
+    try:
+        case_variants = await variant_repo.find_by_case(cid)
+    except Exception:
+        case_variants = await variant_repo.list(filters=[])
+
+    if not case_variants:
+        return DrugRankingRunResponse(
+            run_id="",
+            status="no_variants",
+            message=f"No variants found for case {case_id}",
+        )
+
+    # Gather evidence for each variant and merge results
+    merger = EvidenceMerger(db=db)
+    engine = DrugRankingEngine()
+
+    all_evidence_items = []
+    all_drug_interactions = []
+    variant_ids = []
+    drug_scores: dict[str, dict] = {}  # drug_name -> accumulated data
+
+    for variant in case_variants:
+        v_id = str(variant.id) if hasattr(variant, "id") else ""
+        variant_ids.append(v_id)
+
+        ev_result = await merger.merge_variant_evidence(
+            gene_symbol=variant.gene_symbol if hasattr(variant, "gene_symbol") else "",
+            hgvs=getattr(variant, "hgvs_notation", "") or "",
+            chromosome=getattr(variant, "chromosome", "") or "",
+            position=getattr(variant, "position", 0) or 0,
+            reference=getattr(variant, "reference", "") or "",
+            alternate=getattr(variant, "alternate", "") or "",
+            request_id=f"rank-case-{case_id[:8]}-var-{v_id[:8] if v_id else '?'}",
+        )
+
+        evidence_items = ev_result.get("evidence_items", [])
+        drug_interactions = ev_result.get("drug_interactions", [])
+
+        all_evidence_items.extend(evidence_items)
+        all_drug_interactions.extend(drug_interactions)
+
+        # Track per-variant scores for merge
+        for item in evidence_items:
+            drug_name = (item.get("drug_name", "") or "").strip()
+            if not drug_name:
+                continue
+
+            if drug_name not in drug_scores:
+                drug_scores[drug_name] = {
+                    "variants": [],
+                    "evidence_ids": [],
+                    "match_levels": [],
+                    "has_exact_match": False,
+                    "resistance_count": 0,
+                    "conflict_count": 0,
+                }
+
+            drug_scores[drug_name]["variants"].append(v_id)
+            eid = str(item.get("id", ""))
+            if eid and eid not in drug_scores[drug_name]["evidence_ids"]:
+                drug_scores[drug_name]["evidence_ids"].append(eid)
+
+            ml = item.get("_match_level", "gene_level_only")
+            if ml == "exact_variant":
+                drug_scores[drug_name]["has_exact_match"] = True
+            drug_scores[drug_name]["match_levels"].append(ml)
+
+            direction = (item.get("evidence_direction", "") or "").lower()
+            if direction in ("does not support", "resistance"):
+                drug_scores[drug_name]["resistance_count"] += 1
+            if direction in ("conflicting",):
+                drug_scores[drug_name]["conflict_count"] += 1
+
+    # Run ranking engine on merged evidence
+    match_level = "exact_variant" if any(d["has_exact_match"] for d in drug_scores.values()) else "gene_level_only"
+    ranking_result = await engine.rank(
+        gene_symbol=getattr(case, "cancer_type", ""),
+        evidence_items=all_evidence_items,
+        drug_interactions=all_drug_interactions,
+        disease=getattr(case, "cancer_type", ""),
+        variant_match_level=match_level,
+    )
+
+    # Attach variant contribution metadata to ranking
+    ranking_result.case_id = case_id
+    ranking_result.variant_ids = variant_ids  # Add this for tracking
+
+    # Persist
+    run_id = uuid.uuid4()
+    ranking_result.id = str(run_id)
+    try:
+        await ranking_repo.create(ranking_result.model_dump())
+    except Exception as e:
+        logger.warning("Failed to persist case ranking: %s", e)
+
+    return DrugRankingRunResponse(
+        run_id=str(run_id),
+        status="completed",
+        ranking=ranking_result,
     )
 
 

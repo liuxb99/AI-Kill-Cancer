@@ -53,6 +53,7 @@ class DrugRankingResult(BaseModel):
 
     id: str = ""
     variant_id: Optional[str] = None
+    variant_ids: list[str] = []
     case_id: Optional[str] = None
     gene_symbol: Optional[str] = None
     disease: Optional[str] = None
