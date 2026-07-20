@@ -49,55 +49,103 @@ def _parse_vep_consequence(consequence: str) -> str:
 
 
 def _extract_vep_results(data: dict, region: str) -> list[dict]:
-    """Extract relevant annotation fields from VEP response."""
+    """Extract relevant annotation fields from VEP response.
+
+    Transcript selection policy (priority order):
+    1. MANE Select transcript
+    2. Canonical transcript
+    3. protein_coding biotype
+    4. Highest-impact consequence
+    5. Any other transcript
+
+    All transcript consequences are preserved in the response;
+    the "selected" transcript is marked separately.
+    """
     results = []
     for item in data if isinstance(data, list) else [data]:
-        # Get transcript consequences
         most_severe = item.get("most_severe_consequence", "")
         allele_str = item.get("allele_string", "")
         transcript_consequences = item.get("transcript_consequences", [])
 
-        # Build result entries per transcript
-        if transcript_consequences:
-            for tc in transcript_consequences:
-                result = {
-                    "region": region,
-                    "allele_string": allele_str,
-                    "gene_symbol": tc.get("gene_symbol", ""),
-                    "gene_id": tc.get("gene_id", ""),
-                    "transcript_id": tc.get("transcript_id", ""),
-                    "consequence": _parse_vep_consequence(tc.get("consequence_terms", [""])[0]) if tc.get("consequence_terms") else most_severe.lower(),
-                    "all_consequences": [c.lower() for c in tc.get("consequence_terms", [])],
-                    "hgvs_c": tc.get("hgvs_transcript", ""),
-                    "hgvs_p": tc.get("hgvs_short", ""),
-                    "protein_change": tc.get("hgvs_short", ""),
-                    "codons": tc.get("codons", ""),
-                    "amino_acids": tc.get("amino_acids", ""),
-                    "strand": tc.get("strand", 0),
-                    "biotype": tc.get("biotype", ""),
-                    "impact": tc.get("impact", ""),
-                    "exon": tc.get("exon", ""),
-                    "intron": tc.get("intron", ""),
-                    "domains": tc.get("domains", []),
-                    "sift_prediction": tc.get("sift_prediction", ""),
-                    "polyphen_prediction": tc.get("polyphen_prediction", ""),
-                }
-                results.append(result)
-        else:
-            # Intergenic or no transcript
+        # Define selection priority
+        def _transcript_priority(tc: dict) -> tuple:
+            """Return sort key for transcript selection."""
+            is_mane = 0 if tc.get("mane_select") or tc.get("mane_plus_clinical") else 1
+            is_canonical = 0 if tc.get("canonical") == 1 else 1
+            is_protein_coding = 0 if tc.get("biotype") == "protein_coding" else 1
+            impact_order = {"HIGH": 0, "MODERATE": 1, "LOW": 2, "MODIFIER": 3}
+            impact = impact_order.get(tc.get("impact", ""), 4)
+            return (is_mane, is_canonical, is_protein_coding, impact)
+
+        # Sort transcripts by priority
+        sorted_tcs = sorted(transcript_consequences, key=_transcript_priority)
+
+        # Build result entries for ALL transcripts
+        for i, tc in enumerate(sorted_tcs):
             result = {
                 "region": region,
                 "allele_string": allele_str,
-                "gene_symbol": "",
+                "gene_symbol": tc.get("gene_symbol", ""),
+                "gene_id": tc.get("gene_id", ""),
+                "transcript_id": tc.get("transcript_id", ""),
+                "protein_id": tc.get("protein_id", ""),
+                "consequence": _parse_vep_consequence(
+                    tc.get("consequence_terms", [""])[0]
+                ) if tc.get("consequence_terms") else most_severe.lower(),
+                "all_consequences": [c.lower() for c in tc.get("consequence_terms", [])],
+                "hgvs_c": tc.get("hgvs_transcript", ""),
+                "hgvs_p": tc.get("hgvs_short", ""),
+                "protein_change": tc.get("hgvs_short", ""),
+                "codons": tc.get("codons", ""),
+                "amino_acids": tc.get("amino_acids", ""),
+                "strand": tc.get("strand", 0),
+                "biotype": tc.get("biotype", ""),
+                "impact": tc.get("impact", ""),
+                "exon": tc.get("exon", ""),
+                "intron": tc.get("intron", ""),
+                "domains": tc.get("domains", []),
+                "sift_prediction": tc.get("sift_prediction", ""),
+                "polyphen_prediction": tc.get("polyphen_prediction", ""),
+                "is_mane_select": bool(tc.get("mane_select")),
+                "is_canonical": tc.get("canonical") == 1,
+                "is_selected": i == 0,  # First = highest priority
+                "selection_reason": _selection_reason(i, tc),
+            }
+            results.append(result)
+
+        # If no transcript consequences, still add an entry
+        if not transcript_consequences:
+            result = {
+                "region": region,
+                "allele_string": allele_str,
+                "gene_symbol": item.get("gene_symbol", ""),
+                "colocated_variants": item.get("colocated_variants", []),
                 "consequence": most_severe.lower() if most_severe else "intergenic_variant",
                 "all_consequences": [most_severe.lower()] if most_severe else ["intergenic_variant"],
                 "hgvs_c": "",
                 "hgvs_p": "",
                 "protein_change": "",
+                "is_selected": True,
+                "selection_reason": "no_transcript_consequences",
             }
             results.append(result)
 
     return results
+
+
+def _selection_reason(index: int, tc: dict) -> str:
+    """Return human-readable reason for transcript selection priority."""
+    if index == 0:
+        if tc.get("mane_select"):
+            return "MANE Select transcript"
+        if tc.get("mane_plus_clinical"):
+            return "MANE Plus Clinical transcript"
+        if tc.get("canonical") == 1:
+            return "Canonical transcript"
+        if tc.get("biotype") == "protein_coding":
+            return "protein_coding transcript (highest impact)"
+        return "Highest priority transcript"
+    return f"Additional transcript (priority {index + 1})"
 
 
 class VEPAdapter(BaseAdapter):

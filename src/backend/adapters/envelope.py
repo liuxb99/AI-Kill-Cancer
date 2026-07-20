@@ -20,6 +20,7 @@ class AdapterResult:
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     license: Optional[str] = None
+    metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {

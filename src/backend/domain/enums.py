@@ -126,6 +126,7 @@ class AnalysisStatusEnum(str, enum.Enum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
+    PARTIAL = "partial"
     FAILED = "failed"
     CANCELLED = "cancelled"
     NOT_CONFIGURED = "not_configured"
@@ -211,6 +212,46 @@ class VCFStatusEnum(str, enum.Enum):
     ANNOTATING = "annotating"
     ANNOTATED = "annotated"
     FAILED = "failed"
+
+
+class NormalizationMethodEnum(str, enum.Enum):
+    """Method used for variant normalization."""
+    NOT_APPLICABLE = "not_applicable"
+    MINIMAL_REPRESENTATION = "minimal_representation"
+    BCFTOOLS_CANONICAL = "bcftools_canonical"
+
+
+class NormalizationResultEnum(str, enum.Enum):
+    """Overall result of variant normalization."""
+    NOT_ATTEMPTED = "not_attempted"
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    REFERENCE_UNAVAILABLE = "reference_unavailable"
+
+
+class NormalizationSemanticsEnum(str, enum.Enum):
+    """What the normalization operation actually achieved."""
+    MINIMAL_REPRESENTATION_ONLY = "minimal_representation_only"
+    CANONICAL_WITH_REFERENCE = "canonical_with_reference"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class GenomeBuildConfidenceEnum(str, enum.Enum):
+    """Confidence level of genome build detection."""
+    EXPLICIT = "explicit"  # User-specified or sequencing test metadata
+    HEADER_CONFIRMED = "header_confirmed"  # VCF header matches explicit
+    HEADER_DETECTED = "header_detected"  # Only VCF header
+    CONTENT_DETECTED = "content_detected"  # Guessed from content
+    CONFLICT = "conflict"  # Multiple sources disagree
+    UNKNOWN = "unknown"
+
+
+class UploadDuplicateStrategyEnum(str, enum.Enum):
+    """Strategy for handling duplicate uploads."""
+    REJECT = "reject"
+    ACCEPT_NEW = "accept_new"
+    DEDUPLICATE_RETURN_EXISTING = "deduplicate_return_existing"
 
 
 class ConsentTypeEnum(str, enum.Enum):

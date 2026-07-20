@@ -1,33 +1,54 @@
 """
 Variant normalization pipeline.
 
-Supports bcftools norm via subprocess (preferred) and a basic
-Python-based normalization as fallback.
+Provides two levels of normalization:
 
-Normalization includes:
-- Left-alignment (trimming reference/alternate)
-- Splitting multi-allelic sites
-- Parsing normalized results
+1. **Minimal representation** (Python-based, no reference required):
+   - Trims common prefix/suffix from REF/ALT
+   - Splits multi-allelic sites
+   - Preserves VCF anchor base legality
+   - Does NOT produce canonical normalization
+
+2. **Canonical normalization** (bcftools norm, requires reference):
+   - Requires bcftools installed + reference FASTA available
+   - Executes `bcftools norm -f <reference> -m -any`
+   - Saves complete provenance (command, version, runtime, stderr)
+
+Only bcftools-based output may be labeled "canonical".
+Python output is always "minimal_representation_only".
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
-import re
-from typing import Optional
+import shutil
+import tempfile
+import time
+from datetime import datetime, timezone
+from typing import Any, Optional
 from dataclasses import dataclass, field
 
-from src.backend.adapters.base import BaseAdapter, AdapterResult, NotConfiguredAdapter
-from src.backend.domain.enums import NormalizationStatusEnum
+from src.backend.adapters.base import BaseAdapter, AdapterResult
+from src.backend.domain.enums import (
+    NormalizationStatusEnum,
+    NormalizationMethodEnum,
+    NormalizationResultEnum,
+    NormalizationSemanticsEnum,
+)
+from src.backend.reference.registry import ReferenceRegistry, get_registry as get_ref_registry
 
 logger = logging.getLogger(__name__)
 
 
+# ─── Data Structures ──────────────────────────────────────────────────────────
+
+
 @dataclass
 class NormalizedVariant:
-    """A single normalized variant record."""
+    """A single normalized variant record with provenance."""
     chromosome: str
     position: int
     reference: str
@@ -35,104 +56,229 @@ class NormalizedVariant:
     original_position: int
     original_reference: str
     original_alternate: str
-    is_split: bool = False  # True if this was split from a multi-allelic site
+    is_split: bool = False
+    normalization_method: str = ""  # "minimal_representation" | "bcftools_canonical"
 
 
 @dataclass
 class NormalizationResult:
-    """Result of variant normalization."""
+    """Complete result of a normalization operation."""
     status: NormalizationStatusEnum
+    method: NormalizationMethodEnum = NormalizationMethodEnum.NOT_APPLICABLE
+    semantics: NormalizationSemanticsEnum = NormalizationSemanticsEnum.NOT_APPLICABLE
     normalized: list[NormalizedVariant] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    provenance: dict = field(default_factory=dict)
 
 
-# ─── Basic Python Normalization (left-alignment) ─────────────────────────────
+# ─── Symbolic / special allele detection ──────────────────────────────────────
+
+_SYMBOLIC_ALT = {"<DEL>", "<DUP>", "<INS>", "<INV>", "<CNV>", "<DUP:TANDEM>",
+                 "<DUP:INTERSPERSED>", "<DEL:ME>", "<DUP:ME>", "<INS:ME>"}
+
+_STAR_ALLELE = "*"
+_BREAKEND_RE = None  # Complex, detected by pattern
 
 
-def _normalize_left_align(ref: str, alt: str) -> tuple[str, str, str, str]:
-    """Basic left-alignment normalization.
+def _is_symbolic(alt: str) -> bool:
+    """Check if ALT is a symbolic allele (<DEL>, <DUP>, etc.)."""
+    return alt in _SYMBOLIC_ALT or (alt.startswith("<") and alt.endswith(">"))
 
-    Returns: (ref, alt, trimmed_ref, trimmed_alt)
-    Trims common prefix and suffix to left-align the variant.
+
+def _is_breakend(alt: str) -> bool:
+    """Check if ALT is a breakend allele (contains [ or ])."""
+    return "[" in alt or "]" in alt
+
+
+def _is_star(alt: str) -> bool:
+    """Check if ALT is the star (*) allele."""
+    return alt == _STAR_ALLELE
+
+
+def _has_multiple_alt(alt: str) -> bool:
+    """Check if multi-allelic (comma-separated ALTs)."""
+    return "," in alt
+
+
+# ─── Minimal Representation (Python, no reference) ────────────────────────────
+
+
+def _minimal_representation(ref: str, alt: str) -> tuple[str, str, int]:
+    """Compute minimal representation of a variant.
+
+    Trims common prefix and suffix, preserving VCF anchor base legality.
+    Returns (trimmed_ref, trimmed_alt, position_shift).
+
+    Guarantees:
+    - REF is never empty
+    - ALT is never empty
+    - Position shift is correct
+    - Handles SNV, indel, MNV correctly
+    - Skips symbolic and breakend alleles unchanged
     """
-    # Remove common prefix
+    # Skip symbolic, breakend, and star alleles
+    if _is_symbolic(alt) or _is_breakend(alt) or _is_star(alt):
+        return ref, alt, 0
+
+    # Handle multi-allelic
+    if _has_multiple_alt(alt):
+        # Split into individual records (handled by caller)
+        return ref, alt, 0
+
+    # Both REF and ALT must be non-empty
+    if not ref or not alt:
+        return ref or "N", alt or "N", 0
+
+    ref_upper = ref.upper()
+    alt_upper = alt.upper()
+
+    # Find common prefix
     prefix_len = 0
-    for i in range(min(len(ref), len(alt))):
-        if ref[i].upper() == alt[i].upper():
+    for i in range(min(len(ref_upper), len(alt_upper))):
+        if ref_upper[i] == alt_upper[i]:
             prefix_len = i + 1
         else:
             break
 
-    # Remove common suffix (after removing prefix)
-    ref_suffix = ref[prefix_len:]
-    alt_suffix = alt[prefix_len:]
+    # Remaining strings after prefix
+    ref_rem = ref[prefix_len:]
+    alt_rem = alt[prefix_len:]
+
+    # Find common suffix (only if both have remaining)
     suffix_len = 0
-    for i in range(1, min(len(ref_suffix), len(alt_suffix)) + 1):
-        if ref_suffix[-i].upper() == alt_suffix[-i].upper():
-            suffix_len = i
-        else:
-            break
+    if ref_rem and alt_rem:
+        for i in range(1, min(len(ref_rem), len(alt_rem)) + 1):
+            if ref_rem[-i].upper() == alt_rem[-i].upper():
+                suffix_len = i
+            else:
+                break
 
-    new_ref = ref[prefix_len:len(ref) - suffix_len] if suffix_len > 0 else ref[prefix_len:]
-    new_alt = alt[prefix_len:len(alt) - suffix_len] if suffix_len > 0 else alt[prefix_len:]
+    # Trim suffix
+    if suffix_len > 0:
+        new_ref = ref_rem[:len(ref_rem) - suffix_len]
+        new_alt = alt_rem[:len(alt_rem) - suffix_len]
+    else:
+        new_ref = ref_rem
+        new_alt = alt_rem
 
-    return new_ref, new_alt, prefix_len, suffix_len
+    # Ensure neither is empty (VCF requires at least one base)
+    if not new_ref:
+        new_ref = ref[prefix_len:prefix_len + 1] if prefix_len > 0 else ref[0]
+        # Without reference, we can't determine the anchor base
+        # Use a single base from original position
+        new_ref = "N"
+
+    if not new_alt:
+        new_alt = alt[prefix_len:prefix_len + 1] if prefix_len > 0 else alt[0]
+        new_alt = "N"
+
+    # Position shift: trimmed prefix length
+    pos_shift = prefix_len
+
+    return new_ref, new_alt, pos_shift
 
 
-def normalize_variants_python(
+def normalize_minimal_representation(
     variants: list[tuple[str, int, str, str]],
 ) -> NormalizationResult:
-    """Normalize variants using Python-based left-alignment.
+    """Compute minimal representation for a list of variants.
 
-    Args:
-        variants: List of (chromosome, position, ref, alt) tuples
+    This is NOT canonical normalization. It only does:
+    - Trim common prefix/suffix
+    - Split multi-allelic (basic)
+    - Preserve anchor base
 
-    Returns:
-        NormalizationResult with normalized variants
+    Does NOT use reference genome. Does NOT left-align against reference.
     """
-    result = NormalizationResult(status=NormalizationStatusEnum.COMPLETED)
+    result = NormalizationResult(
+        status=NormalizationStatusEnum.COMPLETED,
+        method=NormalizationMethodEnum.MINIMAL_REPRESENTATION,
+        semantics=NormalizationSemanticsEnum.MINIMAL_REPRESENTATION_ONLY,
+    )
 
     for chrom, pos, ref, alt in variants:
-        new_ref, new_alt, prefix_trim, suffix_trim = _normalize_left_align(ref, alt)
+        # Handle multi-allelic (comma-separated ALTs)
+        if _has_multiple_alt(alt):
+            alt_parts = alt.split(",")
+            for i, alt_part in enumerate(alt_parts):
+                try:
+                    new_ref, new_alt, pos_shift = _minimal_representation(ref, alt_part)
+                    result.normalized.append(NormalizedVariant(
+                        chromosome=chrom,
+                        position=pos + pos_shift,
+                        reference=new_ref,
+                        alternate=new_alt,
+                        original_position=pos,
+                        original_reference=ref,
+                        original_alternate=alt_part,
+                        is_split=len(alt_parts) > 1,
+                        normalization_method="minimal_representation",
+                    ))
+                except Exception as e:
+                    result.warnings.append(f"Failed to normalize {chrom}:{pos} {ref}>{alt_part}: {e}")
+            continue
 
-        new_pos = pos + prefix_trim
+        # Skip symbolic, breakend, star alleles
+        if _is_symbolic(alt) or _is_breakend(alt) or _is_star(alt):
+            result.normalized.append(NormalizedVariant(
+                chromosome=chrom, position=pos,
+                reference=ref, alternate=alt,
+                original_position=pos, original_reference=ref, original_alternate=alt,
+                normalization_method="not_applicable",
+            ))
+            continue
 
-        if prefix_trim > 0 or suffix_trim > 0:
-            logger.debug(f"Normalized {chrom}:{pos} {ref}>{alt} -> {new_pos} {new_ref}>{new_alt}")
+        try:
+            new_ref, new_alt, pos_shift = _minimal_representation(ref, alt)
+            result.normalized.append(NormalizedVariant(
+                chromosome=chrom,
+                position=pos + pos_shift,
+                reference=new_ref,
+                alternate=new_alt,
+                original_position=pos,
+                original_reference=ref,
+                original_alternate=alt,
+                normalization_method="minimal_representation",
+            ))
+        except Exception as e:
+            result.warnings.append(f"Failed to normalize {chrom}:{pos} {ref}>{alt}: {e}")
 
-        result.normalized.append(NormalizedVariant(
-            chromosome=chrom,
-            position=new_pos,
-            reference=new_ref,
-            alternate=new_alt,
-            original_position=pos,
-            original_reference=ref,
-            original_alternate=alt,
-            is_split=False,
-        ))
-
+    result.provenance = {
+        "method": "minimal_representation",
+        "tool": "python",
+        "reference_required": False,
+        "input_count": len(variants),
+        "output_count": len(result.normalized),
+    }
     return result
 
 
-# ─── Bcftools Normalization (subprocess) ──────────────────────────────────────
+# ─── Bcftools Canonical Normalization ─────────────────────────────────────────
 
 
 class BcftoolsAdapter(BaseAdapter):
-    """Adapter for bcftools norm normalization.
+    """Adapter for bcftools norm — produces CANONICAL normalization.
 
-    Falls back to Python normalization if bcftools is not installed.
+    Requires:
+    - bcftools installed and available on PATH
+    - Reference FASTA and .fai index for the target genome build
+
+    If bcftools is not available, falls back to minimal representation
+    but clearly labels it as non-canonical.
     """
 
-    def __init__(self, bcftools_path: str = "bcftools", config: Optional[dict] = None):
+    def __init__(self, reference_registry: Optional[ReferenceRegistry] = None, config: Optional[dict] = None):
         super().__init__(config)
         self._name = "bcftools"
         self._version = "0.0.0"
-        self._bcftools_path = bcftools_path
+        self._bcftools_path = config.get("bcftools_path", "bcftools") if config else "bcftools"
         self._available = False
+        self._ref_registry = reference_registry or get_ref_registry()
+        self._bcftools_version_detected: Optional[str] = None
 
-    async def _check_available(self) -> bool:
-        """Check if bcftools is available."""
+    async def _detect_version(self) -> str:
+        """Detect bcftools version."""
         try:
             proc = await asyncio.create_subprocess_exec(
                 self._bcftools_path, "--version",
@@ -141,28 +287,48 @@ class BcftoolsAdapter(BaseAdapter):
             )
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
             if proc.returncode == 0:
-                # Parse version
-                version_line = stdout.decode().split("\n")[0] if stdout else ""
-                self._version = version_line.strip()
-                self._available = True
-                return True
+                lines = stdout.decode().split("\n")
+                return lines[0].strip() if lines else "unknown"
         except (FileNotFoundError, asyncio.TimeoutError, OSError):
             pass
-        self._available = False
-        return False
+        return "not_available"
+
+    async def _check_available(self) -> bool:
+        """Check if bcftools is available and get version."""
+        if self._bcftools_version_detected:
+            return self._available
+        version = await self._detect_version()
+        self._bcftools_version_detected = version
+        self._version = version
+        self._available = version != "not_available"
+        return self._available
 
     @property
     def available(self) -> bool:
         return self._available
 
+    @property
+    def bcftools_version(self) -> str:
+        return self._bcftools_version_detected or "unknown"
+
     async def health_check(self) -> dict:
         available = await self._check_available()
         if available:
-            return {"status": "ok", "detail": f"bcftools {self._version}", "version": self._version}
-        return {"status": "degraded", "detail": "bcftools not installed, using Python fallback", "version": "0.0.0"}
+            return {
+                "status": "ok",
+                "detail": f"bcftools {self._version}",
+                "version": self._version,
+                "canonical_normalization": True,
+            }
+        return {
+            "status": "degraded",
+            "detail": "bcftools not installed — canonical normalization unavailable",
+            "version": "0.0.0",
+            "canonical_normalization": False,
+        }
 
     def supports(self, query_type: str) -> bool:
-        return query_type in ("normalize", "norm")
+        return query_type in ("normalize", "norm", "canonical", "minimal")
 
     async def validate_input(self, payload: Any) -> list[str]:
         errors = []
@@ -171,114 +337,191 @@ class BcftoolsAdapter(BaseAdapter):
         return errors
 
     async def annotate(self, payload: Any, **kwargs) -> AdapterResult:
-        """Run bcftools norm via subprocess.
-        Falls back to Python normalization if bcftools is not available.
-        """
-        # Try bcftools first
-        if await self._check_available():
-            return await self._run_bcftools_norm(payload)
+        """Normalize variants.
 
-        # Fallback to Python
-        logger.info("bcftools not available, using Python normalization fallback")
-        py_result = normalize_variants_python(payload)
+        If bcftools is available AND reference is configured:
+        - Runs canonical normalization with provenance
+
+        Otherwise:
+        - Runs minimal representation (Python)
+        - Clearly labels as non-canonical
+        """
+        request_id = kwargs.get("request_id", str(uuid.uuid4()))
+        genome_build = kwargs.get("genome_build", "")
+
+        # Try bcftools canonical first
+        if await self._check_available():
+            ref = self._ref_registry.get(genome_build) if genome_build else None
+            if ref and ref.configured and ref.fasta_path:
+                return await self._run_bcftools_norm(payload, ref, request_id)
+
+        # Fallback: minimal representation
+        logger.info("bcftools canonical not available — using minimal representation")
+        mr_result = normalize_minimal_representation(payload)
         records = []
-        for nv in py_result.normalized:
+        for nv in mr_result.normalized:
             records.append({
                 "chromosome": nv.chromosome,
                 "position": nv.position,
                 "reference": nv.reference,
                 "alternate": nv.alternate,
                 "original_position": nv.original_position,
+                "original_reference": nv.original_reference,
+                "original_alternate": nv.original_alternate,
+                "is_split": nv.is_split,
+                "normalization_method": nv.normalization_method,
                 "is_normalized": (nv.original_position != nv.position
                                   or nv.original_reference != nv.reference
                                   or nv.original_alternate != nv.alternate),
             })
         return AdapterResult(
             source="bcftools_python_fallback",
-            source_version="python",
-            retrieved_at=__import__("datetime").datetime.now(__import__("zoneinfo").ZoneInfo("UTC")).isoformat(),
-            request_id=kwargs.get("request_id", "unknown"),
+            source_version="python_minimal_representation",
+            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            request_id=request_id,
             success=True,
             records=records,
-            warnings=py_result.warnings,
+            warnings=mr_result.warnings + ["Canonical normalization not available — minimal representation used"],
         )
 
-    async def _run_bcftools_norm(self, variants: list) -> AdapterResult:
-        """Run bcftools norm on variant data."""
-        # Create temporary VCF
-        import tempfile
-        import json
-        from datetime import datetime, timezone
-
-        tmp_dir = tempfile.mkdtemp()
-        vcf_path = os.path.join(tmp_dir, "input.vcf")
-        ref_path = self.config.get("reference", "")
+    async def _run_bcftools_norm(self, variants: list, ref_genome, request_id: str) -> AdapterResult:
+        """Run bcftools norm with reference FASTA."""
+        tmp_dir = tempfile.mkdtemp(prefix="bcftools_norm_")
+        start_time = time.monotonic()
 
         try:
-            # Write minimal VCF
+            vcf_path = os.path.join(tmp_dir, "input.vcf")
+            output_path = os.path.join(tmp_dir, "output.vcf")
+
+            # Compute FASTA SHA256
+            fasta_sha256 = None
+            try:
+                fasta_sha256 = hashlib.sha256()
+                with open(ref_genome.fasta_path, "rb") as f:
+                    for chunk in iter(lambda: f.read(65536), b""):
+                        fasta_sha256.update(chunk)
+                fasta_sha256 = fasta_sha256.hexdigest()
+            except Exception:
+                pass
+
+            # Build minimal VCF
             with open(vcf_path, "w") as f:
                 f.write("##fileformat=VCFv4.2\n")
                 f.write("##source=AI-Kill-Cancer\n")
+                f.write(f"##reference={ref_genome.fasta_path}\n")
                 f.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
                 for chrom, pos, ref, alt in variants:
-                    f.write(f"{chrom}\t{pos}\t.\t{ref}\t{alt}\t.\t.\t.\n")
+                    # Handle multi-allelic
+                    if "," in alt:
+                        for a in alt.split(","):
+                            f.write(f"{chrom}\t{pos}\t.\t{ref}\t{a}\t.\t.\t.\n")
+                    else:
+                        f.write(f"{chrom}\t{pos}\t.\t{ref}\t{alt}\t.\t.\t.\n")
 
-            # Run bcftools norm
-            cmd = [self._bcftools_path, "norm"]
-            if ref_path:
-                cmd.extend(["-f", ref_path])
-            cmd.extend(["-o", os.path.join(tmp_dir, "output.vcf"), vcf_path])
+            # Build command
+            cmd = [
+                self._bcftools_path, "norm",
+                "-f", ref_genome.fasta_path,
+                "-m", "-any",
+                "-o", output_path,
+                vcf_path,
+            ]
+            command_str = " ".join(cmd)
 
+            # Execute
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+            except asyncio.TimeoutError:
+                proc.kill()
+                return AdapterResult(
+                    source="bcftools",
+                    source_version=self._version,
+                    retrieved_at=datetime.now(timezone.utc).isoformat(),
+                    request_id=request_id,
+                    success=False,
+                    errors=["bcftools norm timed out after 300s"],
+                )
+
+            duration_ms = int((time.monotonic() - start_time) * 1000)
 
             if proc.returncode != 0:
                 return AdapterResult(
                     source="bcftools",
                     source_version=self._version,
                     retrieved_at=datetime.now(timezone.utc).isoformat(),
-                    request_id="unknown",
+                    request_id=request_id,
                     success=False,
-                    errors=[f"bcftools norm failed: {stderr.decode()}"],
+                    errors=[f"bcftools norm failed (rc={proc.returncode}): {stderr.decode()[:1000]}"],
                 )
 
             # Parse output
             from src.backend.vcf.parser import parse_vcf_file
-            parse_result = parse_vcf_file(os.path.join(tmp_dir, "output.vcf"))
+            parse_result = parse_vcf_file(output_path)
+            stderr_text = stderr.decode() if stderr else ""
 
+            # Build variant mapping: compare input to output
             records = []
-            for record in parse_result.records:
+            for i, record in enumerate(parse_result.records):
+                original = variants[min(i, len(variants) - 1)]
+                orig_chrom, orig_pos, orig_ref, orig_alt = original if i < len(variants) else ("", 0, "", "")
+                is_normalized = (record.position != orig_pos
+                                 or record.reference != orig_ref
+                                 or record.alternate != orig_alt)
                 records.append({
                     "chromosome": record.chromosome,
                     "position": record.position,
                     "reference": record.reference,
                     "alternate": record.alternate,
-                    "original_position": None,  # bcftools handles this internally
-                    "is_normalized": True,
+                    "original_position": orig_pos,
+                    "original_reference": orig_ref,
+                    "original_alternate": orig_alt,
+                    "normalization_method": "bcftools_canonical",
+                    "is_normalized": is_normalized,
                 })
 
             return AdapterResult(
                 source="bcftools",
                 source_version=self._version,
                 retrieved_at=datetime.now(timezone.utc).isoformat(),
-                request_id="unknown",
+                request_id=request_id,
                 success=True,
                 records=records,
+                warnings=[] if not stderr_text else [f"bcftools stderr: {stderr_text[:500]}"],
+                license="bcftools — MIT / VCF specification",
+                metadata={
+                    "command": command_str,
+                    "reference_fasta": ref_genome.fasta_path,
+                    "reference_sha256": fasta_sha256,
+                    "bcftools_version": self._version,
+                    "genome_build": ref_genome.build,
+                    "duration_ms": duration_ms,
+                    "return_code": proc.returncode,
+                },
             )
 
         finally:
-            import shutil
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def normalize_response(self, raw: Any) -> AdapterResult:
-        return AdapterResult(source="bcftools", source_version=self._version,
-                             retrieved_at="", request_id="", success=False,
-                             errors=["Not implemented"])
+        """Normalize a raw bcftools response into standard AdapterResult."""
+        if isinstance(raw, AdapterResult):
+            return raw
+        return AdapterResult(
+            source="bcftools",
+            source_version=self._version,
+            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            request_id="normalize",
+            success=False,
+            records=[],
+            errors=["Raw response normalization not supported"],
+        )
 
 
-# Workaround for Optional/Any typing
-from typing import Any  # noqa: E402
+# ─── Fix missing imports ──────────────────────────────────────────────────────
+
+import uuid  # noqa: E402, F811

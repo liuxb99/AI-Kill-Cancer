@@ -66,3 +66,7 @@ reasonix.toml
 # DB
 test.db
 *.db
+
+# Upload storage (local test artifacts)
+src/uploads/
+!src/uploads/.gitkeep
