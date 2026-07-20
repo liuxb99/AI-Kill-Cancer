@@ -48,21 +48,25 @@ def get_registry() -> AdapterRegistry:
 
 
 def _register_defaults(registry: AdapterRegistry) -> None:
-    """Register all adapters. In Phase 1, all are NotConfiguredAdapter stubs."""
+    """Register all adapters. Phase 2A: VEP is REST API, OpenCRAVAT not_configured."""
     from src.backend.adapters.ensembl_vep import EnsemblVEPAdapter
-    from src.backend.adapters.opencravat import OpenCRAVATAdapter
+    from src.backend.adapters.opencravat import OpenCRAVATAdapter as OpenCRAVATStub
     from src.backend.adapters.civic import CIViCAdapter
     from src.backend.adapters.dgidb import DGIdbAdapter
     from src.backend.adapters.oncotree import OncoTreeAdapter
     from src.backend.adapters.myvariant import MyVariantAdapter
     from src.backend.adapters.drkg import DRKGAdapter
     from src.backend.adapters.pharmcat import PharmCATAdapter
+    from src.backend.pipeline.vep_adapter import VEPAdapter
+    from src.backend.pipeline.opencravat_adapter import OpenCRAVATAdapter
+    from src.backend.pipeline.normalization import BcftoolsAdapter
 
-    registry.register("ensembl_vep", EnsemblVEPAdapter(name="ensembl_vep"))
-    registry.register("opencravat", OpenCRAVATAdapter(name="opencravat"))
+    registry.register("ensembl_vep", VEPAdapter())
+    registry.register("opencravat", OpenCRAVATAdapter())
     registry.register("civic", CIViCAdapter(name="civic"))
     registry.register("dgidb", DGIdbAdapter(name="dgidb"))
     registry.register("oncotree", OncoTreeAdapter(name="oncotree"))
     registry.register("myvariant", MyVariantAdapter(name="myvariant"))
     registry.register("drkg", DRKGAdapter(name="drkg"))
     registry.register("pharmcat", PharmCATAdapter(name="pharmcat"))
+    registry.register("bcftools", BcftoolsAdapter())

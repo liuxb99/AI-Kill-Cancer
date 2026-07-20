@@ -76,7 +76,13 @@ class TestAdapterRegistry:
     def test_default_registry_has_all_adapters(self):
         registry = get_registry()
         listing = registry.list()
-        expected = ["ensembl_vep", "opencravat", "civic", "dgidb", "oncotree", "myvariant", "drkg", "pharmcat"]
+        expected = ["ensembl_vep", "opencravat", "civic", "dgidb", "oncotree", "myvariant", "drkg", "pharmcat", "bcftools"]
         for name in expected:
             assert name in listing, f"Missing adapter: {name}"
-            assert listing[name]["configured"] is False
+        # VEP and bcftools are configured in Phase 2A
+        # OpenCRAVAT is configured (adapter pattern exists but returns unavailable)
+        assert listing["ensembl_vep"]["configured"] is True
+        assert listing["bcftools"]["configured"] is True
+        # CIViC, DGIdb, OncoTree, MyVariant, DRKG, PharmCAT remain not_configured
+        for name in ["civic", "dgidb", "oncotree", "myvariant", "drkg", "pharmcat"]:
+            assert listing[name]["configured"] is False, f"{name} should not be configured"

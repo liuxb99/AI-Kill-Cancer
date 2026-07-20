@@ -10,6 +10,7 @@ from src.backend.api.v1.sequencing import router as sequencing_router
 from src.backend.api.v1.uploads import router as uploads_router
 from src.backend.api.v1.variants import router as variants_router
 from src.backend.api.v1.analyses import router as analyses_router
+from src.backend.api.v1.upload_vcf import router as upload_vcf_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -20,3 +21,4 @@ router.include_router(sequencing_router)
 router.include_router(uploads_router)
 router.include_router(variants_router)
 router.include_router(analyses_router)
+router.include_router(upload_vcf_router)

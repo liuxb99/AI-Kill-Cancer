@@ -14,6 +14,7 @@ from sqlalchemy.orm import relationship
 
 from src.backend.database.models import CompatUUID, Base as DBBase
 from src.backend.domain.enums import (
+    ConsequenceEnum,
     DriverStatusEnum,
     NormalizationStatusEnum,
     OncogenicityEnum,
@@ -54,6 +55,18 @@ class VariantModel(DBBase):
     source_record_id = Column(String(256), nullable=True)
     annotation_version = Column(String(64), nullable=True)
     normalization_status = Column(SAEnum(NormalizationStatusEnum), default=NormalizationStatusEnum.PENDING, nullable=False)
+    consequence = Column(SAEnum(ConsequenceEnum), nullable=True, comment="Most severe SO consequence")
+    protein_change = Column(String(128), nullable=True, comment="Protein change e.g. p.Val600Glu")
+    dbsnp_id = Column(String(32), nullable=True, index=True, comment="dbSNP rs ID")
+    clinvar_id = Column(String(32), nullable=True, comment="ClinVar variation ID")
+    cosmic_id = Column(String(32), nullable=True, comment="COSMIC mutation ID")
+    af = Column(Float, nullable=True, comment="Allele frequency from 1KG")
+    gnomad_af = Column(Float, nullable=True, comment="gnomAD allele frequency")
+    annotation_source = Column(String(64), nullable=True, comment="Source of annotation e.g. VEP, OpenCRAVAT")
+    original_vcf_line = Column(String(1024), nullable=True, comment="Original VCF line before normalization")
+    original_vcf_position = Column(Integer, nullable=True, comment="Original position before normalization")
+    original_vcf_reference = Column(String(256), nullable=True, comment="Original ref before normalization")
+    original_vcf_alternate = Column(String(256), nullable=True, comment="Original alt before normalization")
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -80,6 +93,13 @@ class VariantImport(BaseModel):
     hgvs_g: Optional[str] = Field(None, max_length=256)
     hgvs_c: Optional[str] = Field(None, max_length=256)
     hgvs_p: Optional[str] = Field(None, max_length=256)
+    protein_change: Optional[str] = Field(None, max_length=128)
+    consequence: Optional[ConsequenceEnum] = None
+    dbsnp_id: Optional[str] = Field(None, max_length=32)
+    clinvar_id: Optional[str] = Field(None, max_length=32)
+    cosmic_id: Optional[str] = Field(None, max_length=32)
+    af: Optional[float] = None
+    gnomad_af: Optional[float] = None
     vaf: Optional[float] = None
     read_depth: Optional[int] = None
     origin: VariantOriginEnum = VariantOriginEnum.UNKNOWN
@@ -88,6 +108,8 @@ class VariantImport(BaseModel):
     driver_status: DriverStatusEnum = DriverStatusEnum.UNKNOWN
     zygosity: ZygosityEnum = ZygosityEnum.UNKNOWN
     source_record_id: Optional[str] = Field(None, max_length=256)
+    annotation_source: Optional[str] = Field(None, max_length=64)
+    original_vcf_line: Optional[str] = Field(None, max_length=1024)
 
 
 class VariantImportBatch(BaseModel):
@@ -111,6 +133,13 @@ class VariantResponse(BaseModel):
     hgvs_g: Optional[str] = None
     hgvs_c: Optional[str] = None
     hgvs_p: Optional[str] = None
+    protein_change: Optional[str] = None
+    consequence: Optional[str] = None
+    dbsnp_id: Optional[str] = None
+    clinvar_id: Optional[str] = None
+    cosmic_id: Optional[str] = None
+    af: Optional[float] = None
+    gnomad_af: Optional[float] = None
     vaf: Optional[float] = None
     read_depth: Optional[int] = None
     origin: str
@@ -119,6 +148,7 @@ class VariantResponse(BaseModel):
     driver_status: str
     zygosity: str
     normalization_status: str
+    annotation_source: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

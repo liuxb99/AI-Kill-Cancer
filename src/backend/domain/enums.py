@@ -168,6 +168,51 @@ class AnalysisResultTypeEnum(str, enum.Enum):
     PROTEIN = "protein"
 
 
+class ConsequenceEnum(str, enum.Enum):
+    """Sequence Ontology (SO) consequence terms for variant annotation."""
+    MISSENSE_VARIANT = "missense_variant"
+    NONSENSE_VARIANT = "nonsense_variant"
+    SYNONYMOUS_VARIANT = "synonymous_variant"
+    FRAMESHIFT_VARIANT = "frameshift_variant"
+    STOP_GAINED = "stop_gained"
+    STOP_LOST = "stop_lost"
+    START_LOST = "start_lost"
+    SPLICE_ACCEPTOR = "splice_acceptor"
+    SPLICE_DONOR = "splice_donor"
+    SPLICE_REGION = "splice_region"
+    INFRAME_INSERTION = "inframe_insertion"
+    INFRAME_DELETION = "inframe_deletion"
+    PROTEIN_ALTERING = "protein_altering"
+    INTRON_VARIANT = "intron_variant"
+    UPSTREAM_GENE = "upstream_gene"
+    DOWNSTREAM_GENE = "downstream_gene"
+    UTR_VARIANT = "UTR_variant"
+    NON_CODING_TRANSCRIPT = "non_coding_transcript"
+    INTERGENIC_VARIANT = "intergenic_variant"
+    REGULATORY_REGION = "regulatory_region"
+    TF_BINDING_SITE = "TF_binding_site"
+    FEATURE_ELONGATION = "feature_elongation"
+    FEATURE_TRUNCATION = "feature_truncation"
+    CODING_SEQUENCE = "coding_sequence"
+    MATURE_MIRNA = "mature_miRNA"
+    NMD_TRANSCRIPT = "NMD_transcript"
+    NO_CONSEQUENCE = "no_consequence"
+    OTHER = "other"
+
+
+class VCFStatusEnum(str, enum.Enum):
+    """Status of VCF file processing."""
+    UPLOADED = "uploaded"
+    VALIDATING = "validating"
+    VALID = "valid"
+    INVALID = "invalid"
+    NORMALIZING = "normalizing"
+    NORMALIZED = "normalized"
+    ANNOTATING = "annotating"
+    ANNOTATED = "annotated"
+    FAILED = "failed"
+
+
 class ConsentTypeEnum(str, enum.Enum):
     RESEARCH = "research"
     CLINICAL = "clinical"
