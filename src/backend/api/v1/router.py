@@ -14,6 +14,7 @@ from src.backend.api.v1.upload_vcf import router as upload_vcf_router
 from src.backend.api.v1.evidence import router as evidence_router
 from src.backend.api.v1.ranking import router as ranking_router
 from src.backend.api.v1.knowledge import router as knowledge_router
+from src.backend.api.v1.reasoning import router as reasoning_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -28,3 +29,4 @@ router.include_router(upload_vcf_router)
 router.include_router(evidence_router)
 router.include_router(ranking_router)
 router.include_router(knowledge_router)
+router.include_router(reasoning_router)
