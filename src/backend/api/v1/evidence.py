@@ -1,10 +1,11 @@
 """
-Evidence API routes — query clinical evidence from CIViC, DGIdb.
+Evidence API routes — query clinical evidence from CIViC, DGIdb with persistence.
 
 Provides:
-- GET /api/v1/evidence/variant/{id}
-- GET /api/v1/evidence/gene/{symbol}
-- POST /api/v1/evidence/refresh
+- GET  /api/v1/evidence/variant/{id}        — variant evidence (cache-first, refresh on miss)
+- GET  /api/v1/evidence/gene/{symbol}        — gene evidence (cache-first, refresh on miss)
+- POST /api/v1/evidence/refresh              — full refresh: query all sources, merge, persist
+- POST /api/v1/evidence/cache/invalidate      — clear in-memory cache only
 """
 
 from __future__ import annotations
@@ -15,11 +16,18 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.backend.database.session import get_db
 from src.backend.evidence.merger import EvidenceMerger
 from src.backend.evidence.cache import gene_cache, variant_cache
-from src.backend.evidence.domain import EvidenceVariantResponse, EvidenceGeneResponse, EvidenceRefreshResponse, EvidenceItemResponse, DrugInteractionResponse
+from src.backend.evidence.domain import (
+    EvidenceVariantResponse, EvidenceGeneResponse,
+    EvidenceRefreshResponse, EvidenceCacheInvalidateResponse,
+    EvidenceItemResponse, DrugInteractionResponse,
+)
 from src.backend.repositories.variant_repo import VariantRepository
+from src.backend.repositories.knowledge_source_repo import KnowledgeSourceRepository
 from src.backend.api.v1.deps import get_variant_repo
 
 logger = logging.getLogger(__name__)
@@ -37,6 +45,9 @@ def _to_item_response(item: dict) -> EvidenceItemResponse:
         evidence_type=item.get("evidence_type", ""),
         evidence_direction=item.get("evidence_direction", ""),
         evidence_level=item.get("evidence_level", ""),
+        source_native_level=item.get("source_native_level", item.get("evidence_level", "")),
+        match_level=item.get("_match_level", "gene_level_only"),
+        conflict_status=item.get("_conflict_status", "not_evaluable"),
         clinical_significance=item.get("clinical_significance", ""),
         description=item.get("description", ""),
         citation=item.get("citation", ""),
@@ -62,6 +73,7 @@ def _to_interaction_response(item: dict) -> DrugInteractionResponse:
 async def get_variant_evidence(
     variant_id: str,
     repo: VariantRepository = Depends(get_variant_repo),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get clinical evidence for a variant by its internal variant ID."""
     try:
@@ -79,9 +91,11 @@ async def get_variant_evidence(
     if cached:
         return EvidenceVariantResponse(**cached)
 
-    merger = EvidenceMerger()
+    # Query sources with persistence
+    merger = EvidenceMerger(db=db)
     result = await merger.merge_variant_evidence(
         gene_symbol=variant.gene_symbol,
+        hgvs=variant.hgvs_notation or "",
         chromosome=variant.chromosome,
         position=variant.position,
         reference=variant.reference,
@@ -97,6 +111,7 @@ async def get_variant_evidence(
         evidence_count=result.get("evidence_count", 0),
         drug_count=result.get("drug_count", 0),
         highest_evidence_level=result.get("highest_evidence_level"),
+        match_level=result.get("match_level", "gene_level_only"),
         retrieved_at=result.get("retrieved_at", datetime.now(timezone.utc).isoformat()),
     )
 
@@ -105,14 +120,17 @@ async def get_variant_evidence(
 
 
 @router.get("/gene/{gene_symbol}", response_model=EvidenceGeneResponse)
-async def get_gene_evidence(gene_symbol: str):
+async def get_gene_evidence(
+    gene_symbol: str,
+    db: AsyncSession = Depends(get_db),
+):
     """Get clinical evidence for a gene symbol."""
     cache_key = f"gene:{gene_symbol.upper()}"
     cached = gene_cache.get(cache_key)
     if cached:
         return EvidenceGeneResponse(**cached)
 
-    merger = EvidenceMerger()
+    merger = EvidenceMerger(db=db)
     result = await merger.merge_gene_evidence(
         gene_symbol=gene_symbol,
         request_id=f"api-gene-{gene_symbol}",
@@ -132,17 +150,74 @@ async def get_gene_evidence(gene_symbol: str):
 
 
 @router.post("/refresh", response_model=EvidenceRefreshResponse)
-async def refresh_evidence():
-    """Invalidate all cached evidence and return status."""
+async def refresh_evidence(db: AsyncSession = Depends(get_db)):
+    """
+    Full evidence refresh: query all sources, merge, persist to DB,
+    invalidate caches, return summary.
+    """
     started = datetime.now(timezone.utc)
+    merger = EvidenceMerger(db=db)
+    errors = []
+    sources_updated = []
+    total_evidence = 0
+    total_interactions = 0
+
+    # Query common cancer genes
+    cancer_genes = ["BRAF", "EGFR", "KRAS", "NRAS", "PIK3CA", "TP53", "ERBB2",
+                     "ALK", "ROS1", "RET", "MET", "NTRK1", "IDH1", "IDH2",
+                     "BRCA1", "BRCA2", "KIT", "PDGFRA", "FGFR1", "FGFR2",
+                     "FGFR3", "AR", "ESR1", "MYC", "CTNNB1", "CDKN2A", "PTEN",
+                     "NF1", "RB1", "SMAD4", "STK11", "TERT", "AKT1", "CTCF",
+                     "FOXA1", "GATA3", "MAP2K1", "MAP2K2", "NOTCH1", "SF3B1",
+                     "U2AF1", "DNMT3A", "NPM1", "FLT3", "CEBPA", "RUNX1",
+                     "ASXL1", "EZH2", "IDH1", "IDH2", "JAK2", "MPL", "CALR",
+                     "BCR", "ABL1", "JAK3", "IL7R", "PHF6", "WT1", "PTPN11"]
+
+    total = len(cancer_genes)
+    for i, gene in enumerate(cancer_genes):
+        try:
+            result = await merger.refresh_all(
+                gene_symbol=gene,
+                request_id=f"refresh-batch-{i}",
+            )
+            if result.get("evidence_count", 0) > 0:
+                total_evidence += result.get("evidence_count", 0)
+            if result.get("drug_count", 0) > 0:
+                total_interactions += result.get("drug_count", 0)
+            if result.get("errors"):
+                errors.extend(result["errors"])
+        except Exception as e:
+            errors.append(f"Failed to refresh {gene}: {e}")
+            logger.warning("Refresh error for %s: %s", gene, e)
+
+    sources_updated = ["civic", "dgidb"] if not errors else ["civic", "dgidb", "partial"]
+
+    # Invalidate caches
     gene_cache.clear()
     variant_cache.clear()
+
     finished = datetime.now(timezone.utc)
 
     return EvidenceRefreshResponse(
-        status="completed",
-        sources_updated=["gene_cache", "variant_cache"],
-        total_evidence=gene_cache.size + variant_cache.size,
+        status="completed" if not errors else "completed_with_errors",
+        sources_updated=sources_updated,
+        total_evidence=total_evidence,
+        total_interactions=total_interactions,
+        errors=errors[:20],  # Limit error reporting
         started_at=started.isoformat(),
         finished_at=finished.isoformat(),
+    )
+
+
+@router.post("/cache/invalidate", response_model=EvidenceCacheInvalidateResponse)
+async def invalidate_evidence_cache():
+    """Invalidate in-memory evidence cache only. Does not query sources."""
+    cleared = datetime.now(timezone.utc)
+    gene_cache.clear()
+    variant_cache.clear()
+
+    return EvidenceCacheInvalidateResponse(
+        status="completed",
+        cache_type="gene_cache,variant_cache",
+        cleared_at=cleared.isoformat(),
     )

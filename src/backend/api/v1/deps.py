@@ -17,6 +17,9 @@ from src.backend.repositories import (
     AnalysisRunRepository,
     ReportRepository,
 )
+from src.backend.repositories.knowledge_source_repo import KnowledgeSourceRepository
+from src.backend.repositories.evidence_item_repo import EvidenceItemRepository
+from src.backend.repositories.drug_interaction_repo import DrugInteractionRepository
 
 
 async def get_patient_repo(db: AsyncSession = Depends(get_db)) -> PatientRepository:
@@ -57,3 +60,15 @@ async def get_analysis_run_repo(db: AsyncSession = Depends(get_db)) -> AnalysisR
 
 async def get_report_repo(db: AsyncSession = Depends(get_db)) -> ReportRepository:
     return ReportRepository(db)
+
+
+async def get_knowledge_source_repo(db: AsyncSession = Depends(get_db)) -> KnowledgeSourceRepository:
+    return KnowledgeSourceRepository(db)
+
+
+async def get_evidence_item_repo(db: AsyncSession = Depends(get_db)) -> EvidenceItemRepository:
+    return EvidenceItemRepository(db)
+
+
+async def get_drug_interaction_repo(db: AsyncSession = Depends(get_db)) -> DrugInteractionRepository:
+    return DrugInteractionRepository(db)
