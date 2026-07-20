@@ -9,7 +9,6 @@ In-memory registry serves as runtime cache only.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 import uuid
@@ -18,11 +17,9 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.domain.analysis_run import AnalysisRunModel
-from src.backend.domain.enums import AnalysisStatusEnum, NormalizationStatusEnum, NormalizationMethodEnum, NormalizationSemanticsEnum
-from src.backend.pipeline.normalization import BcftoolsAdapter, NormalizedVariant, normalize_minimal_representation
+from src.backend.domain.enums import AnalysisStatusEnum
+from src.backend.pipeline.normalization import BcftoolsAdapter, NormalizedVariant
 from src.backend.pipeline.vep_adapter import VEPAdapter
-from src.backend.pipeline.opencravat_adapter import OpenCRAVATAdapter
 from src.backend.repositories.analysis_run_repo import AnalysisRunRepository
 
 logger = logging.getLogger(__name__)

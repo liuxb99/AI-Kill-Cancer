@@ -21,8 +21,6 @@ import gzip
 import hashlib
 import logging
 import os
-import shutil
-import tempfile
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -30,13 +28,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.config import settings
 from src.backend.database.session import get_db
 from src.backend.domain.enums import (
     FileTypeEnum, GenomeBuildConfidenceEnum,
     UploadStatusEnum, ValidationStatusEnum, UploadEligibilityEnum,
 )
-from src.backend.domain.uploaded_file import UploadedFileCreate, UploadedFileResponse
 from src.backend.repositories.uploaded_file_repo import UploadedFileRepository
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.vcf.validator import validate_vcf_streaming
@@ -385,7 +381,7 @@ async def upload_vcf(
                     "message": "A file with the same SHA256 already exists for this sequencing test",
                     "existing_upload_id": str(same_test[0].id),
                 })
-        warnings.append(f"Duplicate SHA256: another upload with same content exists")
+        warnings.append("Duplicate SHA256: another upload with same content exists")
 
     # ── Resolve storage (dedup blob) ──────────────────────────────────
     storage_path_rel = safe_name  # Relative path only

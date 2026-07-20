@@ -185,7 +185,7 @@ def _parse_data_line(line: str, sample_ids: list[str]) -> Optional[VCFRecord]:
             sample_values=sample_vals,
             raw_line=line,
         )
-    except (ValueError, IndexError) as e:
+    except (ValueError, IndexError):
         return None
 
 

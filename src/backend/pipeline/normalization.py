@@ -35,7 +35,6 @@ from src.backend.adapters.base import BaseAdapter, AdapterResult
 from src.backend.domain.enums import (
     NormalizationStatusEnum,
     NormalizationMethodEnum,
-    NormalizationResultEnum,
     NormalizationSemanticsEnum,
 )
 from src.backend.reference.registry import ReferenceRegistry, get_registry as get_ref_registry
