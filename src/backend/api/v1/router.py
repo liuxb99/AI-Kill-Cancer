@@ -16,6 +16,7 @@ from src.backend.api.v1.ranking import router as ranking_router
 from src.backend.api.v1.knowledge import router as knowledge_router
 from src.backend.api.v1.reasoning import router as reasoning_router
 from src.backend.api.v1.reports import router as reports_router
+from src.backend.api.v1.workbench import router as workbench_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -32,3 +33,4 @@ router.include_router(ranking_router)
 router.include_router(knowledge_router)
 router.include_router(reasoning_router)
 router.include_router(reports_router)
+router.include_router(workbench_router)
