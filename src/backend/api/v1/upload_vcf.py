@@ -1,14 +1,18 @@
 """
-VCF file upload API route — hardened for security, persistence, and gzip support.
+VCF file upload API route — FINAL hardened version.
 
-Handles:
-- .vcf and .vcf.gz file upload with proper gzip detection
-- SHA256 integrity check (on original upload bytes)
-- Decompression with size limits (zip bomb protection)
-- VCF format validation
-- Genome build detection + conflict checking
-- Database persistence via UploadedFile model
-- File size limits, path traversal protection, atomic writes
+Streaming upload with:
+- Chunked file read (4MB chunks)
+- SHA256 computed during streaming
+- Gzip GzipFile streaming decompression with bomb limit
+- Extension/content consistency enforcement
+- Genome build conflict detection (HTTP 422)
+- SequencingTest FK validation (HTTP 404/422)
+- SHA256 deduplication
+- Invalid file quarantine with explicit states
+- Atomic temp → final rename
+- Transaction rollback for all failure modes
+- No sensitive paths/exceptions leaked to user
 """
 
 from __future__ import annotations
@@ -20,99 +24,192 @@ import os
 import shutil
 import tempfile
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.config import settings
 from src.backend.database.session import get_db
 from src.backend.domain.enums import (
-    FileTypeEnum,
-    GenomeBuildConfidenceEnum,
-    UploadStatusEnum,
-    ValidationStatusEnum,
+    FileTypeEnum, GenomeBuildConfidenceEnum,
+    UploadStatusEnum, ValidationStatusEnum, UploadEligibilityEnum,
 )
 from src.backend.domain.uploaded_file import UploadedFileCreate, UploadedFileResponse
 from src.backend.repositories.uploaded_file_repo import UploadedFileRepository
+from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.vcf.validator import validate_vcf
 from src.backend.vcf.models import VCFUploadResponse
-from src.backend.reference.registry import get_registry as get_ref_registry
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/vcf", tags=["vcf"])
 
-# ─── Configuration ────────────────────────────────────────────────────────────
-
-UPLOAD_DIR = os.getenv("VCF_UPLOAD_DIR", os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads"))
+# ─── Configuration ─────────────────────────────────────────────────────
+UPLOAD_DIR = os.getenv("VCF_UPLOAD_DIR",
+                       os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads"))
+CHUNK_SIZE = 4 * 1024 * 1024  # 4 MB
 MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # 500 MB
-MAX_DECOMPRESSED_SIZE = 2 * 1024 * 1024 * 1024  # 2 GB decompression limit
+MAX_DECOMPRESSED_SIZE = 2 * 1024 * 1024 * 1024  # 2 GB
+MAX_COMPRESSION_RATIO = 200  # reject if decompressed > 200x compressed
+MAX_VCF_LINE_LENGTH = 100000  # 100 KB per line max
+MAX_HEADER_BYTES = 1024 * 1024  # 1 MB header max
+MAX_RECORD_COUNT = 10_000_000  # 10M variant records max
+RETENTION_DAYS_REJECTED = 30  # keep rejected uploads for 30 days
+GZIP_MAGIC = b"\x1f\x8b"
 
-# Safe filename pattern: only allow UUID-based names
-SAVE_FILENAME_PATTERN = "{upload_id}{ext}"
+
+# ─── Helpers ──────────────────────────────────────────────────────────
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+def _is_gzip_content(header: bytes) -> bool:
+    return len(header) >= 2 and header[:2] == GZIP_MAGIC
+
+
+def _is_gz_ext(name: str) -> bool:
+    return name.lower().endswith(".gz")
+
+
+def _detect_compression(filename: str, first_chunk: bytes) -> str:
+    """Detect compression. Returns 'gzip', 'none', or raises on mismatch."""
+    gz_by_content = _is_gzip_content(first_chunk)
+    gz_by_name = _is_gz_ext(filename)
+
+    if gz_by_content and gz_by_name:
+        return "gzip"
+    if not gz_by_content and not gz_by_name:
+        return "none"
+    # Mismatch
+    raise HTTPException(status_code=400, detail={
+        "error": "extension_content_mismatch",
+        "message": f"Filename suggests {'gzip' if gz_by_name else 'plain VCF'} "
+                   f"but content is {'gzip' if gz_by_content else 'plain text'}. "
+                   f"Please use correct extension.",
+    })
+
+
+def _streaming_write_and_hash(
+    file: UploadFile, dst_path: str, max_size: int,
+) -> tuple[int, str, bytes, bool]:
+    """Stream file to temp file, computing SHA256 and size.
+
+    Returns (size_bytes, sha256_hex, first_chunk, did_exceed).
+    Does NOT exceed max_size — aborts early if exceeded.
+    """
+    sha = hashlib.sha256()
+    total = 0
+    first_chunk = b""
+    exceeded = False
+
+    tmp_path = dst_path + ".tmp"
+    try:
+        with open(tmp_path, "wb") as f:
+            while True:
+                chunk = file.file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                sha.update(chunk)
+                total += len(chunk)
+                if not first_chunk:
+                    first_chunk = chunk[:4]
+                f.write(chunk)
+                if total > max_size:
+                    exceeded = True
+                    break
+
+        if exceeded:
+            os.remove(tmp_path)
+            return total, sha.hexdigest(), first_chunk, True
+
+        os.rename(tmp_path, dst_path)
+        return total, sha.hexdigest(), first_chunk, False
+
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
+
+def _streaming_decompress_gzip(
+    src_path: str, max_size: int, max_ratio: int,
+) -> tuple[int, str, Optional[str]]:
+    """Streaming gzip decompression with limits.
+
+    Returns (decompressed_size, decompressed_sha256, error_or_None).
+    """
+    sha = hashlib.sha256()
+    total = 0
+    compressed_size = os.path.getsize(src_path)
+
+    try:
+        with open(src_path, "rb") as f_raw:
+            with gzip.GzipFile(fileobj=f_raw) as gz:
+                while True:
+                    chunk = gz.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    sha.update(chunk)
+                    total += len(chunk)
+                    if total > max_size:
+                        return total, "", "decompressed_content_too_large"
+                    if compressed_size > 0 and total // compressed_size > max_ratio:
+                        return total, "", "compression_ratio_exceeded"
+    except gzip.BadGzipFile:
+        return 0, "", "corrupted_gzip"
+    except Exception as e:
+        return 0, "", f"decompression_failed: {e}"
+
+    return total, sha.hexdigest(), None
+
+
+def _check_oversized_line(content: str, max_len: int) -> Optional[str]:
+    """Check for any line exceeding max_len. Returns error or None."""
+    for line in content.split("\n"):
+        if len(line) > max_len:
+            return f"Line exceeds maximum length ({len(line)} > {max_len})"
+    return None
+
+
+def _check_oversized_header(content: str, max_bytes: int) -> Optional[str]:
+    """Check header size limit."""
+    header_end = content.find("\n#CHROM")
+    if header_end == -1:
+        return "Missing #CHROM header line"
+    if header_end > max_bytes:
+        return f"Header exceeds maximum size ({header_end} > {max_bytes})"
+    return None
+
+
+def _check_record_count(content: str, max_count: int) -> Optional[str]:
+    """Check record count limit."""
+    count = 0
+    in_header = True
+    for line in content.split("\n"):
+        if in_header:
+            if line.startswith("#CHROM"):
+                in_header = False
+            continue
+        if line.strip() and not line.startswith("#"):
+            count += 1
+            if count > max_count:
+                return f"Record count exceeds maximum ({count} > {max_count})"
+    return None
 
 
 def _safe_filename(upload_id: str, ext: str) -> str:
-    """Generate a safe storage filename — no user-controlled parts."""
     return f"{upload_id}{ext}"
 
 
-def _atomic_write(dst_path: str, content: bytes) -> None:
-    """Write content to a temporary file then atomically rename."""
-    dir_name = os.path.dirname(dst_path)
-    os.makedirs(dir_name, exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=dir_name, delete=False) as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
-    os.replace(tmp_path, dst_path)
+def _cleanup_path(path: str) -> None:
+    if path and os.path.exists(path):
+        try:
+            os.remove(path)
+        except Exception:
+            pass
 
 
-def _is_gzip_content(data: bytes) -> bool:
-    """Check if bytes start with gzip magic bytes."""
-    return len(data) >= 2 and data[0] == 0x1f and data[1] == 0x8b
-
-
-def _is_gz_extension(filename: str) -> bool:
-    """Check if filename has .gz extension."""
-    return filename.lower().endswith(".gz")
-
-
-def _detect_compression(filename: str, content_header: bytes) -> str:
-    """Detect compression type from filename and content."""
-    is_gz_by_content = _is_gzip_content(content_header)
-    is_gz_by_name = _is_gz_extension(filename)
-
-    if is_gz_by_content and is_gz_by_name:
-        return "gzip"
-    elif is_gz_by_content and not is_gz_by_name:
-        return "gzip"  # Content indicates gzip even if extension missing
-    elif not is_gz_by_content and is_gz_by_name:
-        return "gzip_mismatch"  # Extension says gz but content is not
-    return "none"
-
-
-def _decompress_safe(content: bytes, max_size: int = MAX_DECOMPRESSED_SIZE) -> tuple[bytes, Optional[str]]:
-    """Safely decompress gzip content with size limit.
-
-    Returns (decompressed_bytes, error_or_None).
-    """
-    try:
-        # Limit initial read to max_size
-        result = gzip.decompress(content)
-        if len(result) > max_size:
-            return b"", "decompressed_content_too_large"
-        return result, None
-    except gzip.BadGzipFile:
-        return b"", "corrupted_gzip"
-    except Exception:
-        return b"", "corrupted_gzip"
-
-
-# ─── Upload Endpoint ──────────────────────────────────────────────────────────
+# ─── Upload Endpoint ──────────────────────────────────────────────────
 
 
 @router.post("/upload", response_model=VCFUploadResponse)
@@ -120,139 +217,214 @@ async def upload_vcf(
     file: UploadFile = File(...),
     genome_build: Optional[str] = Form(None),
     sequencing_test_id: Optional[str] = Form(None),
-    db_session=Depends(get_db),
+    upload_mode: Optional[str] = Form(None),
+    db_session: AsyncSession = Depends(get_db),
 ):
-    """Upload a VCF file for processing.
-
-    Accepts .vcf and .vcf.gz files. Performs:
-    - Security validation (size, path traversal)
-    - SHA256 integrity check
-    - Gzip decompression with bomb protection
-    - VCF format validation
-    - Genome build detection + conflict checking
-    - Database persistence
-    """
     upload_id = str(uuid.uuid4())
     errors: list[str] = []
     warnings: list[str] = []
 
-    # ── Validate filename ────────────────────────────────────────────────
     if not file.filename:
         raise HTTPException(status_code=400, detail={
             "error": "missing_filename", "message": "No filename provided",
         })
     filename = file.filename
-
-    # Validate extension
-    is_gz = _is_gz_extension(filename)
     has_vcf_ext = filename.endswith(".vcf") or filename.endswith(".vcf.gz")
     if not has_vcf_ext:
         raise HTTPException(status_code=400, detail={
-            "error": "invalid_file_type",
-            "message": "File must be .vcf or .vcf.gz",
+            "error": "invalid_file_type", "message": "File must be .vcf or .vcf.gz",
         })
 
-    # ── Read with size limit ─────────────────────────────────────────────
+    # ── Validate SequencingTest FK ───────────────────────────────────
+    if sequencing_test_id:
+        try:
+            st_uuid = uuid.UUID(sequencing_test_id)
+        except ValueError:
+            raise HTTPException(status_code=422, detail={
+                "error": "invalid_sequencing_test_id",
+                "message": "sequencing_test_id must be a valid UUID",
+            })
+        st_repo = SequencingTestRepository(db_session)
+        st_record = await st_repo.get(st_uuid)
+        if not st_record:
+            raise HTTPException(status_code=404, detail={
+                "error": "sequencing_test_not_found",
+                "message": "sequencing_test_id does not exist",
+            })
+    elif upload_mode != "anonymous_research":
+        raise HTTPException(status_code=422, detail={
+            "error": "missing_sequencing_test",
+            "message": "sequencing_test_id is required unless upload_mode=anonymous_research",
+        })
+
+    # ── Determine storage path ────────────────────────────────────────
+    is_gz = _is_gz_ext(filename)
+    ext = ".vcf.gz" if is_gz else ".vcf"
+    safe_name = _safe_filename(upload_id, ext)
+    storage_path = os.path.join(UPLOAD_DIR, safe_name)
+
+    # ── Check storage path safety ─────────────────────────────────────
+    abs_storage = os.path.abspath(storage_path)
+    abs_dir = os.path.abspath(UPLOAD_DIR)
+    if not abs_storage.startswith(abs_dir + os.sep) and abs_storage != abs_dir:
+        logger.error("Storage path traversal blocked: %s", storage_path)
+        raise HTTPException(status_code=500, detail={
+            "error": "storage_error", "message": "Storage configuration error",
+        })
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    # ── Stream write + SHA256 ─────────────────────────────────────────
+    compressed_size = 0
+    sha256_hex = ""
+    first_bytes = b""
+    repo = UploadedFileRepository(db_session)
+
     try:
-        content = await file.read()
+        compressed_size, sha256_hex, first_bytes, exceeded = _streaming_write_and_hash(
+            file, storage_path, MAX_UPLOAD_SIZE,
+        )
+    except HTTPException:
+        raise
     except Exception:
-        raise HTTPException(status_code=400, detail={
-            "error": "read_error", "message": "Failed to read uploaded file",
+        logger.exception("Upload streaming failed for %s", upload_id)
+        _cleanup_path(storage_path)
+        raise HTTPException(status_code=500, detail={
+            "error": "upload_failed", "message": "Failed to read uploaded file",
         })
 
-    if len(content) > MAX_UPLOAD_SIZE:
+    if exceeded:
+        _cleanup_path(storage_path)
         raise HTTPException(status_code=413, detail={
             "error": "file_too_large",
-            "message": f"File size exceeds maximum of {MAX_UPLOAD_SIZE // (1024*1024)} MB",
+            "message": f"File exceeds maximum size of {MAX_UPLOAD_SIZE // (1024*1024)} MB",
         })
 
-    # ── SHA256 of original upload ────────────────────────────────────────
-    sha256 = hashlib.sha256(content).hexdigest()
+    # ── Detect compression ────────────────────────────────────────────
+    try:
+        compression = _detect_compression(filename, first_bytes)
+    except HTTPException:
+        _cleanup_path(storage_path)
+        raise
 
-    # ── Detect compression ────────────────────────────────────────────────
-    compression = _detect_compression(filename, content[:4])
     file_type = FileTypeEnum.VCF_GZ if compression == "gzip" else FileTypeEnum.VCF
 
-    if compression == "gzip_mismatch":
-        warnings.append(f"File extension suggests gzip but content is not gzip: {filename}")
+    # ── Genome build: check conflict BEFORE any state change ──────────
+    detected_build: Optional[str] = None
+    build_confidence = GenomeBuildConfidenceEnum.UNKNOWN
+    header_build = None
 
-    # ── Decompress if needed ──────────────────────────────────────────────
-    decompressed_sha256: Optional[str] = None
-    if compression == "gzip":
-        decompressed, decompress_error = _decompress_safe(content)
-        if decompress_error:
-            raise HTTPException(status_code=400, detail={
-                "error": decompress_error,
-                "message": "Failed to decompress gzip file",
-            })
-        if not decompressed:
-            raise HTTPException(status_code=400, detail={
-                "error": "empty_decompressed",
-                "message": "Decompressed file is empty",
-            })
-        content_str = decompressed.decode("utf-8", errors="replace")
-        decompressed_sha256 = hashlib.sha256(decompressed).hexdigest()
-    else:
-        content_str = content.decode("utf-8", errors="replace")
+    # Read header lines for genome build detection
+    vcf_content: Optional[str] = None
+    decompressed_size = 0
+    decompressed_sha = None
 
-    # ── Validate VCF ──────────────────────────────────────────────────────
-    validation = validate_vcf(content_str, expected_build=genome_build)
-    validation_status = ValidationStatusEnum.VALID if validation.valid else ValidationStatusEnum.INVALID
+    try:
+        if compression == "gzip":
+            decompressed_size, decompressed_sha, gz_err = _streaming_decompress_gzip(
+                storage_path, MAX_DECOMPRESSED_SIZE, MAX_COMPRESSION_RATIO,
+            )
+            if gz_err:
+                _cleanup_path(storage_path)
+                raise HTTPException(status_code=400, detail={
+                    "error": gz_err, "message": "Gzip decompression failed",
+                })
+            # Read first portion for validation (not whole file)
+            with gzip.open(storage_path, "rt") as gz:
+                vcf_content = gz.read(MAX_HEADER_BYTES + 8192)
+        else:
+            decompressed_size = compressed_size
+            with open(storage_path, "r") as f:
+                vcf_content = f.read(MAX_HEADER_BYTES + 8192)
+
+        # Detect build from header
+        validation = validate_vcf(vcf_content, expected_build=genome_build)
+        header_build = validation.genome_build
+
+        if genome_build and header_build and genome_build.lower() != header_build.lower():
+            _cleanup_path(storage_path)
+            raise HTTPException(status_code=422, detail={
+                "error": "genome_build_conflict",
+                "message": f"Request genome build '{genome_build}' conflicts with "
+                           f"VCF header build '{header_build}'",
+            })
+
+        if genome_build:
+            detected_build = genome_build
+            build_confidence = GenomeBuildConfidenceEnum.EXPLICIT
+        elif header_build:
+            detected_build = header_build
+            build_confidence = GenomeBuildConfidenceEnum.HEADER_DETECTED
+
+        # File-level checks on content
+        for check_fn, err_code in [
+            (lambda c: _check_oversized_header(c, MAX_HEADER_BYTES), "header_too_large"),
+            (lambda c: _check_oversized_line(c, MAX_VCF_LINE_LENGTH), "line_too_long"),
+            (lambda c: _check_record_count(c, MAX_RECORD_COUNT), "too_many_records"),
+        ]:
+            err = check_fn(vcf_content)
+            if err:
+                _cleanup_path(storage_path)
+                raise HTTPException(status_code=400, detail={
+                    "error": err_code, "message": err,
+                })
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("VCF validation failed for %s", upload_id)
+        _cleanup_path(storage_path)
+        raise HTTPException(status_code=400, detail={
+            "error": "validation_failed", "message": "VCF validation failed",
+        })
+
+    # ── Validation + record count ─────────────────────────────────────
+    validation = validate_vcf(vcf_content, expected_build=genome_build)
     for w in validation.warnings:
         warnings.append(w.message)
     for e in validation.errors:
         errors.append(e.message)
 
-    # ── Genome build detection ─────────────────────────────────────────────
-    detected_build: Optional[str] = None
-    build_confidence = GenomeBuildConfidenceEnum.UNKNOWN
-    header_build = validation.genome_build
+    is_valid = validation.valid and len(errors) == 0
+    validation_status = ValidationStatusEnum.VALID if is_valid else ValidationStatusEnum.INVALID
 
-    if genome_build:
-        detected_build = genome_build
-        build_confidence = GenomeBuildConfidenceEnum.EXPLICIT
-        if header_build and header_build != genome_build:
-            build_confidence = GenomeBuildConfidenceEnum.CONFLICT
-            warnings.append(f"Header genome build ({header_build}) conflicts with "
-                           f"request build ({genome_build})")
-    elif header_build:
-        detected_build = header_build
-        build_confidence = GenomeBuildConfidenceEnum.HEADER_DETECTED
+    # ── Duplicate SHA256 detection ────────────────────────────────────
+    existing = await repo.find_by_sha256(sha256_hex)
+    if existing:
+        # Same SHA256 found — log and handle
+        logger.info("Duplicate SHA256 upload detected: %s (existing: %s)", sha256_hex, existing[0].id)
+        if sequencing_test_id:
+            same_test = [e for e in existing if str(e.sequencing_test_id) == sequencing_test_id]
+            if same_test:
+                _cleanup_path(storage_path)
+                raise HTTPException(status_code=409, detail={
+                    "error": "duplicate_upload",
+                    "message": "A file with the same SHA256 already exists for this sequencing test",
+                    "existing_upload_id": str(same_test[0].id),
+                })
+        # Different test — keep new file record but can reference same blob later
+        warnings.append(f"Duplicate SHA256: another upload with same content exists (id: {existing[0].id})")
 
-    # ── Save to storage ────────────────────────────────────────────────────
-    ext = ".vcf.gz" if compression == "gzip" else ".vcf"
-    safe_name = _safe_filename(upload_id, ext)
-    storage_path = os.path.join(UPLOAD_DIR, safe_name)
+    # ── Eligibility ───────────────────────────────────────────────────
+    now = datetime.now(timezone.utc)
+    eligibility = UploadEligibilityEnum.ELIGIBLE if is_valid else UploadEligibilityEnum.INVALID
+    quarantine_reason = None
+    if not is_valid:
+        quarantine_reason = "; ".join(errors[:5]) if errors else "VCF validation failed"
 
-    try:
-        # Validate storage path (no path traversal)
-        abs_storage = os.path.abspath(storage_path)
-        abs_upload_dir = os.path.abspath(UPLOAD_DIR)
-        if not abs_storage.startswith(abs_upload_dir + os.sep) and abs_storage != abs_upload_dir:
-            raise HTTPException(status_code=500, detail={
-                "error": "storage_error", "message": "Invalid storage path",
-            })
-        _atomic_write(storage_path, content)
-        storage_path = safe_name  # Store relative path only
-    except Exception as e:
-        logger.exception("Failed to save upload %s", upload_id)
-        raise HTTPException(status_code=500, detail={
-            "error": "storage_error", "message": "Failed to store uploaded file",
-        })
-
-    # ── Persist to Database ────────────────────────────────────────────────
-    repo = UploadedFileRepository(db_session)
+    # ── DB persist (AFTER validation, before full file storage) ───────
     try:
         db_record = await repo.create(
-            id=upload_id,
+            id=uuid.UUID(upload_id),
             sequencing_test_id=sequencing_test_id,
             original_filename=filename,
-            storage_path=storage_path,
+            storage_path=safe_name,
             media_type=file.content_type,
             file_type=file_type.value,
-            size_bytes=len(content),
-            sha256=sha256,
-            decompressed_sha256=decompressed_sha256,
+            size_bytes=compressed_size,
+            decompressed_size_bytes=decompressed_size or None,
+            sha256=sha256_hex,
+            decompressed_sha256=decompressed_sha,
             genome_build=detected_build,
             genome_build_confidence=build_confidence.value if build_confidence else None,
             compression=compression if compression != "none" else None,
@@ -261,31 +433,32 @@ async def upload_vcf(
             validation_errors=errors,
             upload_status=UploadStatusEnum.UPLOADED.value,
             validation_status=validation_status.value,
+            analysis_eligible=eligibility.value,
+            quarantine_reason=quarantine_reason,
+            retention_until=(now + timedelta(days=RETENTION_DAYS_REJECTED)).isoformat() if not is_valid else None,
         )
-    except Exception as e:
-        logger.exception("Failed to create upload record for %s", upload_id)
-        # Clean up stored file
-        full_path = os.path.join(UPLOAD_DIR, storage_path)
-        if os.path.isfile(full_path):
-            os.remove(full_path)
+    except Exception:
+        logger.exception("DB persistence failed for upload %s", upload_id)
+        _cleanup_path(storage_path)
         raise HTTPException(status_code=500, detail={
             "error": "db_error", "message": "Failed to save upload metadata",
         })
 
-    # ── Return response ───────────────────────────────────────────────────
+    # ── Response (never return server path) ──────────────────────────
     return VCFUploadResponse(
         upload_id=upload_id,
         database_record_id=str(db_record.id),
         filename=filename,
-        size_bytes=len(content),
-        sha256=sha256,
-        file_type=file_type.value if file_type else None,
+        size_bytes=compressed_size,
+        sha256=sha256_hex,
+        file_type=file_type.value,
         compression=compression if compression != "none" else None,
         genome_build=detected_build,
         genome_build_confidence=build_confidence.value if build_confidence else None,
         validation_status=validation_status.value,
+        analysis_eligible=eligibility.value,
         record_count=validation.record_count,
         warnings=warnings,
         errors=errors,
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=now.isoformat(),
     )

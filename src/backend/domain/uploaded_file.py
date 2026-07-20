@@ -13,7 +13,7 @@ from sqlalchemy import Column, String, DateTime, BigInteger, Integer, JSON, Enum
 from sqlalchemy.orm import relationship
 
 from src.backend.database.models import CompatUUID, Base as DBBase
-from src.backend.domain.enums import FileTypeEnum, UploadStatusEnum, ValidationStatusEnum, GenomeBuildConfidenceEnum, UploadDuplicateStrategyEnum
+from src.backend.domain.enums import FileTypeEnum, UploadStatusEnum, ValidationStatusEnum, GenomeBuildConfidenceEnum, UploadEligibilityEnum
 
 
 def _uuid() -> uuid.UUID:
@@ -38,8 +38,12 @@ class UploadedFileModel(DBBase):
     record_count = Column(Integer, nullable=True, comment="Number of variant records in file")
     validation_warnings = Column(JSON, default=list)
     validation_errors = Column(JSON, default=list)
+    decompressed_size_bytes = Column(BigInteger, nullable=True, comment="Size after decompression (for gzip)")
     upload_status = Column(SAEnum(UploadStatusEnum), default=UploadStatusEnum.UPLOADING, nullable=False)
     validation_status = Column(SAEnum(ValidationStatusEnum), default=ValidationStatusEnum.PENDING, nullable=False)
+    analysis_eligible = Column(SAEnum(UploadEligibilityEnum), default=UploadEligibilityEnum.PENDING_VALIDATION, nullable=False)
+    quarantine_reason = Column(String(256), nullable=True, comment="Reason for quarantine/rejection")
+    retention_until = Column(DateTime, nullable=True, comment="When this upload record may be cleaned up")
     uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     sequencing_test = relationship("SequencingTestModel", back_populates="uploaded_files")
@@ -57,12 +61,16 @@ class UploadedFileCreate(BaseModel):
     media_type: Optional[str] = Field(None, max_length=128)
     file_type: Optional[FileTypeEnum] = None
     size_bytes: Optional[int] = None
+    decompressed_size_bytes: Optional[int] = None
     sha256: Optional[str] = Field(None, max_length=64)
     decompressed_sha256: Optional[str] = Field(None, max_length=64)
     genome_build: Optional[str] = Field(None, max_length=32)
     genome_build_confidence: Optional[GenomeBuildConfidenceEnum] = None
     compression: Optional[str] = Field(None, max_length=16)
     record_count: Optional[int] = None
+    analysis_eligible: Optional[UploadEligibilityEnum] = None
+    quarantine_reason: Optional[str] = Field(None, max_length=256)
+    retention_until: Optional[datetime] = None
 
 
 class UploadedFileResponse(BaseModel):
@@ -71,10 +79,9 @@ class UploadedFileResponse(BaseModel):
     id: str
     sequencing_test_id: Optional[str] = None
     original_filename: str
-    storage_path: Optional[str] = None
-    media_type: Optional[str] = None
     file_type: Optional[str] = None
     size_bytes: Optional[int] = None
+    decompressed_size_bytes: Optional[int] = None
     sha256: Optional[str] = None
     decompressed_sha256: Optional[str] = None
     genome_build: Optional[str] = None
@@ -85,4 +92,8 @@ class UploadedFileResponse(BaseModel):
     validation_errors: list = []
     upload_status: str
     validation_status: str
+    analysis_eligible: Optional[str] = None
+    quarantine_reason: Optional[str] = None
+    retention_until: Optional[datetime] = None
+    created_at: Optional[datetime] = None
     uploaded_at: datetime

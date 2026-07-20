@@ -20,6 +20,7 @@ class VCFUploadResponse(BaseModel):
     genome_build: Optional[str] = None
     genome_build_confidence: Optional[str] = None
     validation_status: str  # "pending" | "valid" | "invalid"
+    analysis_eligible: Optional[str] = None
     record_count: int = 0
     warnings: list[str] = []
     errors: list[str] = []

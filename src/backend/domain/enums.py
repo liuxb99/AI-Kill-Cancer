@@ -254,6 +254,15 @@ class UploadDuplicateStrategyEnum(str, enum.Enum):
     DEDUPLICATE_RETURN_EXISTING = "deduplicate_return_existing"
 
 
+class UploadEligibilityEnum(str, enum.Enum):
+    """Whether the upload is eligible for analysis."""
+    ELIGIBLE = "eligible"
+    INVALID = "invalid"
+    REJECTED = "rejected"
+    QUARANTINED = "quarantined"
+    PENDING_VALIDATION = "pending_validation"
+
+
 class ConsentTypeEnum(str, enum.Enum):
     RESEARCH = "research"
     CLINICAL = "clinical"
