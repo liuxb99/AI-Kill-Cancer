@@ -56,6 +56,38 @@ Three.js 染色體、基因、蛋白質與路徑視覺化
 
 所有基因、路徑、藥物及證據連線必須由結構化資料來源產生；LLM 僅負責解釋、摘要與衝突整理。
 
+## 開源元件整合方向
+
+本專案保留現有 FastAPI、React、PostgreSQL 架構作為總控，不直接 Fork 大型癌症平台。優先整合：
+
+```text
+bcftools normalization
+        ↓
+Ensembl VEP：標準功能註釋
+        ↓
+OpenCRAVAT：變異註釋與優先排序
+        ↓
+CIViC：癌症變異臨床證據
+        ↓
+DGIdb：藥物—基因互動
+        ↓
+OncoTree：癌種標準化
+        ↓
+PostgreSQL Evidence Store
+        ↓
+React Force Graph + Three.js
+```
+
+第二階段研究擴充：
+
+- MyVariant.info：快速補充變異資料。
+- cBioPortal API：公開癌症研究資料與資料模型參考。
+- DRKG：舊藥再定位候選生成，不作為療效證明。
+- ClinicalTrials.gov 與 PubMed：臨床試驗、支持證據與反向證據。
+- PharmCAT：獨立的 germline 藥物基因體流程，不與 tumor somatic DNA 混用。
+
+完整選型、整合方式、授權要求與實作順序見 [OPEN_SOURCE_INTEGRATION_PLAN.md](docs/OPEN_SOURCE_INTEGRATION_PLAN.md)。
+
 ## 目前狀態
 
 | 階段 | 內容 | 狀態 |
@@ -115,6 +147,7 @@ npm run dev
 ## 主要文件
 
 - [THYROID_PRECISION_ONCOLOGY_PRODUCT_PLAN.md](docs/THYROID_PRECISION_ONCOLOGY_PRODUCT_PLAN.md) — 新產品定位、患者流程、Three.js 規劃、舊藥再定位與開發路線。
+- [OPEN_SOURCE_INTEGRATION_PLAN.md](docs/OPEN_SOURCE_INTEGRATION_PLAN.md) — OpenCRAVAT、VEP、CIViC、DGIdb、OncoTree、Three.js 等開源元件選型與整合順序。
 - [CURRENT_STATE.md](docs/CURRENT_STATE.md) — 當前工程狀態。
 - [MEDICAL_SAFETY.md](docs/MEDICAL_SAFETY.md) — 醫療安全聲明。
 - [DATA_PROVENANCE.md](docs/DATA_PROVENANCE.md) — 資料溯源。
@@ -135,13 +168,16 @@ npm run dev
 3. Thyroid cancer variant schema 與首批核心基因格式。
 4. Three.js visualization data contract。
 5. Drug Candidate 與 Evidence Card schema。
-6. 所有候選強制包含來源、證據層級、限制及反向證據。
-7. 文件、API schema、測試同步更新。
+6. Analysis manifest、資料來源版本與第三方授權 manifest。
+7. 所有候選強制包含來源、證據層級、限制及反向證據。
+8. 文件、API schema、測試同步更新。
 
 ## 技術棧
 
 - **後端**：Python 3.10+ / FastAPI / SQLAlchemy / PyTorch
-- **前端**：TypeScript / React / Vite / Tailwind CSS / Three.js
+- **變異分析**：bcftools / Ensembl VEP / OpenCRAVAT
+- **癌症證據**：CIViC / DGIdb / OncoTree
+- **前端**：TypeScript / React / Vite / Tailwind CSS / Three.js / react-force-graph
 - **資料庫**：PostgreSQL；SQLite 僅供本地 MVP
-- **部署**：Vercel Serverless / Docker
+- **部署**：Vercel Serverless / Docker workers
 - **測試**：pytest
