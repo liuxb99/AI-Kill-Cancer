@@ -14,19 +14,8 @@ from src.backend.repositories.patient_repo import PatientRepository
 
 
 def _to_patient_response(patient) -> PatientResponse:
-    """Convert ORM model to Pydantic response, handling UUID serialization."""
-    data = {
-        "id": str(patient.id),
-        "external_id": patient.external_id,
-        "display_name": patient.display_name,
-        "birth_year": patient.birth_year,
-        "age_range": patient.age_range,
-        "sex": patient.sex.value if patient.sex else None,
-        "consent_status": patient.consent_status.value if hasattr(patient.consent_status, 'value') else patient.consent_status,
-        "created_at": patient.created_at,
-        "updated_at": patient.updated_at,
-    }
-    return PatientResponse(**data)
+    """Convert ORM model to Pydantic response with automatic UUID serialization."""
+    return PatientResponse.model_validate(patient)
 
 
 logger = logging.getLogger(__name__)

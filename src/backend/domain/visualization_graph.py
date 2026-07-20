@@ -27,6 +27,7 @@ NODE_TYPES = [
     "evidence",
     "publication",
     "clinical_trial",
+    "cancer_case",
 ]
 
 # ─── Edge Types ───────────────────────────────────────────────────────────────

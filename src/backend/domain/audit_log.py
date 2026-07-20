@@ -8,8 +8,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Text, DateTime, JSON, Enum as SAEnum, ForeignKey
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import Column, String, DateTime, JSON, Enum as SAEnum, ForeignKey
 
 from src.backend.database.models import CompatUUID, Base as DBBase
 from src.backend.domain.enums import AuditActionEnum

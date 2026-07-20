@@ -5,11 +5,9 @@ ClinicalTrial domain model.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
-from typing import Optional
+from datetime import datetime
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Text, Integer, Date, DateTime, JSON, Enum as SAEnum
+from sqlalchemy import Column, String, Text, Integer, Date, DateTime, JSON
 from sqlalchemy.orm import relationship
 
 from src.backend.database.models import CompatUUID, Base as DBBase

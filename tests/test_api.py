@@ -343,8 +343,10 @@ class TestAPPModeDemo:
 
 class TestCheckpointLoading:
 
+    @pytest.mark.torch
     def test_load_model_no_checkpoint(self, client):
         """_load_model should return False when checkpoint doesn't exist."""
+        pytest.importorskip("torch")
         from src.backend.api.routes import _load_model
         original = settings.MODEL_PATH
         settings.MODEL_PATH = "/nonexistent/path.pt"
@@ -356,8 +358,10 @@ class TestCheckpointLoading:
         settings.MODEL_PATH = original
         assert result is False
 
+    @pytest.mark.torch
     def test_load_model_bad_checkpoint(self, tmp_path):
         """_load_model should handle corrupted checkpoint gracefully."""
+        pytest.importorskip("torch")
         import torch
         from src.backend.api.routes import _load_model
         import src.backend.api.routes as routes
@@ -374,8 +378,10 @@ class TestCheckpointLoading:
         settings.MODEL_PATH = original
         assert result is False
 
+    @pytest.mark.torch
     def test_load_model_valid_checkpoint(self, tmp_path):
         """_load_model should load a valid minimal checkpoint."""
+        pytest.importorskip("torch")
         import torch
         from src.backend.api.routes import _load_model
         import src.backend.api.routes as routes
@@ -412,8 +418,10 @@ class TestCheckpointLoading:
 
         assert result is True
 
+    @pytest.mark.torch
     def test_empty_checkpoint_rejected(self, tmp_path):
         """Empty or meaningless checkpoint should not load."""
+        pytest.importorskip("torch")
         import torch
         from src.backend.api.routes import _load_model
         import src.backend.api.routes as routes

@@ -1,8 +1,9 @@
 # 当前项目状态
 
 > 最后更新：2026-07-20
-> 版本：0.2.0-dev → 0.2.0
-> Phase 1: Precision Oncology Foundation ✅ 完成
+> 版本：0.2.1
+> Phase 1: Precision Oncology Foundation ✅ 已完成
+> Phase 1 Review, Verification and Hardening ✅ 已完成
 
 ## 总体状态
 
@@ -16,7 +17,9 @@
 | API v1 Routes | ✅ 完成 | 15 个端點（patients, cases, specimens, variants, analyses 等） |
 | Three.js Contract | ✅ 完成 | 前後端共享 graph contract（10 node types, 12 edge types） |
 | Database Migration | ✅ 完成 | Alembic revision #001（19 張新表 + 索引 + 外鍵） |
-| 版本統一 | ✅ 完成 | 單一 VERSION 檔案，pyproject.toml, config.py 同步 |
+| 版本統一 | ✅ 完成 | 單一 VERSION 檔案，config.py 同步，v0.2.1 |
+| 品質工具 | ✅ 完成 | pytest-cov, ruff lint/format, coverage 77% |
+| 程式碼審查 | ✅ 完成 | PHASE1_REVIEW_REPORT.md (評分 92/100) |
 | 前端页面 | ✅ 完成 | 6 个页面 + 图表组件 |
 | 前端部署 | ✅ 完成 | Vercel 部署 |
 | API 部署 | ✅ 完成 | Vercel Serverless |
@@ -74,7 +77,7 @@
 - 8 個 adapter 已註冊（VEP, OpenCRAVAT, CIViC, DGIdb, OncoTree, MyVariant, DRKG, PharmCAT）
 
 ### Three.js Visualization Contract
-- 10 node types（chromosome, gene, variant, protein, pathway, drug, evidence, publication, clinical_trial）
+- 10 node types（chromosome, gene, variant, protein, pathway, drug, evidence, publication, clinical_trial, cancer_case）
 - 12 edge types（located_on, encodes, affects, activates, inhibits, participates_in, targets, supported_by, conflicts_with, studied_in, approved_for, off_label_for）
 - GraphNode（id, type, label, category, status, evidence_level, metadata）
 - GraphEdge（id, source, target, relation, direction, weight, evidence_ids, provenance）

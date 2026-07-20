@@ -10,7 +10,7 @@ from alembic import command
 
 @pytest.fixture
 def alembic_config(tmp_path):
-    """Create a temporary Alembic config pointing to SQLite."""
+    """Create a temporary Alembic config pointing to async SQLite."""
     cfg = Config()
     cfg.set_main_option("script_location", "migrations")
     cfg.set_main_option("sqlalchemy.url", "sqlite+aiosqlite:///./test_migration.db")
@@ -18,13 +18,11 @@ def alembic_config(tmp_path):
 
 
 class TestMigration:
-    @pytest.mark.skip(reason="Requires full Alembic + aiosqlite setup")
     def test_upgrade_creates_tables(self, alembic_config):
         """Verify migration upgrade creates all domain tables."""
         command.upgrade(alembic_config, "001")
         # In a full test, we'd inspect the DB for table existence
 
-    @pytest.mark.skip(reason="Requires full Alembic + aiosqlite setup")
     def test_downgrade_removes_tables(self, alembic_config):
         """Verify migration downgrade removes all domain tables."""
         command.upgrade(alembic_config, "001")

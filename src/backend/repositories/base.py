@@ -7,7 +7,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Generic, Optional, TypeVar
 
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 

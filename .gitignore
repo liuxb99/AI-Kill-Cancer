@@ -23,11 +23,24 @@ data/processed/*
 *.h5
 *.pkl
 *.onnx
+models/
 !models/.gitkeep
+!models/manifests/
+!models/manifests/*.json
 
 # IDE
 .vscode/
 .idea/
+
+# Agent runtime state
+.omo/
+.omo/*
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 *.swp
 
 # OS

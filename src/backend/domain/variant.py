@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, Enum as SAEnum, ForeignKey
+from sqlalchemy import Column, String, Integer, Float, DateTime, Enum as SAEnum, ForeignKey
 from sqlalchemy.orm import relationship
 
 from src.backend.database.models import CompatUUID, Base as DBBase

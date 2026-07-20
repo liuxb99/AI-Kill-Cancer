@@ -6,11 +6,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Text, DateTime, Enum as SAEnum, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String, DateTime, ForeignKey, JSON
 
 from src.backend.database.models import CompatUUID, Base as DBBase
 

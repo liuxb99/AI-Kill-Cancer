@@ -3,13 +3,12 @@ Variant API routes.
 """
 from __future__ import annotations
 
-import uuid
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
 from src.backend.api.v1.deps import get_variant_repo
-from src.backend.domain.variant import VariantImport, VariantImportBatch, VariantResponse, VariantListResponse
+from src.backend.domain.variant import VariantImportBatch, VariantResponse
 from src.backend.repositories.variant_repo import VariantRepository
 
 logger = logging.getLogger(__name__)

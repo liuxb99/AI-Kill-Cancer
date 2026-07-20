@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_serializer, field_validator
 from sqlalchemy import Column, String, Integer, DateTime, Enum as SAEnum
 from sqlalchemy.orm import relationship
 
@@ -83,6 +83,20 @@ class PatientResponse(BaseModel):
     consent_status: str
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("id")
+    @classmethod
+    def serialize_id(cls, v: Any) -> str:
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def validate_id(cls, v: Any) -> str:
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
 
 
 class PatientListResponse(BaseModel):

@@ -9,7 +9,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.backend.api.v1.deps import get_specimen_repo
-from src.backend.domain.specimen import SpecimenCreate, SpecimenUpdate, SpecimenResponse
+from src.backend.domain.specimen import SpecimenCreate, SpecimenResponse
 from src.backend.repositories.specimen_repo import SpecimenRepository
 
 logger = logging.getLogger(__name__)

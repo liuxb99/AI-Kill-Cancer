@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Column, String, Float, Text, DateTime, Enum as SAEnum, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 

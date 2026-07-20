@@ -240,7 +240,8 @@ class TestGraphSchema:
         assert "gene" in NODE_TYPES
         assert "variant" in NODE_TYPES
         assert "drug" in NODE_TYPES
-        assert len(NODE_TYPES) == 9
+        assert "cancer_case" in NODE_TYPES
+        assert len(NODE_TYPES) == 10
 
     def test_edge_types_are_valid(self):
         from src.backend.domain.visualization_graph import EDGE_TYPES

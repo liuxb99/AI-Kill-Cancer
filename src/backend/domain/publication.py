@@ -6,9 +6,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Column, String, Text, Integer, DateTime, JSON
 from sqlalchemy.orm import relationship
 

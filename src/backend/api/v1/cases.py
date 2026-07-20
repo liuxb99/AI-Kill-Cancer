@@ -9,7 +9,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.backend.api.v1.deps import get_cancer_case_repo
-from src.backend.domain.cancer_case import CancerCaseCreate, CancerCaseUpdate, CancerCaseResponse, CancerCaseListResponse
+from src.backend.domain.cancer_case import CancerCaseCreate, CancerCaseResponse, CancerCaseListResponse
 from src.backend.repositories.cancer_case_repo import CancerCaseRepository
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,6 @@ async def list_cases(
     limit: int = Query(100, ge=1, le=1000),
     repo: CancerCaseRepository = Depends(get_cancer_case_repo),
 ):
-    from sqlalchemy import select
     from src.backend.domain.cancer_case import CancerCaseModel
 
     filters = []

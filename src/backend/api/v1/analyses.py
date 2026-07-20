@@ -5,20 +5,16 @@ from __future__ import annotations
 
 import uuid
 import logging
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
-from src.backend.api.v1.deps import get_analysis_run_repo, get_variant_repo, get_drug_repo, get_evidence_repo
+from src.backend.api.v1.deps import get_analysis_run_repo
 from src.backend.domain.analysis_run import AnalysisRunCreate, AnalysisRunResponse
-from src.backend.domain.drug_candidate import DrugCandidateResponse, DrugCandidateListResponse
-from src.backend.domain.evidence import EvidenceResponse, EvidenceSearchResult, EvidenceDirectionEnum, EvidenceLevelEnum
-from src.backend.domain.visualization_graph import VisualizationGraph, GraphNode, GraphEdge, GraphAnalysisResponse
+from src.backend.domain.drug_candidate import DrugCandidateListResponse
+from src.backend.domain.evidence import EvidenceSearchResult
+from src.backend.domain.visualization_graph import VisualizationGraph, GraphAnalysisResponse
 from src.backend.domain.enums import AnalysisStatusEnum
 from src.backend.repositories.analysis_run_repo import AnalysisRunRepository
-from src.backend.repositories.variant_repo import VariantRepository
-from src.backend.repositories.drug_repo import DrugRepository
-from src.backend.repositories.evidence_repo import EvidenceRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analyses", tags=["analyses"])
