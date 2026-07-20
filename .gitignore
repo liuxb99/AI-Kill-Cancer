@@ -45,6 +45,9 @@ Thumbs.db
 # Vercel
 .vercel
 
+# Reasonix — session state (not project config)
+.reasonix/desktop-topic-*.json
+
 # DB
 test.db
 *.db
