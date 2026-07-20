@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import sys
@@ -24,7 +26,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting %s v%s", settings.APP_NAME, settings.APP_VERSION)
+    logger.info(
+        "Starting %s v%s (mode=%s)",
+        settings.APP_NAME, settings.APP_VERSION, settings.APP_MODE,
+    )
     db_url = settings.DATABASE_URL
     if db_url:
         try:
@@ -33,7 +38,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("Database initialization failed (API will work, DB features disabled): %s", e)
     if settings.MODEL_ENABLED:
-        logger.info("Model path: %s", settings.MODEL_PATH)
+        logger.info("Model path: %s (mode=%s)", settings.MODEL_PATH, settings.APP_MODE)
     yield
     await close_db()
     logger.info("Database connection closed")
@@ -48,10 +53,17 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # CORS: production mode disallows wildcard with credentials
+    cors_origins = settings.CORS_ORIGINS
+    allow_creds = True
+    if "*" in cors_origins:
+        # FastAPI/Starlette requires explicit origins when allow_credentials=True
+        allow_creds = False
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=True,
+        allow_origins=cors_origins,
+        allow_credentials=allow_creds,
         allow_methods=["*"],
         allow_headers=["*"],
     )

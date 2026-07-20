@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.backend.models import DataProvenance
+
 from src.backend.database.session import get_db
 from src.backend.database import create_research_paper, search_research_papers
 
@@ -44,6 +46,7 @@ class SandboxRunResponse(BaseModel):
     output: dict
     latency_ms: int
     status: str
+    provenance: DataProvenance | None = None
 
 
 class DataUploadResponse(BaseModel):
@@ -52,6 +55,7 @@ class DataUploadResponse(BaseModel):
     file_size: int
     status: str
     uploaded_at: str
+    provenance: DataProvenance | None = None
 
 
 class SandboxHistoryItem(BaseModel):
@@ -185,6 +189,7 @@ async def sandbox_run(body: SandboxRunRequest):
     try:
         run_id = str(uuid.uuid4())
         import time, random
+        from datetime import datetime, timezone
         start = time.monotonic()
 
         model_registry = {
@@ -215,6 +220,14 @@ async def sandbox_run(body: SandboxRunRequest):
             output=output,
             latency_ms=latency,
             status="completed",
+            provenance=DataProvenance(
+                data_mode="synthetic",
+                source="Mock model sandbox — simulated output for research exploration",
+                source_url=None,
+                retrieved_at=datetime.now(timezone.utc).isoformat(),
+                model_version=None,
+                disclaimer="Sandbox output is simulated. Not for clinical use.",
+            ),
         )
     except HTTPException:
         raise

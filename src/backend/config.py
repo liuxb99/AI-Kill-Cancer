@@ -1,4 +1,5 @@
 import os
+import logging
 
 
 class Settings:
@@ -6,7 +7,14 @@ class Settings:
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
+    # 运行模式: demo / research / production
+    APP_MODE: str = os.getenv("APP_MODE", "demo").lower()
+
     CORS_ORIGINS: list[str] = os.getenv("CORS_ORIGINS", "*").split(",")
+    # production 模式下禁止通配符 origin
+    if CORS_ORIGINS == ["*"] and APP_MODE == "production":
+        logging.warning("CORS_ORIGINS=* is not allowed in production mode, falling back to http://localhost:5173")
+        CORS_ORIGINS = ["http://localhost:5173"]
 
     DB_HOST: str = os.getenv("DB_HOST", "localhost")
     DB_PORT: int = int(os.getenv("DB_PORT", "5432"))
