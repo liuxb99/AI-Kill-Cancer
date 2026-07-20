@@ -39,7 +39,7 @@ from src.backend.domain.enums import (
 from src.backend.domain.uploaded_file import UploadedFileCreate, UploadedFileResponse
 from src.backend.repositories.uploaded_file_repo import UploadedFileRepository
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
-from src.backend.vcf.validator import validate_vcf
+from src.backend.vcf.validator import validate_vcf_streaming
 from src.backend.vcf.models import VCFUploadResponse
 
 logger = logging.getLogger(__name__)
@@ -119,15 +119,14 @@ def _streaming_write_and_hash(
                     break
 
         if exceeded:
-            os.remove(tmp_path)
+            _cleanup_path(tmp_path)
             return total, sha.hexdigest(), first_chunk, True
 
         os.rename(tmp_path, dst_path)
         return total, sha.hexdigest(), first_chunk, False
 
     except Exception:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        _cleanup_path(tmp_path)
         raise
 
 
@@ -209,7 +208,38 @@ def _cleanup_path(path: str) -> None:
             pass
 
 
-# ─── Upload Endpoint ──────────────────────────────────────────────────
+# ─── Duplicate blob sharing ──────────────────────────────────────────────
+
+
+async def _resolve_storage(
+    repo: UploadedFileRepository,
+    upload_id: str,
+    sha256_hex: str,
+    storage_path: str,
+    sequencing_test_id: Optional[str],
+) -> tuple[str, Optional[str], Optional[str]]:
+    """Determine storage path for an upload.
+
+    If a blob with the same SHA256 already exists for a different test,
+    return the existing storage_path and mark as duplicate.
+
+    Returns (final_storage_path, duplicate_of_upload_id, warning_or_None).
+    """
+    existing = await repo.find_by_sha256(sha256_hex)
+    if not existing:
+        return storage_path, None, None
+
+    for e in existing:
+        if e.storage_path and e.storage_path != storage_path:
+            if sequencing_test_id and str(e.sequencing_test_id) == sequencing_test_id:
+                # Same test, same SHA256 — will be handled as 409 elsewhere
+                return storage_path, None, None
+            # Different test — share blob
+            _cleanup_path(storage_path)
+            logger.info("Duplicating blob reference: %s -> %s (existing: %s)", sha256_hex, e.storage_path, e.id)
+            return e.storage_path, str(e.id), "Duplicate content: sharing existing blob"
+
+    return storage_path, None, None
 
 
 @router.post("/upload", response_model=VCFUploadResponse)
@@ -312,87 +342,40 @@ async def upload_vcf(
     # ── Genome build: check conflict BEFORE any state change ──────────
     detected_build: Optional[str] = None
     build_confidence = GenomeBuildConfidenceEnum.UNKNOWN
-    header_build = None
 
-    # Read header lines for genome build detection
-    vcf_content: Optional[str] = None
-    decompressed_size = 0
-    decompressed_sha = None
+    # ── Streaming file validation (runs in thread to avoid event loop block) ──
+    import asyncio
+    validation = await asyncio.to_thread(
+        validate_vcf_streaming,
+        storage_path,
+        genome_build,
+    )
 
-    try:
-        if compression == "gzip":
-            decompressed_size, decompressed_sha, gz_err = _streaming_decompress_gzip(
-                storage_path, MAX_DECOMPRESSED_SIZE, MAX_COMPRESSION_RATIO,
-            )
-            if gz_err:
-                _cleanup_path(storage_path)
-                raise HTTPException(status_code=400, detail={
-                    "error": gz_err, "message": "Gzip decompression failed",
-                })
-            # Read first portion for validation (not whole file)
-            with gzip.open(storage_path, "rt") as gz:
-                vcf_content = gz.read(MAX_HEADER_BYTES + 8192)
-        else:
-            decompressed_size = compressed_size
-            with open(storage_path, "r") as f:
-                vcf_content = f.read(MAX_HEADER_BYTES + 8192)
-
-        # Detect build from header
-        validation = validate_vcf(vcf_content, expected_build=genome_build)
-        header_build = validation.genome_build
-
-        if genome_build and header_build and genome_build.lower() != header_build.lower():
-            _cleanup_path(storage_path)
-            raise HTTPException(status_code=422, detail={
-                "error": "genome_build_conflict",
-                "message": f"Request genome build '{genome_build}' conflicts with "
-                           f"VCF header build '{header_build}'",
-            })
-
-        if genome_build:
-            detected_build = genome_build
-            build_confidence = GenomeBuildConfidenceEnum.EXPLICIT
-        elif header_build:
-            detected_build = header_build
-            build_confidence = GenomeBuildConfidenceEnum.HEADER_DETECTED
-
-        # File-level checks on content
-        for check_fn, err_code in [
-            (lambda c: _check_oversized_header(c, MAX_HEADER_BYTES), "header_too_large"),
-            (lambda c: _check_oversized_line(c, MAX_VCF_LINE_LENGTH), "line_too_long"),
-            (lambda c: _check_record_count(c, MAX_RECORD_COUNT), "too_many_records"),
-        ]:
-            err = check_fn(vcf_content)
-            if err:
-                _cleanup_path(storage_path)
-                raise HTTPException(status_code=400, detail={
-                    "error": err_code, "message": err,
-                })
-
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("VCF validation failed for %s", upload_id)
-        _cleanup_path(storage_path)
-        raise HTTPException(status_code=400, detail={
-            "error": "validation_failed", "message": "VCF validation failed",
-        })
-
-    # ── Validation + record count ─────────────────────────────────────
-    validation = validate_vcf(vcf_content, expected_build=genome_build)
     for w in validation.warnings:
         warnings.append(w.message)
     for e in validation.errors:
         errors.append(e.message)
 
-    is_valid = validation.valid and len(errors) == 0
+    detected_build = validation.genome_build
+    if genome_build:
+        build_confidence = GenomeBuildConfidenceEnum.EXPLICIT
+        if detected_build and genome_build.lower() != detected_build.lower():
+            _cleanup_path(storage_path)
+            raise HTTPException(status_code=422, detail={
+                "error": "genome_build_conflict",
+                "message": f"Request genome build '{genome_build}' conflicts with "
+                           f"VCF header build '{detected_build}'",
+            })
+    elif detected_build:
+        build_confidence = GenomeBuildConfidenceEnum.HEADER_DETECTED
+
+    is_valid = validation.valid
     validation_status = ValidationStatusEnum.VALID if is_valid else ValidationStatusEnum.INVALID
 
     # ── Duplicate SHA256 detection ────────────────────────────────────
     existing = await repo.find_by_sha256(sha256_hex)
     if existing:
-        # Same SHA256 found — log and handle
-        logger.info("Duplicate SHA256 upload detected: %s (existing: %s)", sha256_hex, existing[0].id)
+        logger.info("Duplicate SHA256: %s", sha256_hex)
         if sequencing_test_id:
             same_test = [e for e in existing if str(e.sequencing_test_id) == sequencing_test_id]
             if same_test:
@@ -402,8 +385,17 @@ async def upload_vcf(
                     "message": "A file with the same SHA256 already exists for this sequencing test",
                     "existing_upload_id": str(same_test[0].id),
                 })
-        # Different test — keep new file record but can reference same blob later
-        warnings.append(f"Duplicate SHA256: another upload with same content exists (id: {existing[0].id})")
+        warnings.append(f"Duplicate SHA256: another upload with same content exists")
+
+    # ── Resolve storage (dedup blob) ──────────────────────────────────
+    storage_path_rel = safe_name  # Relative path only
+    duplicate_of_id: Optional[str] = None
+    if sequencing_test_id:
+        storage_path_rel, duplicate_of_id, dup_warn = await _resolve_storage(
+            repo, upload_id, sha256_hex, storage_path, sequencing_test_id,
+        )
+        if dup_warn:
+            warnings.append(dup_warn)
 
     # ── Eligibility ───────────────────────────────────────────────────
     now = datetime.now(timezone.utc)
@@ -422,9 +414,7 @@ async def upload_vcf(
             media_type=file.content_type,
             file_type=file_type.value,
             size_bytes=compressed_size,
-            decompressed_size_bytes=decompressed_size or None,
             sha256=sha256_hex,
-            decompressed_sha256=decompressed_sha,
             genome_build=detected_build,
             genome_build_confidence=build_confidence.value if build_confidence else None,
             compression=compression if compression != "none" else None,
@@ -436,6 +426,7 @@ async def upload_vcf(
             analysis_eligible=eligibility.value,
             quarantine_reason=quarantine_reason,
             retention_until=(now + timedelta(days=RETENTION_DAYS_REJECTED)).isoformat() if not is_valid else None,
+            duplicate_of_upload_id=duplicate_of_id,
         )
     except Exception:
         logger.exception("DB persistence failed for upload %s", upload_id)

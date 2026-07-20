@@ -44,6 +44,7 @@ class UploadedFileModel(DBBase):
     analysis_eligible = Column(SAEnum(UploadEligibilityEnum), default=UploadEligibilityEnum.PENDING_VALIDATION, nullable=False)
     quarantine_reason = Column(String(256), nullable=True, comment="Reason for quarantine/rejection")
     retention_until = Column(DateTime, nullable=True, comment="When this upload record may be cleaned up")
+    duplicate_of_upload_id = Column(String(36), nullable=True, comment="Points to original upload if this is a blob duplicate")
     uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     sequencing_test = relationship("SequencingTestModel", back_populates="uploaded_files")
@@ -71,6 +72,7 @@ class UploadedFileCreate(BaseModel):
     analysis_eligible: Optional[UploadEligibilityEnum] = None
     quarantine_reason: Optional[str] = Field(None, max_length=256)
     retention_until: Optional[datetime] = None
+    duplicate_of_upload_id: Optional[str] = Field(None, max_length=36)
 
 
 class UploadedFileResponse(BaseModel):
@@ -95,5 +97,6 @@ class UploadedFileResponse(BaseModel):
     analysis_eligible: Optional[str] = None
     quarantine_reason: Optional[str] = None
     retention_until: Optional[datetime] = None
+    duplicate_of_upload_id: Optional[str] = None
     created_at: Optional[datetime] = None
     uploaded_at: datetime
