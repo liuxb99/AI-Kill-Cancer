@@ -42,10 +42,10 @@ export default function Dashboard() {
   }, [])
 
   const defaultKpis: KPI[] = [
-    { label: '涵蓋癌症種類', value: '12', unit: '種' },
-    { label: 'AI 模型準確率', value: '97.8', unit: '%' },
-    { label: '研究論文數', value: '8,640', unit: '篇' },
-    { label: '臨床試驗', value: '342', unit: '項' },
+    { label: '涵蓋癌症種類 (模擬)', value: '12', unit: '種' },
+    { label: 'AI 模型準確率 (模擬)', value: '97.8', unit: '%' },
+    { label: '研究論文數 (模擬)', value: '8,640', unit: '篇' },
+    { label: '臨床試驗 (模擬)', value: '342', unit: '項' },
   ]
 
   const displayKpis = kpis ?? defaultKpis
@@ -72,6 +72,10 @@ export default function Dashboard() {
       </header>
 
       <main className="flex-1 max-w-7xl mx-auto px-4 py-8 space-y-8">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-800">
+          ⓘ 此儀表板顯示<strong>模擬數據</strong>，僅供展示用途，不可用於診斷或治療決策。
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {kpiLoading
             ? [1, 2, 3, 4].map((i) => (

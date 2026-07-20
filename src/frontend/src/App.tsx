@@ -5,10 +5,12 @@ import Tools from './pages/Tools'
 import Research from './pages/Research'
 import Dashboard from './pages/Dashboard'
 import ResearchPortal from './pages/ResearchPortal'
+import StatusBanner from './components/StatusBanner'
 
 function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
+      <StatusBanner />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/knowledge" element={<KnowledgeBase />} />

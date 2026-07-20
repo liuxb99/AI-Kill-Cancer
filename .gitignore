@@ -47,6 +47,8 @@ Thumbs.db
 
 # Reasonix — session state (not project config)
 .reasonix/desktop-topic-*.json
+.reasonix/autoresearch/
+reasonix.toml
 
 # DB
 test.db

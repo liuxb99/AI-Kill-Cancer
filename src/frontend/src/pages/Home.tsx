@@ -44,7 +44,8 @@ export default function Home() {
             用 AI 對抗癌症
           </h2>
           <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto mb-8">
-            整合人工智慧與醫學知識，提供癌症預防、診斷輔助與治療建議的智慧平台。
+            整合人工智慧與醫學知識，提供癌症預防、診斷輔助與治療建議的研究探索平台。<br />
+            <span className="text-white/60 text-sm">⚠ 目前為原型階段，所有數據為模擬資料，不可用於臨床用途。</span>
           </p>
           <button
             onClick={() => navigate('/tools')}

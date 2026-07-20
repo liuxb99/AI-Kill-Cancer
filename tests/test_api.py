@@ -436,3 +436,33 @@ class TestCheckpointLoading:
         from src.backend.api.routes import _MODEL as current_model
         # When no checkpoint is loaded, _MODEL stays None
         assert current_model is None
+
+
+class TestDatabaseUnavailable:
+
+    def test_api_works_without_db(self):
+        """API should start and serve health even when DB is unavailable."""
+        from src.backend.config import settings as s
+        from src.backend.main import create_app
+        from fastapi.testclient import TestClient
+
+        original_db = s.DATABASE_URL
+        s.DATABASE_URL = "postgresql+asyncpg://invalid:invalid@localhost:9999/nonexistent"
+        try:
+            app = create_app()
+            with TestClient(app) as c:
+                resp = c.get("/api/v1/health")
+                assert resp.status_code == 200
+                data = resp.json()
+                assert data["status"] == "ok"
+
+                # readiness should show degraded DB
+                ready = c.get("/api/v1/health/ready")
+                assert ready.status_code == 200
+                deps = ready.json()["dependencies"]
+                db_dep = [d for d in deps if d["name"] == "database"]
+                assert len(db_dep) > 0
+                # DB status can be degraded or unavailable
+                assert db_dep[0]["status"] in ("degraded", "unavailable")
+        finally:
+            s.DATABASE_URL = original_db
