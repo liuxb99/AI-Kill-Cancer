@@ -153,12 +153,12 @@ def _streaming_decompress_gzip(
                     total += len(chunk)
                     if total > max_size:
                         return total, "", "decompressed_content_too_large"
-                    if compressed_size > 0 and total // compressed_size > max_ratio:
+                    if compressed_size > 0 and total // compressed_size >= max_ratio:
                         return total, "", "compression_ratio_exceeded"
     except gzip.BadGzipFile:
         return 0, "", "corrupted_gzip"
-    except Exception as e:
-        return 0, "", f"decompression_failed: {e}"
+    except Exception:
+        return 0, "", "decompression_failed"
 
     return total, sha.hexdigest(), None
 
