@@ -87,18 +87,22 @@ async def _raw_insert_report(
 # ── Tests ─────────────────────────────────────────────────────────────────
 
 
-class TestReportNULLCaseId:
-    """Reports with NULL case_id must be denied for all non-admin users."""
+SENTINEL_CASE_ID = "00000000-0000-0000-0000-000000000000"
+
+
+class TestLegacyNullMigratedToQuarantineCase:
+    """Migration 015 converts NULL case_id → sentinel UUID. Quarantined reports
+    must be denied for ALL users, including admin."""
 
     @pytest.fixture(scope="module")
     def setup(self, app_client):
-        token_user, uid_user = _register(app_client, "null_case_user", "TestPass123!")
-        token_admin, uid_admin = _register(app_client, "null_case_admin", "TestPass123!")
-        # Use raw SQL to insert a report with NULL case_id
+        token_user, uid_user = _register(app_client, "quarantine_user", "TestPass123!")
+        # Register a user as admin role — but admin still cannot access quarantine
+        token_admin, uid_admin = _register(app_client, "quarantine_admin", "TestPass123!")
         import asyncio
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        report_id = loop.run_until_complete(_raw_insert_report(None))
+        report_id = loop.run_until_complete(_raw_insert_report(SENTINEL_CASE_ID))
         loop.close()
         return {
             "token_user": token_user,
@@ -106,32 +110,47 @@ class TestReportNULLCaseId:
             "report_id": report_id,
         }
 
-    def test_null_case_unrelated_denied(self, app_client, setup):
-        """NULL case_id report must be denied for normal user."""
+    def test_legacy_null_quarantine_denied(self, app_client, setup):
+        """Quarantined report (migrated NULL case_id) denied for normal user."""
         resp = app_client.get(
             f"/api/v1/reports/{setup['report_id']}",
             headers=_auth_headers(setup["token_user"]),
         )
         assert resp.status_code == 403
 
-    def test_null_case_html_denied(self, app_client, setup):
+    def test_legacy_null_html_denied(self, app_client, setup):
         resp = app_client.get(
             f"/api/v1/reports/{setup['report_id']}/html",
             headers=_auth_headers(setup["token_user"]),
         )
         assert resp.status_code == 403
 
-    def test_null_case_json_denied(self, app_client, setup):
+    def test_legacy_null_json_denied(self, app_client, setup):
         resp = app_client.get(
             f"/api/v1/reports/{setup['report_id']}/json",
             headers=_auth_headers(setup["token_user"]),
         )
         assert resp.status_code == 403
 
-    def test_null_case_fhir_denied(self, app_client, setup):
+    def test_legacy_null_fhir_denied(self, app_client, setup):
         resp = app_client.get(
             f"/api/v1/reports/{setup['report_id']}/fhir",
             headers=_auth_headers(setup["token_user"]),
+        )
+        assert resp.status_code == 403
+
+    def test_admin_quarantine_denied(self, app_client, setup):
+        """Admin must also be denied access to quarantined legacy reports."""
+        resp = app_client.get(
+            f"/api/v1/reports/{setup['report_id']}",
+            headers=_auth_headers(setup["token_admin"]),
+        )
+        assert resp.status_code == 403
+
+    def test_admin_quarantine_html_denied(self, app_client, setup):
+        resp = app_client.get(
+            f"/api/v1/reports/{setup['report_id']}/html",
+            headers=_auth_headers(setup["token_admin"]),
         )
         assert resp.status_code == 403
 

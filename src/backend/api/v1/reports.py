@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 
+SENTINEL_CASE_ID = "00000000-0000-0000-0000-000000000000"
+
+
 async def _get_report_and_verify_access(
     report_id: str,
     user: UserModel,
@@ -62,6 +65,12 @@ async def _get_report_and_verify_access(
         cid = uuid.UUID(str(case_id_str))
     except ValueError:
         logger.error("Report %s has invalid case_id %r — denying access", report_id, case_id_str)
+        raise HTTPException(status_code=403, detail={"error": "access_denied"})
+
+    # Quarantine sentinel — migration 015 assigns this UUID to rows that had NULL case_id
+    # No user (including admin) may access quarantined reports
+    if str(cid) == SENTINEL_CASE_ID:
+        logger.error("Report %s has sentinel case_id (%s) — quarantined report denied", report_id, SENTINEL_CASE_ID)
         raise HTTPException(status_code=403, detail={"error": "access_denied"})
 
     await verify_case_access(cid, user, db, required_role)
