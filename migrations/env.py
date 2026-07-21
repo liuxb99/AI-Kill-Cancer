@@ -26,6 +26,8 @@ from src.backend.domain import (
     ConsentModel,
     AuditLogModel,
 )
+from src.backend.domain.user import UserModel, TokenBlacklistModel
+from src.backend.domain.case_acl import CaseACLModel
 
 config = context.config
 if config.config_file_name is not None:

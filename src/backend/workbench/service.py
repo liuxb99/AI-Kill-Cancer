@@ -8,7 +8,7 @@ import logging
 
 from src.backend.workbench.models import (
     KnowledgeGraph, GraphNode, GraphEdge,
-    TumorBoardReview, WorkbenchTimeline,
+    WorkbenchTimeline,
     CaseComparisonResult,
 )
 from src.backend.workbench.repository import TumorBoardRepository

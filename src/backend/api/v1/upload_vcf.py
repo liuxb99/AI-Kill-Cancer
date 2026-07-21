@@ -29,6 +29,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
+from src.backend.auth.dependencies import require_auth
+from src.backend.domain.user import UserModel
 from src.backend.domain.enums import (
     FileTypeEnum, GenomeBuildConfidenceEnum,
     UploadStatusEnum, ValidationStatusEnum, UploadEligibilityEnum,
@@ -244,6 +246,7 @@ async def upload_vcf(
     genome_build: Optional[str] = Form(None),
     sequencing_test_id: Optional[str] = Form(None),
     upload_mode: Optional[str] = Form(None),
+    user: UserModel = Depends(require_auth),
     db_session: AsyncSession = Depends(get_db),
 ):
     upload_id = str(uuid.uuid4())

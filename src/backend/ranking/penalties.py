@@ -4,7 +4,6 @@ Penalty functions for the Drug Ranking Engine.
 
 from __future__ import annotations
 
-from typing import Any
 
 
 class ConflictPenalty:

@@ -5,3 +5,7 @@ pydantic-settings==2.7.0
 python-multipart==0.0.19
 asyncpg==0.30.0
 sqlalchemy[asyncio]==2.0.36
+bcrypt==4.2.1
+PyJWT==2.10.1
+alembic==1.14.0
+aiosqlite==0.20.0

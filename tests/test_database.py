@@ -1,21 +1,12 @@
 import uuid
 import pytest
-from datetime import date
 from sqlalchemy import create_engine, event
 from sqlalchemy.pool import StaticPool
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from src.backend.database.models import (
     Base, Patient, Diagnosis, Treatment, Drug, ResearchPaper,
     GenderEnum, CancerStageEnum, TreatmentStatusEnum,
-)
-from src.backend.database.crud import (
-    create_patient, get_patient, list_patients,
-    update_patient, delete_patient, count_patients,
-    create_diagnosis, get_diagnoses_by_patient,
-    create_treatment, get_treatments_by_patient,
-    create_drug, get_drugs_by_treatment,
-    create_research_paper, search_research_papers,
 )
 
 

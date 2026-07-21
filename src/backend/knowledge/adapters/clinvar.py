@@ -10,12 +10,10 @@ License: ClinVar data is public domain
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import time
 from datetime import datetime, timezone
 from typing import Optional
-from xml.etree import ElementTree
 
 import httpx
 

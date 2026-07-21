@@ -20,11 +20,6 @@ async def init_db(db_url: str, debug: bool = False):
     async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with engine.begin() as conn:
         from src.backend.database.models import Base
-        from src.backend.domain import PatientModel, CancerCaseModel, SpecimenModel, \
-            SequencingTestModel, UploadedFileModel, VariantModel, GeneModel, \
-            ProteinModel, PathwayModel, DrugModel, DrugTargetModel, EvidenceModel, \
-            DrugCandidateModel, PublicationModel, ClinicalTrialModel, AnalysisRunModel, \
-            ReportModel, ConsentModel, AuditLogModel
         await conn.run_sync(Base.metadata.create_all)
 
 

@@ -11,21 +11,21 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
+from src.backend.auth.dependencies import require_auth, require_case_access, verify_case_access
+from src.backend.domain.case_acl import CaseRole
+from src.backend.domain.user import UserModel
 from src.backend.evidence.merger import EvidenceMerger
 from src.backend.ranking.engine import DrugRankingEngine
 from src.backend.ranking.models import (
-    DrugRankingResult, DrugRankingRunResponse, DrugRankingRunStatus,
+    DrugRankingResult, DrugRankingRunResponse,
 )
-from src.backend.ranking.repository import RankingRunRepository, RankingRunModel
+from src.backend.ranking.repository import RankingRunRepository
 from src.backend.repositories.variant_repo import VariantRepository
-from src.backend.repositories.knowledge_source_repo import KnowledgeSourceRepository
 from src.backend.api.v1.deps import get_variant_repo
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ router = APIRouter(prefix="/ranking", tags=["ranking"])
 @router.post("/variant/{variant_id}", response_model=DrugRankingRunResponse)
 async def rank_variant(
     variant_id: str,
+    user: UserModel = Depends(require_auth),
     repo: VariantRepository = Depends(get_variant_repo),
     db: AsyncSession = Depends(get_db),
 ):
@@ -47,6 +48,10 @@ async def rank_variant(
     variant = await repo.get(vid)
     if not variant:
         raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Variant not found"})
+
+    # Check case-level access if variant belongs to a case
+    if hasattr(variant, 'case_id') and variant.case_id:
+        await verify_case_access(variant.case_id, user, db, CaseRole.EDITOR)
 
     # Gather evidence
     merger = EvidenceMerger(db=db)
@@ -103,6 +108,7 @@ async def rank_variant(
 @router.post("/case/{case_id}", response_model=DrugRankingRunResponse)
 async def rank_case(
     case_id: str,
+    user: UserModel = Depends(require_case_access(CaseRole.EDITOR)),
     db: AsyncSession = Depends(get_db),
 ):
     """Rank drugs for a cancer case.
@@ -111,13 +117,11 @@ async def rank_case(
     → preserves variant-specific evidence → persists ranking run.
     """
     import uuid
-    from datetime import datetime, timezone
     from src.backend.repositories.cancer_case_repo import CancerCaseRepository
     from src.backend.repositories.variant_repo import VariantRepository
     from src.backend.evidence.merger import EvidenceMerger
     from src.backend.ranking.engine import DrugRankingEngine
     from src.backend.ranking.repository import RankingRunRepository
-    from src.backend.ranking.models import DrugRankingResult
 
     try:
         cid = uuid.UUID(case_id)

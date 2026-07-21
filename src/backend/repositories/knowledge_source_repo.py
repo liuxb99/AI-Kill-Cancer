@@ -6,11 +6,10 @@ Provides upsert, version tracking, health check recording.
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select, func, update as sa_update
+from sqlalchemy import select
 
 from src.backend.repositories.base import BaseRepository
 from src.backend.evidence.domain import KnowledgeSourceModel

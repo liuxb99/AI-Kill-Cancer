@@ -74,12 +74,10 @@ class CIViCAdapter(BaseAdapter):
         return errors
 
     async def lookup_gene(self, gene_symbol: str, request_id: str = "") -> AdapterResult:
-        import httpx
         url = f"{self._api_base}/genes/{gene_symbol}"
         return await self._api_get(url, request_id)
 
     async def lookup_variant(self, gene_symbol: str, variant_name: str = "", request_id: str = "") -> AdapterResult:
-        import httpx
         url = f"{self._api_base}/genes/{gene_symbol}/variants"
         params = {}
         if variant_name:
@@ -87,13 +85,11 @@ class CIViCAdapter(BaseAdapter):
         return await self._api_get(url, request_id, params=params)
 
     async def lookup_hgvs(self, hgvs: str, request_id: str = "") -> AdapterResult:
-        import httpx
         url = f"{self._api_base}/variants"
         params = {"hgvs": hgvs}
         return await self._api_get(url, request_id, params=params)
 
     async def lookup_coordinates(self, chromosome: str, position: int, reference: str, alternate: str, request_id: str = "") -> AdapterResult:
-        import httpx
         region = f"{chromosome}:{position}:{reference}:{alternate}"
         url = f"{self._api_base}/variants"
         params = {"region": region}

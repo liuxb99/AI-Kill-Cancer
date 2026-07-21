@@ -13,15 +13,17 @@ Provides:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
+from src.backend.auth.dependencies import require_auth, require_case_access
+from src.backend.domain.case_acl import CaseRole
+from src.backend.domain.user import UserModel
 from src.backend.workbench.service import WorkbenchService
 from src.backend.workbench.models import (
-    KnowledgeGraph, TumorBoardReview, WorkbenchTimeline,
+    KnowledgeGraph, WorkbenchTimeline,
     CaseComparisonResult,
 )
 from src.backend.workbench.repository import TumorBoardRepository
@@ -33,6 +35,7 @@ router = APIRouter(prefix="/workbench", tags=["workbench"])
 @router.get("/graph/variant/{variant_id}", response_model=KnowledgeGraph)
 async def get_variant_graph(
     variant_id: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Get knowledge graph data for a variant."""
@@ -44,6 +47,7 @@ async def get_variant_graph(
 @router.get("/graph/case/{case_id}", response_model=KnowledgeGraph)
 async def get_case_graph(
     case_id: str,
+    user: UserModel = Depends(require_case_access(CaseRole.VIEWER)),
     db: AsyncSession = Depends(get_db),
 ):
     """Get knowledge graph data for a case."""
@@ -55,6 +59,7 @@ async def get_case_graph(
 @router.post("/tumor-board/{case_id}/review")
 async def create_tumor_board_review(
     case_id: str,
+    user: UserModel = Depends(require_case_access(CaseRole.REVIEWER)),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a tumor board review for a case."""
@@ -66,6 +71,7 @@ async def create_tumor_board_review(
 @router.get("/tumor-board/{case_id}/timeline", response_model=WorkbenchTimeline)
 async def get_case_timeline(
     case_id: str,
+    user: UserModel = Depends(require_case_access(CaseRole.VIEWER)),
     db: AsyncSession = Depends(get_db),
 ):
     """Get timeline of events for a case."""
@@ -77,6 +83,7 @@ async def get_case_timeline(
 @router.post("/compare/cases", response_model=CaseComparisonResult)
 async def compare_cases(
     case_ids: list[str],
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Compare multiple cases."""
@@ -88,6 +95,9 @@ async def compare_cases(
 
 
 @router.post("/compare/variants")
-async def compare_variants(variant_ids: list[str]):
+async def compare_variants(
+    variant_ids: list[str],
+    user: UserModel = Depends(require_auth),
+):
     """Compare variants (placeholder)."""
     return {"status": "not_implemented", "message": "Variant comparison not yet implemented"}

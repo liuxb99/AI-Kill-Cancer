@@ -9,6 +9,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.backend.api.v1.deps import get_sequencing_repo
+from src.backend.auth.dependencies import require_auth
+from src.backend.domain.user import UserModel
 from src.backend.domain.sequencing_test import SequencingTestCreate, SequencingTestResponse
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 
@@ -19,6 +21,7 @@ router = APIRouter(prefix="/sequencing-tests", tags=["sequencing-tests"])
 @router.post("", response_model=SequencingTestResponse, status_code=201)
 async def create_sequencing_test(
     body: SequencingTestCreate,
+    user: UserModel = Depends(require_auth),
     repo: SequencingTestRepository = Depends(get_sequencing_repo),
 ):
     try:
@@ -32,6 +35,7 @@ async def create_sequencing_test(
 @router.get("/{test_id}", response_model=SequencingTestResponse)
 async def get_sequencing_test(
     test_id: str,
+    user: UserModel = Depends(require_auth),
     repo: SequencingTestRepository = Depends(get_sequencing_repo),
 ):
     try:

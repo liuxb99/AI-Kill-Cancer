@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional
 
 from src.backend.knowledge.repository import KnowledgeRepository
 from src.backend.knowledge.models import KnowledgeEntityResponse, KnowledgeEntity
@@ -33,7 +32,7 @@ class KnowledgeService:
         if not entity:
             return KnowledgeEntityResponse()
 
-        relations = await self.repo.get_relations(vid)
+        await self.repo.get_relations(vid)
         return KnowledgeEntityResponse(
             entity=KnowledgeEntity(
                 id=str(entity.id),
@@ -53,7 +52,7 @@ class KnowledgeService:
             return KnowledgeEntityResponse()
 
         entity = entities[0]
-        relations = await self.repo.get_relations(entity.id)
+        await self.repo.get_relations(entity.id)
         return KnowledgeEntityResponse(
             entity=KnowledgeEntity(
                 id=str(entity.id),

@@ -4,7 +4,6 @@ Tests for Clinical Reasoning Layer (v0.7.0).
 
 from __future__ import annotations
 
-import pytest
 
 from src.backend.reasoning.models import (
     ClinicalReasoningResult, ReasoningRunResponse,
@@ -15,8 +14,7 @@ from src.backend.reasoning.validator import EvidenceCitationValidator, Hallucina
 from src.backend.reasoning.conflicts import ConflictAnalyzer
 from src.backend.reasoning.context import ReasoningContextBuilder
 from src.backend.reasoning.llm import (
-    LLMAdapter, DisabledLLMAdapter, OpenAILikeAdapter, LocalLLMAdapter,
-    get_llm_adapter, LLMResult,
+    DisabledLLMAdapter, OpenAILikeAdapter, get_llm_adapter,
 )
 
 

@@ -13,12 +13,13 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
+from src.backend.auth.dependencies import require_auth
+from src.backend.domain.user import UserModel
 from src.backend.evidence.merger import EvidenceMerger
 from src.backend.evidence.cache import gene_cache, variant_cache
 from src.backend.evidence.domain import (
@@ -27,7 +28,6 @@ from src.backend.evidence.domain import (
     EvidenceItemResponse, DrugInteractionResponse,
 )
 from src.backend.repositories.variant_repo import VariantRepository
-from src.backend.repositories.knowledge_source_repo import KnowledgeSourceRepository
 from src.backend.api.v1.deps import get_variant_repo
 
 logger = logging.getLogger(__name__)
@@ -72,6 +72,7 @@ def _to_interaction_response(item: dict) -> DrugInteractionResponse:
 @router.get("/variant/{variant_id}", response_model=EvidenceVariantResponse)
 async def get_variant_evidence(
     variant_id: str,
+    user: UserModel = Depends(require_auth),
     repo: VariantRepository = Depends(get_variant_repo),
     db: AsyncSession = Depends(get_db),
 ):
@@ -122,6 +123,7 @@ async def get_variant_evidence(
 @router.get("/gene/{gene_symbol}", response_model=EvidenceGeneResponse)
 async def get_gene_evidence(
     gene_symbol: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Get clinical evidence for a gene symbol."""
@@ -150,7 +152,10 @@ async def get_gene_evidence(
 
 
 @router.post("/refresh", response_model=EvidenceRefreshResponse)
-async def refresh_evidence(db: AsyncSession = Depends(get_db)):
+async def refresh_evidence(
+    user: UserModel = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
     """
     Full evidence refresh: query all sources, merge, persist to DB,
     invalidate caches, return summary.
@@ -173,7 +178,7 @@ async def refresh_evidence(db: AsyncSession = Depends(get_db)):
                      "ASXL1", "EZH2", "IDH1", "IDH2", "JAK2", "MPL", "CALR",
                      "BCR", "ABL1", "JAK3", "IL7R", "PHF6", "WT1", "PTPN11"]
 
-    total = len(cancer_genes)
+    len(cancer_genes)
     for i, gene in enumerate(cancer_genes):
         try:
             result = await merger.refresh_all(
@@ -210,7 +215,9 @@ async def refresh_evidence(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/cache/invalidate", response_model=EvidenceCacheInvalidateResponse)
-async def invalidate_evidence_cache():
+async def invalidate_evidence_cache(
+    user: UserModel = Depends(require_auth),
+):
     """Invalidate in-memory evidence cache only. Does not query sources."""
     cleared = datetime.now(timezone.utc)
     gene_cache.clear()

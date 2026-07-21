@@ -1,18 +1,16 @@
 import numpy as np
-import torch
+import pytest
+
+torch = pytest.importorskip("torch", reason="PyTorch not installed")
 
 from src.models import (
     CancerClassifier, CancerClassifierConfig,
     Trainer, TrainingConfig,
-    Predictor,
     MoleculeVAE, MoleculeVAEConfig,
     DTIPredictor, DTIPredictorConfig,
     DrugDiscoveryPipeline,
-    DrugBankIntegrator, DrugBankConfig,
-    FingerprintConfig,
-    validate_smiles, standardize_smiles,
-    smiles_to_indices, indices_to_smiles,
-    morgan_fingerprint, compute_descriptors,
+    DrugBankIntegrator, FingerprintConfig,
+    validate_smiles, smiles_to_indices, indices_to_smiles,
     tanimoto_similarity,
 )
 from src.models.treatment_recommender import (
@@ -138,7 +136,7 @@ class TestPredictor:
         model.eval()
         import torch
         with torch.no_grad():
-            probs = model.predict_proba(torch.tensor(x.reshape(1, -1)))
+            model.predict_proba(torch.tensor(x.reshape(1, -1)))
             preds = model.predict(torch.tensor(x.reshape(1, -1)))
         assert preds["cancer_type"].shape == (1,)
 

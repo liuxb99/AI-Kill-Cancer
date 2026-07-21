@@ -3,7 +3,6 @@ Tests for normalization semantics and bcftools adapter.
 """
 from __future__ import annotations
 
-import pytest
 from src.backend.pipeline.normalization import (
     normalize_minimal_representation,
     BcftoolsAdapter,

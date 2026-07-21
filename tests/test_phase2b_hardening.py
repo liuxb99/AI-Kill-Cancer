@@ -14,16 +14,13 @@ Tests:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 
 from src.backend.evidence.domain import (
     KnowledgeSourceModel, EvidenceItemModel, DrugInteractionModel,
     MATCH_LEVEL_ORDER, MATCH_LEVEL_PRECEDENCE,
-    EvidenceVariantResponse, EvidenceGeneResponse,
-    EvidenceRefreshResponse, EvidenceCacheInvalidateResponse,
+    EvidenceVariantResponse, EvidenceRefreshResponse, EvidenceCacheInvalidateResponse,
 )
 from src.backend.evidence.merger import EvidenceMerger
 from src.backend.evidence.cache import TTLCache

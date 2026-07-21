@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, String, Text, DateTime, JSON, Boolean, select
+from sqlalchemy import Column, String, Text, DateTime, JSON, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.models import CompatUUID, Base as DBBase

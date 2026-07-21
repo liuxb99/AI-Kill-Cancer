@@ -3,7 +3,6 @@ Tests for normalization pipeline.
 """
 from __future__ import annotations
 
-import pytest
 from src.backend.pipeline.normalization import normalize_minimal_representation, BcftoolsAdapter
 from src.backend.domain.enums import NormalizationStatusEnum
 

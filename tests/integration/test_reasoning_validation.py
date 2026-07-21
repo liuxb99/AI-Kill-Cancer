@@ -2,8 +2,7 @@
 """
 Integration test for clinical reasoning validation.
 """
-import pytest
-from src.backend.reasoning.models import ClinicalReasoningResult, ReasoningValidationResult
+from src.backend.reasoning.models import ClinicalReasoningResult
 from src.backend.reasoning.validator import EvidenceCitationValidator
 from src.backend.reasoning.conflicts import ConflictAnalyzer
 from src.backend.reasoning.context import ReasoningContextBuilder
@@ -43,7 +42,7 @@ class TestReasoningValidationFlow:
         import asyncio
         builder = ReasoningContextBuilder()
         ctx1 = asyncio.run(builder.build(variant_data={"gene": "BRAF"}))
-        ctx2 = asyncio.run(builder.build(variant_data={"gene": "BRAF"}))
+        asyncio.run(builder.build(variant_data={"gene": "BRAF"}))
         # Different built_at timestamps, so hashes will differ
         assert ctx1.context_hash is not None
         assert len(ctx1.context_hash) == 64

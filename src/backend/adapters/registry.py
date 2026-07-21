@@ -49,8 +49,6 @@ def get_registry() -> AdapterRegistry:
 
 def _register_defaults(registry: AdapterRegistry) -> None:
     """Register all adapters. Phase 2A: VEP is REST API, OpenCRAVAT not_configured."""
-    from src.backend.adapters.ensembl_vep import EnsemblVEPAdapter
-    from src.backend.adapters.opencravat import OpenCRAVATAdapter as OpenCRAVATStub
     from src.backend.adapters.civic import CIViCAdapter
     from src.backend.adapters.dgidb import DGIdbAdapter
     from src.backend.adapters.oncotree import OncoTreeAdapter

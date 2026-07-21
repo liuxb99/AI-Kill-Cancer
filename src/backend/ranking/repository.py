@@ -4,13 +4,11 @@ Repository for persisting and retrieving Drug Ranking runs.
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, String, Text, DateTime, JSON, Float, Integer
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import Column, String, DateTime, JSON
 
 from src.backend.database.models import CompatUUID, Base as DBBase
 

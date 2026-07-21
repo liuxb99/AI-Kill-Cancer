@@ -15,10 +15,9 @@ from src.backend.reasoning.context import ReasoningContextBuilder
 from src.backend.reasoning.validator import EvidenceCitationValidator, HallucinationGuard
 from src.backend.reasoning.conflicts import ConflictAnalyzer
 from src.backend.reasoning.repository import ReasoningRunRepository
-from src.backend.reasoning.llm import get_llm_adapter, LLMAdapter, LLMResult
+from src.backend.reasoning.llm import get_llm_adapter, LLMAdapter
 from src.backend.reasoning.models import (
-    ClinicalReasoningResult, ReasoningRunResponse, ReasoningValidationResult,
-    ReasoningEvidenceCitation, ReasoningDrugExplanation, SafetyNotice,
+    ClinicalReasoningResult, ReasoningRunResponse, ReasoningDrugExplanation, SafetyNotice,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +64,7 @@ class ClinicalReasoningService:
 
         Uses frozen context snapshots. All evidence must be pre-collected.
         """
-        now = datetime.utcnow()
+        datetime.utcnow()
         run_id = uuid.uuid4()
 
         # Build frozen context

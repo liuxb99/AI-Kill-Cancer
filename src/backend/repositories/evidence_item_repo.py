@@ -143,7 +143,7 @@ class EvidenceItemRepository(BaseRepository[EvidenceItemModel]):
                 EvidenceItemModel.withdrawn_at.is_(None),
                 or_(
                     EvidenceItemModel.is_superseded.is_(None),
-                    EvidenceItemModel.is_superseded == False,
+                    not EvidenceItemModel.is_superseded,
                 ),
             )
         )
@@ -157,7 +157,7 @@ class EvidenceItemRepository(BaseRepository[EvidenceItemModel]):
                 EvidenceItemModel.withdrawn_at.is_(None),
                 or_(
                     EvidenceItemModel.is_superseded.is_(None),
-                    EvidenceItemModel.is_superseded == False,
+                    not EvidenceItemModel.is_superseded,
                 ),
             )
         )
@@ -170,7 +170,7 @@ class EvidenceItemRepository(BaseRepository[EvidenceItemModel]):
                 EvidenceItemModel.withdrawn_at.is_(None),
                 or_(
                     EvidenceItemModel.is_superseded.is_(None),
-                    EvidenceItemModel.is_superseded == False,
+                    not EvidenceItemModel.is_superseded,
                 ),
             )
         )

@@ -3,24 +3,18 @@ Tests for repository layer — uses SQLite in-memory.
 """
 from __future__ import annotations
 
-import uuid
 import pytest
-from datetime import datetime
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import sessionmaker
 
 from src.backend.database.models import Base
 from src.backend.repositories.patient_repo import PatientRepository
-from src.backend.repositories.cancer_case_repo import CancerCaseRepository
 from src.backend.repositories.variant_repo import VariantRepository
-from src.backend.repositories.drug_repo import DrugRepository
-from src.backend.repositories.evidence_repo import EvidenceRepository
 from src.backend.repositories.analysis_run_repo import AnalysisRunRepository
 from src.backend.domain.patient import PatientModel, SexEnum, ConsentStatusEnum
 from src.backend.domain.cancer_case import CancerCaseModel, CancerTypeEnum
-from src.backend.domain.variant import VariantModel, VariantTypeEnum, VariantOriginEnum, OncogenicityEnum
-from src.backend.domain.analysis_run import AnalysisRunModel, AnalysisStatusEnum
+from src.backend.domain.variant import VariantTypeEnum, VariantOriginEnum
+from src.backend.domain.analysis_run import AnalysisStatusEnum
 
 
 @pytest.fixture
@@ -79,8 +73,6 @@ class TestVariantRepository:
         repo = VariantRepository(db_session)
         from src.backend.domain.sequencing_test import SequencingTestModel
         from src.backend.domain.specimen import SpecimenModel
-        from src.backend.domain.cancer_case import CancerCaseModel
-        from src.backend.domain.patient import PatientModel
 
         # Create chain: patient -> case -> specimen -> seq_test -> variants
         patient = PatientModel(display_name="TEST", sex=SexEnum.F, consent_status=ConsentStatusEnum.GRANTED)
@@ -95,7 +87,7 @@ class TestVariantRepository:
         db_session.add(specimen)
         await db_session.flush()
 
-        from src.backend.domain.sequencing_test import SequencingTestModel, AnalysisResultTypeEnum
+        from src.backend.domain.sequencing_test import AnalysisResultTypeEnum
         seq = SequencingTestModel(specimen_id=specimen.id, assay_name="ThyroSeq", result_type=AnalysisResultTypeEnum.SOMATIC)
         db_session.add(seq)
         await db_session.flush()
@@ -138,8 +130,6 @@ class TestVariantRepository:
 class TestAnalysisRunRepository:
     async def test_create_analysis_run(self, db_session):
         repo = AnalysisRunRepository(db_session)
-        from src.backend.domain.cancer_case import CancerCaseModel
-        from src.backend.domain.patient import PatientModel
 
         patient = PatientModel(display_name="TEST", sex=SexEnum.F, consent_status=ConsentStatusEnum.GRANTED)
         db_session.add(patient)

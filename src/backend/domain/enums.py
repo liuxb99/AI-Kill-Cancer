@@ -272,6 +272,41 @@ class ConsentTypeEnum(str, enum.Enum):
 
 class AuditActionEnum(str, enum.Enum):
     CREATE = "create"
+
+
+# ── Auth enums (imported by domain/user.py and auth/models.py) ──────────
+
+class Role(str, enum.Enum):
+    ADMIN = "admin"
+    CLINICIAN = "clinician"
+    RESEARCHER = "researcher"
+    REVIEWER = "reviewer"
+    VIEWER = "viewer"
+    SERVICE = "service"
+
+
+class Permission(str, enum.Enum):
+    # Patient/Case permissions
+    READ_PATIENT = "read:patient"
+    WRITE_PATIENT = "write:patient"
+    DELETE_PATIENT = "delete:patient"
+    # Evidence permissions
+    READ_EVIDENCE = "read:evidence"
+    REFRESH_EVIDENCE = "refresh:evidence"
+    # Ranking permissions
+    READ_RANKING = "read:ranking"
+    RUN_RANKING = "run:ranking"
+    # Reasoning permissions
+    READ_REASONING = "read:reasoning"
+    RUN_REASONING = "run:reasoning"
+    # Report permissions
+    READ_REPORT = "read:report"
+    CREATE_REPORT = "create:report"
+    DOWNLOAD_REPORT = "download:report"
+    # Admin permissions
+    MANAGE_USERS = "manage:users"
+    MANAGE_SETTINGS = "manage:settings"
+    VIEW_AUDIT = "view:audit"
     READ = "read"
     UPDATE = "update"
     DELETE = "delete"

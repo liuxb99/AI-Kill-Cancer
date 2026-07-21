@@ -9,6 +9,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.backend.api.v1.deps import get_upload_repo
+from src.backend.auth.dependencies import require_auth
+from src.backend.domain.user import UserModel
 from src.backend.domain.uploaded_file import UploadedFileCreate, UploadedFileResponse
 from src.backend.repositories.uploaded_file_repo import UploadedFileRepository
 
@@ -19,6 +21,7 @@ router = APIRouter(prefix="/uploads", tags=["uploads"])
 @router.post("", response_model=UploadedFileResponse, status_code=201)
 async def create_upload(
     body: UploadedFileCreate,
+    user: UserModel = Depends(require_auth),
     repo: UploadedFileRepository = Depends(get_upload_repo),
 ):
     try:
@@ -32,6 +35,7 @@ async def create_upload(
 @router.get("/{upload_id}", response_model=UploadedFileResponse)
 async def get_upload(
     upload_id: str,
+    user: UserModel = Depends(require_auth),
     repo: UploadedFileRepository = Depends(get_upload_repo),
 ):
     try:

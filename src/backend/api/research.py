@@ -188,7 +188,7 @@ async def list_uploads():
 async def sandbox_run(body: SandboxRunRequest):
     try:
         run_id = str(uuid.uuid4())
-        import time, random
+        import time
         from datetime import datetime, timezone
         start = time.monotonic()
 

@@ -4,7 +4,6 @@ Tests for Doctor Workbench (v0.9.0).
 
 from __future__ import annotations
 
-import pytest
 import uuid
 
 from src.backend.workbench.models import (
@@ -14,7 +13,7 @@ from src.backend.workbench.models import (
 )
 from src.backend.workbench.service import WorkbenchService
 from src.backend.workbench.repository import (
-    TumorBoardReviewModel, WorkbenchNoteModel, TumorBoardRepository,
+    TumorBoardRepository,
 )
 
 
@@ -104,7 +103,7 @@ class TestTumorBoardRepository:
         repo = TumorBoardRepository(db)
 
         # Create and immediately try to update (mock won't persist)
-        review = await repo.create_review(case_id="case-1")
+        await repo.create_review(case_id="case-1")
         # Since mock doesn't actually persist, update will return None
         result = await repo.update_status(uuid.uuid4(), "approved", "approve")
         assert result is None  # Mock DB doesn't store

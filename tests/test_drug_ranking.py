@@ -17,12 +17,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
 
 from src.backend.ranking.scorers import (
     EvidenceScorer, ResistanceScorer, SensitivityScorer,
     GuidelineScorer, RegulatoryScorer, ClinicalTrialScorer,
-    EVIDENCE_LEVEL_WEIGHT, MATCH_LEVEL_WEIGHT,
 )
 from src.backend.ranking.penalties import ConflictPenalty, UncertaintyPenalty
 from src.backend.ranking.engine import DrugRankingEngine

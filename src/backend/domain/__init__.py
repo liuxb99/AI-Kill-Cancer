@@ -27,6 +27,8 @@ from src.backend.domain.enums import (
     FileTypeEnum,
     NormalizationStatusEnum,
     OncogenicityEnum,
+    Permission,
+    Role,
     SexEnum,
     SpecimenTypeEnum,
     UploadStatusEnum,
@@ -139,6 +141,27 @@ from src.backend.domain.visualization_graph import (
     EDGE_TYPES,
 )
 
+from src.backend.domain.user import (
+    UserModel,
+    TokenBlacklistModel,
+    UserCreate,
+    UserResponse,
+    TokenResponse,
+    LoginRequest,
+    RefreshRequest,
+    LogoutRequest,
+)
+
+from src.backend.domain.case_acl import (
+    CaseACLModel,
+    CaseRole,
+    CASE_ROLE_HIERARCHY,
+    CASE_REQUIRED_ROLES,
+    CaseACLCreate,
+    CaseACLResponse,
+    CasePermissionCheck,
+)
+
 
 __all__ = [
     # Enums
@@ -157,6 +180,8 @@ __all__ = [
     "FileTypeEnum",
     "NormalizationStatusEnum",
     "OncogenicityEnum",
+    "Permission",
+    "Role",
     "SexEnum",
     "SpecimenTypeEnum",
     "UploadStatusEnum",
@@ -224,4 +249,21 @@ __all__ = [
     "GraphAnalysisResponse",
     "NODE_TYPES",
     "EDGE_TYPES",
+    # Auth
+    "UserModel",
+    "TokenBlacklistModel",
+    "UserCreate",
+    "UserResponse",
+    "TokenResponse",
+    "LoginRequest",
+    "RefreshRequest",
+    "LogoutRequest",
+    # Case ACL
+    "CaseACLModel",
+    "CaseRole",
+    "CASE_ROLE_HIERARCHY",
+    "CASE_REQUIRED_ROLES",
+    "CaseACLCreate",
+    "CaseACLResponse",
+    "CasePermissionCheck",
 ]

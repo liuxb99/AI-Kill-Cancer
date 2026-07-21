@@ -4,10 +4,8 @@ Pydantic models for the Doctor Workbench.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel
 
 
 class GraphNode(BaseModel):

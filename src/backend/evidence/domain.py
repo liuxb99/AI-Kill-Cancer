@@ -12,8 +12,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Float, Text, DateTime, JSON, Integer, Enum as SAEnum, ForeignKey, Boolean
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import Column, String, Float, Text, DateTime, JSON, Integer, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 
 from src.backend.database.models import CompatUUID, Base as DBBase

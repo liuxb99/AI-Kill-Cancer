@@ -8,9 +8,7 @@ from pydantic import ValidationError
 
 from src.backend.domain.enums import (
     CancerTypeEnum, SexEnum, ConsentStatusEnum,
-    VariantTypeEnum, VariantOriginEnum, OncogenicityEnum,
-    EvidenceDirectionEnum, EvidenceLevelEnum, CandidateCategoryEnum,
-    AnalysisStatusEnum, FileTypeEnum, UploadStatusEnum,
+    VariantTypeEnum, VariantOriginEnum, EvidenceDirectionEnum, EvidenceLevelEnum, FileTypeEnum,
 )
 from src.backend.domain.patient import PatientCreate, PatientUpdate
 from src.backend.domain.cancer_case import CancerCaseCreate
@@ -196,7 +194,6 @@ class TestAnalysisRunSchema:
 
     def test_analysis_run_default_status(self):
         """AnalysisRuns created in Phase 1 start as pending."""
-        from src.backend.domain.analysis_run import AnalysisRunModel, AnalysisStatusEnum
         # AnalysisRunCreate doesn't have status field — it's set server-side
         a = AnalysisRunCreate(
             case_id="550e8400-e29b-41d4-a716-446655440000",

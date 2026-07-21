@@ -9,6 +9,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.backend.api.v1.deps import get_patient_repo
+from src.backend.auth.dependencies import require_auth
+from src.backend.domain.user import UserModel
 from src.backend.domain.patient import PatientCreate, PatientUpdate, PatientResponse, PatientListResponse
 from src.backend.repositories.patient_repo import PatientRepository
 
@@ -25,6 +27,7 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 @router.post("", response_model=PatientResponse, status_code=201)
 async def create_patient(
     body: PatientCreate,
+    user: UserModel = Depends(require_auth),
     repo: PatientRepository = Depends(get_patient_repo),
 ):
     try:
@@ -38,6 +41,7 @@ async def create_patient(
 @router.get("/{patient_id}", response_model=PatientResponse)
 async def get_patient(
     patient_id: str,
+    user: UserModel = Depends(require_auth),
     repo: PatientRepository = Depends(get_patient_repo),
 ):
     try:
@@ -55,6 +59,7 @@ async def get_patient(
 async def list_patients(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    user: UserModel = Depends(require_auth),
     repo: PatientRepository = Depends(get_patient_repo),
 ):
     patients = await repo.list(skip=skip, limit=limit)
@@ -67,6 +72,7 @@ async def list_patients(
 async def update_patient(
     patient_id: str,
     body: PatientUpdate,
+    user: UserModel = Depends(require_auth),
     repo: PatientRepository = Depends(get_patient_repo),
 ):
     try:
@@ -87,6 +93,7 @@ async def update_patient(
 @router.delete("/{patient_id}", status_code=204)
 async def delete_patient(
     patient_id: str,
+    user: UserModel = Depends(require_auth),
     repo: PatientRepository = Depends(get_patient_repo),
 ):
     try:

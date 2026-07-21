@@ -16,6 +16,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
+from src.backend.auth.dependencies import require_auth, require_case_access
+from src.backend.domain.case_acl import CaseRole
+from src.backend.domain.user import UserModel
 from src.backend.reasoning.service import ClinicalReasoningService
 from src.backend.reasoning.models import (
     ClinicalReasoningResult, ReasoningRunResponse, ReasoningValidationResult,
@@ -31,6 +34,7 @@ router = APIRouter(prefix="/reasoning", tags=["reasoning"])
 @router.post("/case/{case_id}", response_model=ReasoningRunResponse)
 async def reason_case(
     case_id: str,
+    user: UserModel = Depends(require_case_access(CaseRole.EDITOR)),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -54,6 +58,7 @@ async def reason_case(
 @router.get("/run/{run_id}", response_model=ReasoningRunResponse)
 async def get_reasoning_run(
     run_id: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Get a previously computed reasoning run."""

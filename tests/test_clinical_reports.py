@@ -4,11 +4,10 @@ Tests for Clinical Report System (v0.8.0).
 
 from __future__ import annotations
 
-import pytest
 
 from src.backend.reporting.models import (
     ClinicalReport, ReportMetadata, ReportSection,
-    ReportCreateResponse, ReportListResponse,
+    ReportCreateResponse,
 )
 from src.backend.reporting.builder import ReportBuilder
 from src.backend.reporting.validator import ReportValidator

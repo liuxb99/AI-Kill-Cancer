@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, String, Text, DateTime, JSON, Float, Integer, select
+from sqlalchemy import Column, String, DateTime, JSON, Float, Integer, select
 
 from src.backend.database.models import CompatUUID, Base as DBBase
 

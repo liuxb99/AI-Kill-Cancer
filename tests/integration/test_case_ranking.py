@@ -3,10 +3,7 @@
 Integration test for case-based drug ranking (was 501).
 Tests the full flow: variant evidence → merge → rank → persist.
 """
-import uuid
-import pytest
 from src.backend.ranking.engine import DrugRankingEngine
-from src.backend.ranking.models import DrugRankingResult
 
 class TestCaseRankingFlow:
     async def test_rank_case_no_variants(self):

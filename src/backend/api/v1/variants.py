@@ -8,6 +8,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.backend.api.v1.deps import get_variant_repo
+from src.backend.auth.dependencies import require_auth
+from src.backend.domain.user import UserModel
 from src.backend.domain.variant import VariantImportBatch, VariantResponse
 from src.backend.repositories.variant_repo import VariantRepository
 
@@ -18,6 +20,7 @@ router = APIRouter(prefix="/variants", tags=["variants"])
 @router.post("/import", response_model=list[VariantResponse], status_code=201)
 async def import_variants(
     body: VariantImportBatch,
+    user: UserModel = Depends(require_auth),
     repo: VariantRepository = Depends(get_variant_repo),
 ):
     try:

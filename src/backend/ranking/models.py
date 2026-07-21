@@ -4,11 +4,9 @@ Pydantic domain models for drug ranking engine results.
 
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict
 
 
 class ScoreBreakdown(BaseModel):

@@ -16,16 +16,14 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional, Union
+from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.pipeline.civic_adapter import CIViCAdapter
 from src.backend.pipeline.dgidb_adapter import DGIdbAdapter
-from src.backend.adapters.base import AdapterResult
 from src.backend.evidence.domain import (
-    MATCH_LEVEL_ORDER, MATCH_LEVEL_PRECEDENCE,
-    EvidenceItemModel, DrugInteractionModel, KnowledgeSourceModel,
+    MATCH_LEVEL_ORDER, KnowledgeSourceModel,
 )
 # Lazy imports to avoid circular dependency
 # KnowledgeSourceRepository, EvidenceItemRepository, DrugInteractionRepository
@@ -199,7 +197,7 @@ class EvidenceMerger:
         # Determine best match level achievable from query
         has_hgvs = bool(hgvs)
         has_coords = bool(chromosome and position and reference and alternate)
-        has_variant_name = bool(variant_name)
+        bool(variant_name)
         has_gene = bool(gene_symbol)
 
         # ── Phase 1: HGVS lookup ──

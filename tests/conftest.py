@@ -3,7 +3,6 @@ import sys
 import uuid
 import pytest
 import numpy as np
-from datetime import date
 from dataclasses import dataclass
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

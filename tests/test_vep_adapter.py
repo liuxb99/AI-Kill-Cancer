@@ -3,7 +3,6 @@ Tests for VEP adapter module.
 """
 from __future__ import annotations
 
-import pytest
 from src.backend.pipeline.vep_adapter import VEPAdapter, _build_region_string, _parse_vep_consequence
 
 

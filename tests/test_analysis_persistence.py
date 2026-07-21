@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 
 from src.backend.database.models import Base
 from src.backend.domain.enums import AnalysisStatusEnum
-from src.backend.pipeline.analysis_job import create_and_run_job, load_job_from_db, get_cached_job
+from src.backend.pipeline.analysis_job import create_and_run_job, load_job_from_db
 
 
 @pytest.fixture

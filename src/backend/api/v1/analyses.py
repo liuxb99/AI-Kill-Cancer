@@ -9,6 +9,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.backend.api.v1.deps import get_analysis_run_repo
+from src.backend.auth.dependencies import require_auth
+from src.backend.domain.user import UserModel
 from src.backend.domain.analysis_run import AnalysisRunCreate, AnalysisRunResponse
 from src.backend.domain.drug_candidate import DrugCandidateListResponse
 from src.backend.domain.evidence import EvidenceSearchResult
@@ -23,6 +25,7 @@ router = APIRouter(prefix="/analyses", tags=["analyses"])
 @router.post("", response_model=AnalysisRunResponse, status_code=201)
 async def create_analysis(
     body: AnalysisRunCreate,
+    user: UserModel = Depends(require_auth),
     repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
 ):
     try:
@@ -38,6 +41,7 @@ async def create_analysis(
 @router.get("/{analysis_id}", response_model=AnalysisRunResponse)
 async def get_analysis(
     analysis_id: str,
+    user: UserModel = Depends(require_auth),
     repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
 ):
     try:
@@ -54,6 +58,7 @@ async def get_analysis(
 @router.get("/{analysis_id}/graph", response_model=GraphAnalysisResponse)
 async def get_analysis_graph(
     analysis_id: str,
+    user: UserModel = Depends(require_auth),
     repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
 ):
     """Return the visualization graph for an analysis run.
@@ -87,6 +92,7 @@ async def get_analysis_graph(
 @router.get("/{analysis_id}/drug-candidates", response_model=DrugCandidateListResponse)
 async def get_analysis_drug_candidates(
     analysis_id: str,
+    user: UserModel = Depends(require_auth),
     repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
 ):
     """Return drug candidates for an analysis run.
@@ -107,6 +113,7 @@ async def get_analysis_drug_candidates(
 @router.get("/{analysis_id}/evidence", response_model=EvidenceSearchResult)
 async def get_analysis_evidence(
     analysis_id: str,
+    user: UserModel = Depends(require_auth),
     repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
 ):
     """Return evidence for an analysis run.

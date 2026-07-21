@@ -5,13 +5,12 @@ Tests for Extended Knowledge Layer (v0.6.0).
 from __future__ import annotations
 
 import uuid
-import pytest
 
 from src.backend.knowledge.models import (
     KnowledgeEntity, KnowledgeRelation, Publication, ClinicalTrial,
     GuidelineItem, RegulatoryApproval, KnowledgeEntityResponse,
 )
-from src.backend.knowledge.identifiers import IdentifierMapper, normalize_hgvs, normalize_gene_symbol
+from src.backend.knowledge.identifiers import IdentifierMapper, normalize_hgvs
 
 
 class TestIdentifierMapper:

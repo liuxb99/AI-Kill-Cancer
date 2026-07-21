@@ -4,7 +4,6 @@ ReportTemplateRegistry — manages HTML templates for clinical reports.
 
 from __future__ import annotations
 
-from typing import Optional
 
 from src.backend.reporting.models import ClinicalReport
 

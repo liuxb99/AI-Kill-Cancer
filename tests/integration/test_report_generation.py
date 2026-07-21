@@ -3,7 +3,6 @@
 Integration test for report generation flow.
 Tests: builder → validator → HTML → JSON → FHIR.
 """
-import pytest
 from src.backend.reporting.builder import ReportBuilder
 from src.backend.reporting.validator import ReportValidator
 from src.backend.reporting.renderer import ReportRenderer, FHIRExporter

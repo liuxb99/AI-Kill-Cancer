@@ -1,23 +1,22 @@
 """
 Authentication & Authorization system for production deployment.
 """
-
 from src.backend.auth.service import AuthService, get_auth_service
 from src.backend.auth.models import (
-    User, Role, Permission, Session, APIToken,
-    UserCreate, UserResponse, TokenResponse,
-    PermissionDeniedError, AuthenticationError,
+    Role, Permission, ROLE_PERMISSIONS,
+    AuthenticationError, PermissionDeniedError,
+    UserNotFoundError, DuplicateUserError,
 )
 from src.backend.auth.dependencies import (
-    require_auth, require_role, require_permission,
-    get_current_user,
+    require_auth, require_permission,
+    get_current_user, require_case_access, verify_case_access,
 )
 
 __all__ = [
     "AuthService", "get_auth_service",
-    "User", "Role", "Permission", "Session", "APIToken",
-    "UserCreate", "UserResponse", "TokenResponse",
-    "PermissionDeniedError", "AuthenticationError",
-    "require_auth", "require_role", "require_permission",
+    "Role", "Permission", "ROLE_PERMISSIONS",
+    "AuthenticationError", "PermissionDeniedError",
+    "UserNotFoundError", "DuplicateUserError",
+    "require_auth", "require_permission",
     "get_current_user",
 ]

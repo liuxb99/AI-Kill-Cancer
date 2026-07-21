@@ -2,10 +2,9 @@
 """
 Integration test for workbench flows.
 """
-import pytest
 from src.backend.workbench.models import (
     KnowledgeGraph, GraphNode, GraphEdge,
-    TumorBoardReview, WorkbenchTimeline, CaseComparisonResult,
+    TumorBoardReview, CaseComparisonResult,
 )
 
 class TestWorkbenchAPIFlow:

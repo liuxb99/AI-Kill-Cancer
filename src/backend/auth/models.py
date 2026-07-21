@@ -1,47 +1,23 @@
 """
-Auth models — User, Role, Permission, Session, APIToken.
-"""
+Auth models — Role/Permission (re-exported), ROLE_PERMISSIONS mapping, and error classes.
 
+Role and Permission enums are defined in src/backend/domain/enums.py to avoid
+circular imports between auth and domain packages.
+"""
 from __future__ import annotations
 
-import enum
-from datetime import datetime
-from typing import Optional
+from src.backend.domain.enums import Role, Permission
 
-from pydantic import BaseModel, Field
-
-
-class Role(str, enum.Enum):
-    ADMIN = "admin"
-    CLINICIAN = "clinician"
-    RESEARCHER = "researcher"
-    REVIEWER = "reviewer"
-    VIEWER = "viewer"
-    SERVICE = "service"
-
-
-class Permission(str, enum.Enum):
-    # Patient/Case permissions
-    READ_PATIENT = "read:patient"
-    WRITE_PATIENT = "write:patient"
-    DELETE_PATIENT = "delete:patient"
-    # Evidence permissions
-    READ_EVIDENCE = "read:evidence"
-    REFRESH_EVIDENCE = "refresh:evidence"
-    # Ranking permissions
-    READ_RANKING = "read:ranking"
-    RUN_RANKING = "run:ranking"
-    # Reasoning permissions
-    READ_REASONING = "read:reasoning"
-    RUN_REASONING = "run:reasoning"
-    # Report permissions
-    READ_REPORT = "read:report"
-    CREATE_REPORT = "create:report"
-    DOWNLOAD_REPORT = "download:report"
-    # Admin permissions
-    MANAGE_USERS = "manage:users"
-    MANAGE_SETTINGS = "manage:settings"
-    VIEW_AUDIT = "view:audit"
+# Re-export for convenience
+__all__ = [
+    "Role",
+    "Permission",
+    "ROLE_PERMISSIONS",
+    "AuthenticationError",
+    "PermissionDeniedError",
+    "UserNotFoundError",
+    "DuplicateUserError",
+]
 
 
 # Role -> Permission mapping
@@ -54,6 +30,9 @@ ROLE_PERMISSIONS: dict[Role, list[Permission]] = {
         Permission.READ_REPORT, Permission.CREATE_REPORT, Permission.DOWNLOAD_REPORT,
         Permission.MANAGE_USERS, Permission.MANAGE_SETTINGS,
         Permission.VIEW_AUDIT,
+        Permission.READ, Permission.UPDATE, Permission.DELETE, Permission.EXPORT, Permission.SHARE,
+        Permission.CONSENT_GRANT, Permission.CONSENT_REVOKE,
+        Permission.ANALYSIS_START, Permission.ANALYSIS_COMPLETE,
     ],
     Role.CLINICIAN: [
         Permission.READ_PATIENT, Permission.WRITE_PATIENT,
@@ -91,57 +70,21 @@ ROLE_PERMISSIONS: dict[Role, list[Permission]] = {
 }
 
 
-class User(BaseModel):
-    id: str = ""
-    username: str = ""
-    email: str = ""
-    role: Role = Role.VIEWER
-    is_active: bool = True
-    created_at: str = ""
-
-
-class UserCreate(BaseModel):
-    username: str = Field(..., min_length=3, max_length=64)
-    email: str = ""
-    password: str = Field(..., min_length=8)
-    role: Role = Role.VIEWER
-
-
-class UserResponse(BaseModel):
-    id: str = ""
-    username: str = ""
-    email: str = ""
-    role: str = ""
-    is_active: bool = True
-
-
-class TokenResponse(BaseModel):
-    access_token: str = ""
-    token_type: str = "bearer"
-    user: UserResponse
-
-
-class Session(BaseModel):
-    id: str = ""
-    user_id: str = ""
-    token_hash: str = ""
-    expires_at: str = ""
-    created_at: str = ""
-
-
-class APIToken(BaseModel):
-    id: str = ""
-    user_id: str = ""
-    name: str = ""
-    token_hash: str = ""
-    permissions: list[str] = []
-    expires_at: str = ""
-    created_at: str = ""
-
-
 class AuthenticationError(Exception):
+    """Raised when token validation fails."""
     pass
 
 
 class PermissionDeniedError(Exception):
+    """Raised when a user lacks the required permission."""
+    pass
+
+
+class UserNotFoundError(Exception):
+    """Raised when a user is not found."""
+    pass
+
+
+class DuplicateUserError(Exception):
+    """Raised when a username or email already exists."""
     pass

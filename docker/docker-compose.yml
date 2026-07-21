@@ -68,6 +68,7 @@ services:
       DB_NAME: ${DB_NAME:-cancer_db}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-key-change-in-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:80,http://localhost:3000}
       DEBUG: ${DEBUG:-false}
       MODEL_ENABLED: ${MODEL_ENABLED:-true}
@@ -90,9 +91,16 @@ services:
     container_name: cancer_frontend
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_started
     ports:
       - "${FRONTEND_PORT:-80}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     logging: *default-logging
     networks:
       - cancer_net

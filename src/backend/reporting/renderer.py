@@ -4,8 +4,6 @@ ReportRenderer — renders clinical reports to HTML, JSON, and FHIR.
 
 from __future__ import annotations
 
-import json
-from typing import Optional
 
 from src.backend.reporting.models import ClinicalReport
 from src.backend.reporting.templates import ReportTemplateRegistry

@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 from src.backend.api.routes import router
 from src.backend.api.research import router as research_router
 from src.backend.api.v1.router import router as v1_router
+from src.backend.auth.api import router as auth_router
 from src.backend.config import settings
 from src.backend.database.session import init_db, close_db
 
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
     app.include_router(router)
     app.include_router(research_router)
     app.include_router(v1_router)
+    app.include_router(auth_router)
 
     frontend_dist = os.path.normpath(
         os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

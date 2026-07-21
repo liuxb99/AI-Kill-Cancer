@@ -3,7 +3,6 @@ Tests for DGIdb adapter.
 """
 from __future__ import annotations
 
-import pytest
 from src.backend.pipeline.dgidb_adapter import DGIdbAdapter
 
 

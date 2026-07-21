@@ -12,6 +12,8 @@ from src.backend.repositories.report_repo import ReportRepository
 from src.backend.repositories.knowledge_source_repo import KnowledgeSourceRepository
 from src.backend.repositories.evidence_item_repo import EvidenceItemRepository
 from src.backend.repositories.drug_interaction_repo import DrugInteractionRepository
+from src.backend.repositories.user_repo import UserRepository
+from src.backend.repositories.case_acl_repo import CaseACLRepository
 
 __all__ = [
     "BaseRepository", "ModelT",
@@ -23,4 +25,6 @@ __all__ = [
     "KnowledgeSourceRepository",
     "EvidenceItemRepository",
     "DrugInteractionRepository",
+    "UserRepository",
+    "CaseACLRepository",
 ]

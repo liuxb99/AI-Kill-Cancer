@@ -9,12 +9,10 @@ Supports:
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from typing import Optional
 
-from src.backend.reasoning.models import ClinicalReasoningResult
 
 logger = logging.getLogger(__name__)
 

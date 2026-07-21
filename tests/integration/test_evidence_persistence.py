@@ -3,9 +3,6 @@
 Integration test for evidence persistence flow.
 Tests: upsert → find → withdrawn lifecycle.
 """
-import uuid
-import pytest
-from datetime import datetime
 from src.backend.evidence.domain import EvidenceItemModel
 
 class TestEvidencePersistenceFlow:

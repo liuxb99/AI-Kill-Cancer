@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import pytest
 from fastapi.testclient import TestClient
 
@@ -362,7 +361,6 @@ class TestCheckpointLoading:
     def test_load_model_bad_checkpoint(self, tmp_path):
         """_load_model should handle corrupted checkpoint gracefully."""
         pytest.importorskip("torch")
-        import torch
         from src.backend.api.routes import _load_model
         import src.backend.api.routes as routes
 
