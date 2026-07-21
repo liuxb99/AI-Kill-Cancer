@@ -21,21 +21,27 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "domain_audit_logs",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("timestamp", sa.DateTime, nullable=False),
-        sa.Column("action", sa.String(64), nullable=False, index=True),
-        sa.Column("user_id", sa.String(64), nullable=False, index=True),
-        sa.Column("resource_type", sa.String(64), nullable=False),
-        sa.Column("resource_id", sa.String(36), nullable=True),
-        sa.Column("details", sa.JSON, default=dict),
-        sa.Column("ip_address", sa.String(45), nullable=True),
-        sa.Column("request_id", sa.String(36), nullable=True),
-        sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
-    )
-    op.create_index("ix_audit_logs_action_time", "domain_audit_logs", ["action", "timestamp"])
-    op.create_index("ix_audit_logs_user_time", "domain_audit_logs", ["user_id", "timestamp"])
+    # domain_audit_logs may already exist from migration 001
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if not inspector.has_table("domain_audit_logs"):
+        op.create_table(
+            "domain_audit_logs",
+            sa.Column("id", sa.String(36), primary_key=True),
+            sa.Column("timestamp", sa.DateTime, nullable=False),
+            sa.Column("action", sa.String(64), nullable=False, index=True),
+            sa.Column("user_id", sa.String(64), nullable=False, index=True),
+            sa.Column("resource_type", sa.String(64), nullable=False),
+            sa.Column("resource_id", sa.String(36), nullable=True),
+            sa.Column("details", sa.JSON, default=dict),
+            sa.Column("ip_address", sa.String(45), nullable=True),
+            sa.Column("request_id", sa.String(36), nullable=True),
+            sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
+        )
+    op.create_index("ix_audit_logs_action_time", "domain_audit_logs", ["action", "timestamp"],
+                     if_not_exists=True)
+    op.create_index("ix_audit_logs_user_time", "domain_audit_logs", ["user_id", "timestamp"],
+                     if_not_exists=True)
 
 
 def downgrade() -> None:
