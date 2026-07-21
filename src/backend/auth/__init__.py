@@ -18,5 +18,6 @@ __all__ = [
     "AuthenticationError", "PermissionDeniedError",
     "UserNotFoundError", "DuplicateUserError",
     "require_auth", "require_permission",
+    "require_case_access", "verify_case_access",
     "get_current_user",
 ]

@@ -35,7 +35,23 @@ async def create_case(
         # Auto-grant owner role to the creator
         acl_service = CaseACLService(db)
         await acl_service.grant_owner(case.id, user.id)
-        return CancerCaseResponse.model_validate(case)
+        return CancerCaseResponse(
+            id=str(case.id),
+            patient_id=str(case.patient_id),
+            oncotree_code=case.oncotree_code,
+            cancer_type=case.cancer_type.value if hasattr(case.cancer_type, "value") else case.cancer_type,
+            histology=case.histology,
+            stage=case.stage,
+            diagnosis_date=case.diagnosis_date,
+            radioiodine_status=case.radioiodine_status,
+            recurrence_status=case.recurrence_status,
+            metastatic_sites=case.metastatic_sites or [],
+            treatment_history=case.treatment_history or [],
+            current_medications=case.current_medications or [],
+            clinical_notes=case.clinical_notes,
+            created_at=case.created_at,
+            updated_at=case.updated_at,
+        )
     except Exception as e:
         logger.exception("Failed to create cancer case")
         raise HTTPException(status_code=500, detail=str(e))

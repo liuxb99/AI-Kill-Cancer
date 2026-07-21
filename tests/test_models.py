@@ -3,7 +3,7 @@ import pytest
 
 torch = pytest.importorskip("torch", reason="PyTorch not installed")
 
-from src.models import (
+from src.models import (  # noqa: E402 — import after importorskip guard
     CancerClassifier, CancerClassifierConfig,
     Trainer, TrainingConfig,
     MoleculeVAE, MoleculeVAEConfig,
@@ -13,12 +13,12 @@ from src.models import (
     validate_smiles, smiles_to_indices, indices_to_smiles,
     tanimoto_similarity,
 )
-from src.models.treatment_recommender import (
+from src.models.treatment_recommender import (  # noqa: E402
     TreatmentRecommender, TreatmentRecommenderConfig,
     lookup_drug_knowledge, list_available_cancers,
     CANCER_DRUG_DB,
 )
-from src.models.drug_response import DrugResponsePredictor, DrugResponseConfig
+from src.models.drug_response import DrugResponsePredictor, DrugResponseConfig  # noqa: E402
 
 
 class TestCancerClassifier:

@@ -104,6 +104,19 @@ def _decode_token(token: str, expected_type: str = "access") -> dict:
 class AuthService:
     """Production authentication service backed by the database."""
 
+    @staticmethod
+    def _user_to_response(user: UserModel) -> UserResponse:
+        """Convert a UserModel to a UserResponse, handling UUID->str conversion."""
+        return UserResponse(
+            id=str(user.id),
+            username=user.username,
+            email=user.email,
+            role=user.role.value if hasattr(user.role, "value") else user.role,
+            is_active=user.is_active,
+            display_name=user.display_name,
+            created_at=user.created_at,
+        )
+
     async def register_user(
         self,
         db: AsyncSession,
@@ -133,7 +146,7 @@ class AuthService:
         await db.commit()
         await db.refresh(user)
         logger.info("Registered user %s (role=%s)", user.username, user.role)
-        return UserResponse.model_validate(user)
+        return self._user_to_response(user)
 
     async def login(
         self,
@@ -160,7 +173,7 @@ class AuthService:
             refresh_token=refresh_token,
             token_type="bearer",
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            user=UserResponse.model_validate(user),
+            user=self._user_to_response(user),
         )
 
     async def authenticate(self, db: AsyncSession, token: str) -> UserModel:
@@ -220,7 +233,7 @@ class AuthService:
             refresh_token=new_refresh,
             token_type="bearer",
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            user=UserResponse.model_validate(user),
+            user=self._user_to_response(user),
         )
 
     async def logout(

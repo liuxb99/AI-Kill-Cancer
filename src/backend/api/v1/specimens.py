@@ -37,7 +37,18 @@ async def create_specimen(
 
     try:
         specimen = await repo.create(**body.model_dump(exclude_none=True))
-        return SpecimenResponse.model_validate(specimen)
+        return SpecimenResponse(
+            id=str(specimen.id),
+            case_id=str(specimen.case_id),
+            specimen_type=specimen.specimen_type.value if hasattr(specimen.specimen_type, "value") else specimen.specimen_type,
+            collection_site=specimen.collection_site,
+            collection_date=specimen.collection_date,
+            tumor_purity=specimen.tumor_purity,
+            matched_normal_available=specimen.matched_normal_available,
+            storage_reference=specimen.storage_reference,
+            created_at=specimen.created_at,
+            updated_at=specimen.updated_at,
+        )
     except Exception as e:
         logger.exception("Failed to create specimen")
         raise HTTPException(status_code=500, detail=str(e))
@@ -64,4 +75,15 @@ async def get_specimen(
         logger.error("Specimen %s has no case_id — denying access", specimen_id)
         raise HTTPException(status_code=403, detail="Access denied")
     await verify_case_access(specimen.case_id, user, db, CaseRole.VIEWER)
-    return SpecimenResponse.model_validate(specimen)
+    return SpecimenResponse(
+        id=str(specimen.id),
+        case_id=str(specimen.case_id),
+        specimen_type=specimen.specimen_type.value if hasattr(specimen.specimen_type, "value") else specimen.specimen_type,
+        collection_site=specimen.collection_site,
+        collection_date=specimen.collection_date,
+        tumor_purity=specimen.tumor_purity,
+        matched_normal_available=specimen.matched_normal_available,
+        storage_reference=specimen.storage_reference,
+        created_at=specimen.created_at,
+        updated_at=specimen.updated_at,
+    )

@@ -61,7 +61,7 @@ from src.backend.domain.specimen import (
     SpecimenResponse,
 )
 
-from src.backend.domain.sequencing_test import (
+from src.backend.domain.sequencing import (
     SequencingTestModel,
     SequencingTestCreate,
     SequencingTestResponse,

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.api.v1.deps import get_analysis_run_repo
-from src.backend.auth.dependencies import require_auth, require_case_access, verify_case_access
+from src.backend.auth.dependencies import require_auth, verify_case_access
 from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel

@@ -13,12 +13,13 @@ Provides:
 from __future__ import annotations
 
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
-from src.backend.auth.dependencies import require_auth, require_case_access
+from src.backend.auth.dependencies import require_auth, require_case_access, verify_case_access
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
 from src.backend.workbench.service import WorkbenchService

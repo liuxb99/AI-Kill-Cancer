@@ -1,6 +1,6 @@
 """Sequencing test repository."""
 from src.backend.repositories.base import BaseRepository
-from src.backend.domain.sequencing_test import SequencingTestModel
+from src.backend.domain.sequencing import SequencingTestModel
 
 
 class SequencingTestRepository(BaseRepository[SequencingTestModel]):

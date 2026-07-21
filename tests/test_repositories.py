@@ -71,7 +71,7 @@ class TestPatientRepository:
 class TestVariantRepository:
     async def test_bulk_create(self, db_session):
         repo = VariantRepository(db_session)
-        from src.backend.domain.sequencing_test import SequencingTestModel
+        from src.backend.domain.sequencing import SequencingTestModel
         from src.backend.domain.specimen import SpecimenModel
 
         # Create chain: patient -> case -> specimen -> seq_test -> variants
@@ -87,7 +87,7 @@ class TestVariantRepository:
         db_session.add(specimen)
         await db_session.flush()
 
-        from src.backend.domain.sequencing_test import AnalysisResultTypeEnum
+        from src.backend.domain.sequencing import AnalysisResultTypeEnum
         seq = SequencingTestModel(specimen_id=specimen.id, assay_name="ThyroSeq", result_type=AnalysisResultTypeEnum.SOMATIC)
         db_session.add(seq)
         await db_session.flush()

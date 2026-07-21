@@ -135,10 +135,10 @@ check_services() {
     info "驗證服務健康狀態..."
     docker compose -f "$COMPOSE_FILE" ps
 
-    wait_health db || true
-    wait_health redis || true
-    wait_health api || true
-    wait_health frontend || true
+    wait_health db
+    wait_health redis
+    wait_health api
+    wait_health frontend
 }
 
 show_info() {

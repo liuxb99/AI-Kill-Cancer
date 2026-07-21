@@ -16,7 +16,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.backend.repositories.evidence_repo import KnowledgeSourceRepository, EvidenceItemRepository, DrugInteractionRepository
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

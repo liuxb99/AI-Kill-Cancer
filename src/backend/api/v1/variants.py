@@ -52,7 +52,7 @@ async def import_variants(
         try:
             st_id = uuid.UUID(item.sequencing_test_id)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid sequencing_test_id in variant batch")
+            raise HTTPException(status_code=400, detail="Invalid sequencing_test_id in variant batch")
 
         if st_id not in seen_case_ids:
             seen_case_ids.add(st_id)

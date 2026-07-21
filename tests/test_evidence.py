@@ -45,10 +45,13 @@ class TestEvidenceCache:
         assert cache.get("test_key") == {"data": 123}
 
     def test_cache_expiry(self):
-        cache = TTLCache(ttl_seconds=0)
+        """Use injectable time_func for deterministic expiry testing."""
+        fake_time = [0.0]
+        cache = TTLCache(ttl_seconds=10, time_func=lambda: fake_time[0])
         cache.set("test_key", "value")
-        import time
-        time.sleep(0.001)
+        assert cache.get("test_key") == "value"
+        # Advance time past TTL
+        fake_time[0] = 11.0
         assert cache.get("test_key") is None
 
     def test_cache_miss(self):

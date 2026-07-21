@@ -33,7 +33,11 @@ def _create_enum_if_not_exists(enum_name: str, values: list[str], schema: str = 
     # Check if running against PostgreSQL
     bind = op.get_context().bind
     if bind.dialect.name == "postgresql":
-        op.execute(f"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = '{enum_name}') THEN CREATE TYPE {schema}.{enum_name} AS ENUM ({','.join(f"'{v}'" for v in values)}); END IF; END $$;")
+        values_str = ",".join(f"'{v}'" for v in values)
+        op.execute(
+            f"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = '{enum_name}') "
+            f"THEN CREATE TYPE {schema}.{enum_name} AS ENUM ({values_str}); END IF; END $$;"
+        )
 
 
 def upgrade() -> None:

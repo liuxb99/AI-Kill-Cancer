@@ -14,7 +14,7 @@ from src.backend.auth.dependencies import require_auth, verify_case_access
 from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
-from src.backend.domain.sequencing_test import SequencingTestCreate, SequencingTestResponse
+from src.backend.domain.sequencing import SequencingTestCreate, SequencingTestResponse
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.repositories.specimen_repo import SpecimenRepository
 

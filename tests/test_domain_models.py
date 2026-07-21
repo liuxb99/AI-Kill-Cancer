@@ -13,7 +13,7 @@ from src.backend.domain.enums import (
 from src.backend.domain.patient import PatientCreate, PatientUpdate
 from src.backend.domain.cancer_case import CancerCaseCreate
 from src.backend.domain.specimen import SpecimenCreate, SpecimenTypeEnum
-from src.backend.domain.sequencing_test import SequencingTestCreate
+from src.backend.domain.sequencing import SequencingTestCreate
 from src.backend.domain.uploaded_file import UploadedFileCreate, FileTypeEnum as UploadFileType
 from src.backend.domain.variant import VariantImport
 from src.backend.domain.drug import DrugCreate

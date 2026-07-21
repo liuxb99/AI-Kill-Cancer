@@ -59,7 +59,7 @@ class ReportTemplateRegistry:
                 if report.clinical_reasoning else ""
             ),
             limitations="<br>".join(
-                f"<li>{l}</li>" for l in report.limitations
+                f"<li>{lim}</li>" for lim in report.limitations
             ) if report.limitations else "<li>None documented</li>",
             citations="<br>".join(
                 f"[{c.get('pmid', '')}] {c.get('citation', '')[:100]}"

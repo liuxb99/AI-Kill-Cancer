@@ -8,7 +8,7 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from sqlalchemy import Column, String, Text, Date, DateTime, Enum as SAEnum, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
@@ -98,6 +98,16 @@ class CancerCaseResponse(BaseModel):
     clinical_notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def _convert_uuids(cls, data):
+        """Convert UUID fields to strings when using from_attributes."""
+        if hasattr(data, "id") and not isinstance(data.id, str):
+            data.id = str(data.id)
+        if hasattr(data, "patient_id") and not isinstance(data.patient_id, str):
+            data.patient_id = str(data.patient_id)
+        return data
 
 
 class CancerCaseListResponse(BaseModel):

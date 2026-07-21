@@ -14,5 +14,5 @@ from src.backend.reporting.renderer import ReportRenderer, FHIRExporter, PDFRend
 __all__ = [
     "ReportBuilder", "ReportTemplateRegistry", "ReportValidator",
     "ReportRepository", "ClinicalReportModel",
-    "ReportRenderer", "FHIRExporter",
+    "ReportRenderer", "FHIRExporter", "PDFRenderer",
 ]

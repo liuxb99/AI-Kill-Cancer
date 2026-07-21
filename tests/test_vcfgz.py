@@ -19,6 +19,18 @@ def client():
     settings.DEBUG = False
     app = create_app()
     with TestClient(app) as c:
+        # Register and login to get auth token
+        c.post("/auth/register", json={
+            "username": "testuser_vcf",
+            "password": "TestPass123!",
+            "display_name": "Test User",
+        })
+        login_resp = c.post("/auth/login", json={
+            "username": "testuser_vcf",
+            "password": "TestPass123!",
+        })
+        token = login_resp.json()["access_token"]
+        c.headers.update({"Authorization": f"Bearer {token}"})
         yield c
 
 

@@ -10,8 +10,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.auth.dependencies import require_auth, require_permission
-
-_security = HTTPBearer(auto_error=False)
 from src.backend.auth.models import (
     Permission, Role,
     AuthenticationError, DuplicateUserError,
@@ -23,6 +21,8 @@ from src.backend.domain.user import (
     UserCreate, UserResponse, TokenResponse,
     LoginRequest, RefreshRequest, LogoutRequest,
 )
+
+_security = HTTPBearer(auto_error=False)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])

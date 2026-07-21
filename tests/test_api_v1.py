@@ -18,6 +18,18 @@ def client():
     settings.DEBUG = False
     app = create_app()
     with TestClient(app) as c:
+        # Register and login to get auth token
+        c.post("/auth/register", json={
+            "username": "testuser_v1",
+            "password": "TestPass123!",
+            "display_name": "Test User",
+        })
+        login_resp = c.post("/auth/login", json={
+            "username": "testuser_v1",
+            "password": "TestPass123!",
+        })
+        token = login_resp.json()["access_token"]
+        c.headers.update({"Authorization": f"Bearer {token}"})
         yield c
 
 
@@ -56,10 +68,11 @@ class TestV1Patients:
         ]
         for method, path in endpoints:
             resp = client.request(method, path)
-            # Routes exist if we get any response other than 404
+            # Routes exist if we get any response other than 404 or 403/401
             # 404 means resource not found (valid for non-existent IDs)
+            # 403 means case ACL check failed but route is active
             # 500 means route found but internal error
-            assert resp.status_code in (404, 200, 500), f"Unexpected status for {method} {path}: {resp.status_code}"
+            assert resp.status_code in (403, 404, 200, 500), f"Unexpected status for {method} {path}: {resp.status_code}"
 
 
 class TestV1Analyses:

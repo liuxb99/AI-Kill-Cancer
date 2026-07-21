@@ -7,23 +7,32 @@ Prevents redundant API calls for recently-accessed genes/variants.
 from __future__ import annotations
 
 import time
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 
 class TTLCache:
-    """Simple TTL cache with max size."""
+    """Simple TTL cache with max size.
 
-    def __init__(self, ttl_seconds: int = 300, max_size: int = 1000):
+    Supports injectable time function for deterministic testing.
+    """
+
+    def __init__(
+        self,
+        ttl_seconds: int = 300,
+        max_size: int = 1000,
+        time_func: Optional[Callable[[], float]] = None,
+    ):
         self._ttl = ttl_seconds
         self._max_size = max_size
         self._cache: dict[str, tuple[float, Any]] = {}
+        self._time = time_func or time.monotonic
 
     def get(self, key: str) -> Optional[Any]:
         entry = self._cache.get(key)
         if entry is None:
             return None
         timestamp, value = entry
-        if time.monotonic() - timestamp > self._ttl:
+        if self._time() - timestamp > self._ttl:
             del self._cache[key]
             return None
         return value
@@ -34,7 +43,7 @@ class TTLCache:
             sorted_keys = sorted(self._cache.keys(), key=lambda k: self._cache[k][0])
             for k in sorted_keys[:len(sorted_keys) // 5]:
                 del self._cache[k]
-        self._cache[key] = (time.monotonic(), value)
+        self._cache[key] = (self._time(), value)
 
     def invalidate(self, key: str) -> None:
         self._cache.pop(key, None)
