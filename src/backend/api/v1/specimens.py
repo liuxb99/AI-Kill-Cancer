@@ -26,7 +26,15 @@ async def create_specimen(
     body: SpecimenCreate,
     user: UserModel = Depends(require_auth),
     repo: SpecimenRepository = Depends(get_specimen_repo),
+    db: AsyncSession = Depends(get_db),
 ):
+    # Verify EDITOR access on the case
+    try:
+        cid = uuid.UUID(body.case_id)
+        await verify_case_access(cid, user, db, CaseRole.EDITOR)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid case_id in request body")
+
     try:
         specimen = await repo.create(**body.model_dump(exclude_none=True))
         return SpecimenResponse.model_validate(specimen)
@@ -51,7 +59,9 @@ async def get_specimen(
     if not specimen:
         raise HTTPException(status_code=404, detail="Specimen not found")
 
-    # Check case-level access
-    if hasattr(specimen, 'case_id') and specimen.case_id:
-        await verify_case_access(specimen.case_id, user, db, CaseRole.VIEWER)
+    # Check case-level access — fail closed
+    if not specimen.case_id:
+        logger.error("Specimen %s has no case_id — denying access", specimen_id)
+        raise HTTPException(status_code=403, detail="Access denied")
+    await verify_case_access(specimen.case_id, user, db, CaseRole.VIEWER)
     return SpecimenResponse.model_validate(specimen)

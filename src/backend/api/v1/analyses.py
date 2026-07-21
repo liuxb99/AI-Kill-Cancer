@@ -7,9 +7,12 @@ import uuid
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.api.v1.deps import get_analysis_run_repo
-from src.backend.auth.dependencies import require_auth
+from src.backend.auth.dependencies import require_auth, require_case_access, verify_case_access
+from src.backend.database.session import get_db
+from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
 from src.backend.domain.analysis_run import AnalysisRunCreate, AnalysisRunResponse
 from src.backend.domain.drug_candidate import DrugCandidateListResponse
@@ -27,7 +30,15 @@ async def create_analysis(
     body: AnalysisRunCreate,
     user: UserModel = Depends(require_auth),
     repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
+    db: AsyncSession = Depends(get_db),
 ):
+    # Verify EDITOR access on the case
+    try:
+        cid = uuid.UUID(body.case_id)
+        await verify_case_access(cid, user, db, CaseRole.EDITOR)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid case_id")
+
     try:
         data = body.model_dump(exclude_none=True)
         data["status"] = AnalysisStatusEnum.PENDING
@@ -43,6 +54,7 @@ async def get_analysis(
     analysis_id: str,
     user: UserModel = Depends(require_auth),
     repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
         aid = uuid.UUID(analysis_id)
@@ -52,6 +64,13 @@ async def get_analysis(
     analysis = await repo.get(aid)
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
+
+    # Verify VIEWER access on the analysis's case
+    if not analysis.case_id:
+        logger.error("Analysis %s has no case_id — denying access", analysis_id)
+        raise HTTPException(status_code=403, detail="Access denied")
+    await verify_case_access(analysis.case_id, user, db, CaseRole.VIEWER)
+
     return AnalysisRunResponse.model_validate(analysis)
 
 
@@ -60,11 +79,9 @@ async def get_analysis_graph(
     analysis_id: str,
     user: UserModel = Depends(require_auth),
     repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Return the visualization graph for an analysis run.
-    In Phase 1, this returns the analysis status — graph data is
-    only populated when a real analysis pipeline is configured.
-    """
+    """Return the visualization graph for an analysis run."""
     try:
         aid = uuid.UUID(analysis_id)
     except ValueError:
@@ -74,6 +91,10 @@ async def get_analysis_graph(
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
 
+    if not analysis.case_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    await verify_case_access(analysis.case_id, user, db, CaseRole.VIEWER)
+
     if analysis.status != AnalysisStatusEnum.COMPLETED:
         return GraphAnalysisResponse(
             analysis_id=analysis_id,
@@ -81,7 +102,6 @@ async def get_analysis_graph(
             graph=VisualizationGraph(),
         )
 
-    # In Phase 1, graph is empty (no real pipeline yet)
     return GraphAnalysisResponse(
         analysis_id=analysis_id,
         status="not_configured",
@@ -94,10 +114,9 @@ async def get_analysis_drug_candidates(
     analysis_id: str,
     user: UserModel = Depends(require_auth),
     repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Return drug candidates for an analysis run.
-    In Phase 1, returns empty list since no real analysis pipeline is configured.
-    """
+    """Return drug candidates for an analysis run."""
     try:
         aid = uuid.UUID(analysis_id)
     except ValueError:
@@ -106,6 +125,10 @@ async def get_analysis_drug_candidates(
     analysis = await repo.get(aid)
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
+
+    if not analysis.case_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    await verify_case_access(analysis.case_id, user, db, CaseRole.VIEWER)
 
     return DrugCandidateListResponse(items=[], total=0)
 
@@ -115,10 +138,9 @@ async def get_analysis_evidence(
     analysis_id: str,
     user: UserModel = Depends(require_auth),
     repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Return evidence for an analysis run.
-    In Phase 1, returns not_searched status.
-    """
+    """Return evidence for an analysis run."""
     try:
         aid = uuid.UUID(analysis_id)
     except ValueError:
@@ -127,6 +149,10 @@ async def get_analysis_evidence(
     analysis = await repo.get(aid)
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
+
+    if not analysis.case_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    await verify_case_access(analysis.case_id, user, db, CaseRole.VIEWER)
 
     return EvidenceSearchResult(
         status="not_searched",

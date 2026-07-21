@@ -38,7 +38,10 @@ async def _get_report_and_verify_access(
     db: AsyncSession,
     required_role: CaseRole = CaseRole.VIEWER,
 ):
-    """Look up a report, resolve its case_id, and verify case-level access."""
+    """Look up a report, resolve its case_id, and verify case-level access.
+
+    Fail-closed: missing or invalid case_id raises 403.
+    """
     try:
         rid = uuid.UUID(report_id)
     except ValueError:
@@ -49,15 +52,19 @@ async def _get_report_and_verify_access(
     if not model:
         raise HTTPException(status_code=404, detail={"error": "not_found"})
 
-    # Resolve case_id from the report model
-    case_id_str = getattr(model, 'case_id', None) or (model.report_data or {}).get("metadata", {}).get("case_id")
-    if case_id_str:
-        try:
-            cid = uuid.UUID(str(case_id_str))
-            await verify_case_access(cid, user, db, required_role)
-        except ValueError:
-            pass  # Invalid case_id — still return the report for existing data
+    # Resolve case_id from the report model — fail closed
+    case_id_str = model.case_id
+    if not case_id_str:
+        logger.error("Report %s has no case_id — denying access", report_id)
+        raise HTTPException(status_code=403, detail={"error": "access_denied"})
 
+    try:
+        cid = uuid.UUID(str(case_id_str))
+    except ValueError:
+        logger.error("Report %s has invalid case_id %r — denying access", report_id, case_id_str)
+        raise HTTPException(status_code=403, detail={"error": "access_denied"})
+
+    await verify_case_access(cid, user, db, required_role)
     return model
 
 
@@ -88,6 +95,7 @@ async def create_case_report(
 
     # Persist
     model = await repo.create(
+        case_id=case_id,
         report_data=report.model_dump(),
         html_content=html,
         fhir_data=fhir,

@@ -103,27 +103,29 @@ class TestRouteSecurityCoverage:
                 # Included router
                 for sub_route in route.routes:
                     if hasattr(sub_route, 'endpoint'):
-                        deps = getattr(sub_route, 'dependencies', [])
-                        if not deps:
-                            # Check if dependant has dependencies
-                            dependant = getattr(sub_route, 'dependant', None)
-                            if dependant and dependant.dependencies:
-                                continue  # Has auth via dependant
-                            # Check route function signature for Depends(require_auth)
-                            import inspect
-                            sig = inspect.signature(sub_route.endpoint)
-                            params = list(sig.parameters.values())
-                            has_auth = any(
-                                'require_auth' in str(p.default) or
-                                'require_case_access' in str(p.default) or
-                                'require_permission' in str(p.default)
-                                for p in params
-                            )
-                            if not has_auth:
-                                unprotected.append(sub_route.path)
-        # Note: This test is informational - actual protection is verified at runtime
-        # The test passes if no more than a few intentionally public routes exist
+                        # Check route-level dependencies
+                        route_deps = getattr(sub_route, 'dependencies', [])
+                        if route_deps:
+                            continue  # Has auth via route dependencies
+
+                        # Check dependant-level dependencies
+                        dependant = getattr(sub_route, 'dependant', None)
+                        if dependant and dependant.dependencies:
+                            continue  # Has auth via dependant
+
+                        # Check route function signature for Depends(require_auth)
+                        import inspect
+                        sig = inspect.signature(sub_route.endpoint)
+                        params = list(sig.parameters.values())
+                        has_auth = any(
+                            'require_auth' in str(p.default) or
+                            'require_case_access' in str(p.default) or
+                            'require_permission' in str(p.default)
+                            for p in params
+                        )
+                        if not has_auth:
+                            unprotected.append(f"{sub_route.methods} {sub_route.path}")
+
         known_public = []  # Public routes (health, docs) are not in v1 scope
         actual_unprotected = [p for p in unprotected if p not in known_public]
-        if actual_unprotected:
-            print(f"WARNING: Potentially unprotected routes: {actual_unprotected}")
+        assert actual_unprotected == [], f"Potentially unprotected routes: {actual_unprotected}"

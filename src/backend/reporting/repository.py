@@ -19,7 +19,7 @@ class ClinicalReportModel(DBBase):
     __tablename__ = "domain_clinical_reports"
 
     id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
-    case_id = Column(String(36), nullable=True, index=True)
+    case_id = Column(String(36), nullable=False, index=True)
     version = Column(String(32), nullable=False, default="1.0.0")
     supersedes_report_id = Column(String(36), nullable=True)
     status = Column(String(32), nullable=False, default="draft")
@@ -36,11 +36,11 @@ class ReportRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(self, report_data: dict, html_content: str = "",
+    async def create(self, case_id: str, report_data: dict, html_content: str = "",
                       fhir_data: Optional[dict] = None) -> ClinicalReportModel:
-        """Create a new report."""
+        """Create a new report with explicit case_id."""
         instance = ClinicalReportModel(
-            case_id=report_data.get("metadata", {}).get("case_id"),
+            case_id=case_id,
             version=report_data.get("metadata", {}).get("version", "1.0.0"),
             supersedes_report_id=report_data.get("metadata", {}).get("supersedes_report_id"),
             status=report_data.get("metadata", {}).get("status", "draft"),

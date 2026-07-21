@@ -49,9 +49,17 @@ async def rank_variant(
     if not variant:
         raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Variant not found"})
 
-    # Check case-level access if variant belongs to a case
-    if hasattr(variant, 'case_id') and variant.case_id:
-        await verify_case_access(variant.case_id, user, db, CaseRole.EDITOR)
+    # Check case-level access — resolve through sequencing_test → specimen → case
+    if variant.sequencing_test_id:
+        from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
+        from src.backend.repositories.specimen_repo import SpecimenRepository
+        st_repo = SequencingTestRepository(db)
+        st = await st_repo.get(variant.sequencing_test_id)
+        if st and st.specimen_id:
+            spec_repo = SpecimenRepository(db)
+            spec = await spec_repo.get(st.specimen_id)
+            if spec and spec.case_id:
+                await verify_case_access(spec.case_id, user, db, CaseRole.EDITOR)
 
     # Gather evidence
     merger = EvidenceMerger(db=db)
@@ -242,6 +250,7 @@ async def rank_case(
 @router.get("/run/{run_id}", response_model=DrugRankingRunResponse)
 async def get_ranking_run(
     run_id: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Get a previously computed ranking run."""

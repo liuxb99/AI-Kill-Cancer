@@ -40,8 +40,9 @@ jobs:
       - name: Lint with ruff
         run: ruff check src/ tests/
 
-      - name: Type check with mypy
-        run: mypy src/ --ignore-missing-imports || echo "mypy not fully configured — skipping for now"
+      # TODO: Re-enable mypy when type annotations are complete across the codebase.
+      # Current approach: mypy src/ --ignore-missing-imports
+      # Blocked on: missing type annotations in models/, repositories/, and domain/
 
       - name: Test with pytest
         env:

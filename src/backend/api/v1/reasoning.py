@@ -73,6 +73,14 @@ async def get_reasoning_run(
     if not run_model:
         raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Reasoning run not found"})
 
+    # Resolve case_id from reasoning_run if stored
+    if hasattr(run_model, 'case_id') and run_model.case_id:
+        try:
+            cid = uuid.UUID(str(run_model.case_id))
+            await verify_case_access(cid, user, db, CaseRole.VIEWER)
+        except ValueError:
+            raise HTTPException(status_code=403, detail={"error": "access_denied"})
+
     reasoning_data = run_model.reasoning_data if isinstance(run_model.reasoning_data, dict) else {}
     validation_data = run_model.validation_result if isinstance(run_model.validation_result, dict) else None
 
@@ -90,6 +98,7 @@ async def get_reasoning_run(
 @router.post("/run/{run_id}/validate", response_model=ReasoningValidationResult)
 async def validate_reasoning_run(
     run_id: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Re-validate a reasoning run's citations."""
@@ -104,8 +113,13 @@ async def validate_reasoning_run(
     if not run_model:
         raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Reasoning run not found"})
 
-    if not run_model.reasoning_data:
-        raise HTTPException(status_code=400, detail={"error": "no_data", "message": "No reasoning data to validate"})
+    # Resolve case_id from reasoning_run if stored
+    if hasattr(run_model, 'case_id') and run_model.case_id:
+        try:
+            cid = uuid.UUID(str(run_model.case_id))
+            await verify_case_access(cid, user, db, CaseRole.EDITOR)
+        except ValueError:
+            raise HTTPException(status_code=403, detail={"error": "access_denied"})
 
     reasoning_data = run_model.reasoning_data if isinstance(run_model.reasoning_data, dict) else {}
     reasoning_result = ClinicalReasoningResult(**reasoning_data)

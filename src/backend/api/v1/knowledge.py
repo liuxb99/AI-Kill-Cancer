@@ -20,6 +20,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
+from src.backend.auth.dependencies import require_auth
+from src.backend.domain.user import UserModel
 from src.backend.knowledge.service import KnowledgeService
 from src.backend.knowledge.models import (
     KnowledgeEntityResponse, KnowledgeEntity,
@@ -35,6 +37,7 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 @router.get("/variant/{variant_id}", response_model=KnowledgeEntityResponse)
 async def get_variant_knowledge(
     variant_id: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Get all knowledge about a variant."""
@@ -48,6 +51,7 @@ async def get_variant_knowledge(
 @router.get("/gene/{gene_symbol}", response_model=KnowledgeEntityResponse)
 async def get_gene_knowledge(
     gene_symbol: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Get all knowledge about a gene."""
@@ -61,6 +65,7 @@ async def get_gene_knowledge(
 @router.get("/drug/{drug_id}", response_model=KnowledgeEntityResponse)
 async def get_drug_knowledge(
     drug_id: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Get knowledge about a drug from the local knowledge base."""
@@ -106,6 +111,7 @@ async def get_drug_knowledge(
 @router.get("/disease/{disease_id}", response_model=KnowledgeEntityResponse)
 async def get_disease_knowledge(
     disease_id: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Get knowledge about a disease from the knowledge base."""
@@ -145,6 +151,7 @@ async def get_disease_knowledge(
 @router.get("/publication/{pmid}", response_model=KnowledgeEntityResponse)
 async def get_publication(
     pmid: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Get publication details from PubMed (public API, no key required)."""
@@ -175,6 +182,7 @@ async def get_publication(
 @router.get("/trial/{nct_id}", response_model=KnowledgeEntityResponse)
 async def get_trial(
     nct_id: str,
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Get clinical trial details from ClinicalTrials.gov (public API, no key required)."""
@@ -208,6 +216,7 @@ async def get_trial(
 
 @router.post("/refresh")
 async def refresh_knowledge(
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Refresh knowledge base from configured public sources."""

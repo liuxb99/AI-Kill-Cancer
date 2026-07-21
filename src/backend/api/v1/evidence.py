@@ -18,7 +18,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
-from src.backend.auth.dependencies import require_auth
+from src.backend.auth.dependencies import require_auth, verify_case_access
+from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
 from src.backend.evidence.merger import EvidenceMerger
 from src.backend.evidence.cache import gene_cache, variant_cache
@@ -85,6 +86,18 @@ async def get_variant_evidence(
     variant = await repo.get(vid)
     if not variant:
         raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Variant not found"})
+
+    # Verify VIEWER access on the variant's case
+    if variant.sequencing_test_id:
+        from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
+        from src.backend.repositories.specimen_repo import SpecimenRepository
+        st_repo = SequencingTestRepository(db)
+        st = await st_repo.get(variant.sequencing_test_id)
+        if st and st.specimen_id:
+            spec_repo = SpecimenRepository(db)
+            spec = await spec_repo.get(st.specimen_id)
+            if spec and spec.case_id:
+                await verify_case_access(spec.case_id, user, db, CaseRole.VIEWER)
 
     # Check cache
     cache_key = f"variant:{variant_id}"

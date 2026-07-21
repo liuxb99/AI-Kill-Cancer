@@ -29,7 +29,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
-from src.backend.auth.dependencies import require_auth
+from src.backend.auth.dependencies import require_auth, verify_case_access
+from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
 from src.backend.domain.enums import (
     FileTypeEnum, GenomeBuildConfidenceEnum,
@@ -280,6 +281,13 @@ async def upload_vcf(
                 "error": "sequencing_test_not_found",
                 "message": "sequencing_test_id does not exist",
             })
+
+        # Verify EDITOR access on the sequencing test's case
+        from src.backend.repositories.specimen_repo import SpecimenRepository
+        spec_repo = SpecimenRepository(db_session)
+        spec = await spec_repo.get(st_record.specimen_id)
+        if spec and spec.case_id:
+            await verify_case_access(spec.case_id, user, db_session, CaseRole.EDITOR)
     elif upload_mode != "anonymous_research":
         raise HTTPException(status_code=422, detail={
             "error": "missing_sequencing_test",

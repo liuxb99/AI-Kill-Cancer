@@ -11,6 +11,7 @@ import logging
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from src.backend.auth.models import PermissionDeniedError
 from src.backend.domain.case_acl import CaseACLModel, CaseRole, CASE_ROLE_HIERARCHY
@@ -83,26 +84,61 @@ class CaseACLService:
             obj = await repo.get(resource_id)
             return obj.case_id if obj else None
         elif resource_type == "variant":
+            # Variant → sequencing_test → specimen → case
             repo = VariantRepository(self.db)
             obj = await repo.get(resource_id)
-            return obj.case_id if obj else None
+            if obj and obj.sequencing_test_id:
+                st_repo = SequencingTestRepository(self.db)
+                st_obj = await st_repo.get(obj.sequencing_test_id)
+                if st_obj and st_obj.specimen_id:
+                    spec_repo = SpecimenRepository(self.db)
+                    spec_obj = await spec_repo.get(st_obj.specimen_id)
+                    return spec_obj.case_id if spec_obj else None
+            return None
+        elif resource_type == "sequencing_test":
+            # SequencingTest → specimen → case
+            repo = SequencingTestRepository(self.db)
+            obj = await repo.get(resource_id)
+            if obj and obj.specimen_id:
+                spec_repo = SpecimenRepository(self.db)
+                spec_obj = await spec_repo.get(obj.specimen_id)
+                return spec_obj.case_id if spec_obj else None
+            return None
         elif resource_type == "report":
+            # report uses ClinicalReportModel (not ReportModel), which has direct case_id
+            # Try ClinicalReportModel first, then ReportModel fallback
+            try:
+                from src.backend.reporting.repository import ClinicalReportModel
+                stmt = select(ClinicalReportModel).where(ClinicalReportModel.id == resource_id)
+                result = await self.db.execute(stmt)
+                obj = result.scalar_one_or_none()
+                if obj:
+                    return uuid.UUID(obj.case_id) if obj.case_id else None
+            except Exception:
+                pass
+            # Fallback: ReportModel has analysis_run_id → case
             repo = ReportRepository(self.db)
             obj = await repo.get(resource_id)
-            return obj.case_id if obj else None
+            if obj and obj.analysis_run_id:
+                ar_repo = AnalysisRunRepository(self.db)
+                ar_obj = await ar_repo.get(obj.analysis_run_id)
+                return ar_obj.case_id if ar_obj else None
+            return None
         elif resource_type == "evidence":
             repo = EvidenceRepository(self.db)
             obj = await repo.get(resource_id)
-            return obj.case_id if obj else None
+            if obj and hasattr(obj, 'case_id') and obj.case_id:
+                return obj.case_id
+            # Evidence may link to analysis_run → case
+            if obj and hasattr(obj, 'analysis_run_id') and obj.analysis_run_id:
+                ar_repo = AnalysisRunRepository(self.db)
+                ar_obj = await ar_repo.get(obj.analysis_run_id)
+                return ar_obj.case_id if ar_obj else None
+            return None
         elif resource_type == "analysis_run":
             repo = AnalysisRunRepository(self.db)
             obj = await repo.get(resource_id)
             return obj.case_id if obj else None
-        elif resource_type == "sequencing_test":
-            repo = SequencingTestRepository(self.db)
-            obj = await repo.get(resource_id)
-            return obj.case_id if obj else None
-        return None
 
     async def grant_owner(self, case_id: uuid.UUID, user_id: uuid.UUID, granted_by: Optional[uuid.UUID] = None) -> CaseACLModel:
         """Grant owner role to a user on a case. Used when creating a case."""
