@@ -33,11 +33,15 @@ from src.backend.domain.case_acl import CaseACLModel
 
 config = context.config
 # Allow override via DATABASE_URL env var (used in CI with SQLite)
+# Only override when config is loaded from a file, not in-memory (test) config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-db_url = os.environ.get("DATABASE_URL")
-if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        config.set_main_option("sqlalchemy.url", db_url)
+else:
+    # In-memory config (e.g., test fixture) — respect programmatic settings
+    pass
 
 target_metadata = Base.metadata
 
