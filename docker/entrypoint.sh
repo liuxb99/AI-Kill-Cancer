@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+export PYTHONPATH=/app
+
 echo "Running database migrations..."
 alembic -c migrations/alembic.ini upgrade head
 
