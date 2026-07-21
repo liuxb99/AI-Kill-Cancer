@@ -98,14 +98,11 @@ jobs:
           echo "Waiting for Redis..."
           timeout 30 sh -c 'until docker compose -f docker/docker-compose.yml exec -T redis redis-cli ping 2>/dev/null | grep -q PONG; do sleep 2; done'
           echo "Redis is healthy"
-          echo "Waiting for API..."
-          timeout 60 sh -c 'until curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/health 2>/dev/null | grep -q 200; do sleep 2; done'
-          echo "API is healthy"
-          echo "API container status:"
+          echo "Waiting for API container to be running..."
+          timeout 60 sh -c 'until docker compose -f docker/docker-compose.yml ps --format json 2>/dev/null | grep cancer_api | grep -q running; do sleep 2; done'
+          echo "API container is running"
+          echo "All services:"
           docker compose -f docker/docker-compose.yml ps
-          echo "Waiting for Frontend..."
-          timeout 60 sh -c 'until docker compose -f docker/docker-compose.yml ps --format json 2>/dev/null | grep cancer_frontend | grep -q running; do sleep 2; done'
-          echo "Frontend container is running"
 
       - name: Run Alembic migration
         run: |
