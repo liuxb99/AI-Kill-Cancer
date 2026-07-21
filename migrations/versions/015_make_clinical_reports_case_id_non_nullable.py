@@ -29,13 +29,37 @@ def upgrade() -> None:
             "UPDATE domain_clinical_reports SET case_id = :sentinel WHERE case_id IS NULL"
         ).bindparams(sentinel=SENTINEL_CASE_ID)
     )
-    # Make case_id non-nullable
-    op.alter_column(
-        "domain_clinical_reports",
-        "case_id",
-        existing_type=sa.String(36),
-        nullable=False,
-    )
+    # Make case_id non-nullable — SQLite does not support ALTER COLUMN SET NOT NULL
+    bind = op.get_bind()
+    if bind.dialect.name != "sqlite":
+        op.alter_column(
+            "domain_clinical_reports",
+            "case_id",
+            existing_type=sa.String(36),
+            nullable=False,
+        )
+    else:
+        # For SQLite, recreate the table with NOT NULL constraint
+        op.execute(sa.text(
+            "CREATE TABLE domain_clinical_reports_new ("
+            "  id VARCHAR(36) NOT NULL PRIMARY KEY,"
+            "  case_id VARCHAR(36) NOT NULL,"
+            "  version VARCHAR(32) NOT NULL DEFAULT '1.0.0',"
+            "  supersedes_report_id VARCHAR(36),"
+            "  status VARCHAR(32) NOT NULL DEFAULT 'draft',"
+            "  report_data JSON NOT NULL,"
+            "  html_content TEXT,"
+            "  fhir_data JSON,"
+            "  created_at DATETIME NOT NULL,"
+            "  updated_at DATETIME NOT NULL"
+            ")"
+        ))
+        op.execute(sa.text(
+            "INSERT INTO domain_clinical_reports_new "
+            "SELECT * FROM domain_clinical_reports"
+        ))
+        op.execute(sa.text("DROP TABLE domain_clinical_reports"))
+        op.execute(sa.text("ALTER TABLE domain_clinical_reports_new RENAME TO domain_clinical_reports"))
 
 
 def downgrade() -> None:
