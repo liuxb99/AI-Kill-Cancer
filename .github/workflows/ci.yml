@@ -52,7 +52,7 @@ jobs:
       - name: Test migration
         env:
           DATABASE_URL: sqlite+aiosqlite:///test_ci.db
-        run: alembic -c alembic.ini upgrade head
+        run: alembic -c migrations/alembic.ini upgrade head
 
   frontend:
     runs-on: ubuntu-latest
@@ -106,7 +106,7 @@ jobs:
 
       - name: Run Alembic migration
         run: |
-          docker compose -f docker/docker-compose.yml exec -T api alembic upgrade head
+          docker compose -f docker/docker-compose.yml exec -T api alembic -c migrations/alembic.ini upgrade head
           echo "Migration completed"
 
       - name: Smoke test — register + login + create patient + create case + ACL

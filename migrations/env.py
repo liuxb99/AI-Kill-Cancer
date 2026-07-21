@@ -1,3 +1,5 @@
+import os
+
 import asyncio
 from logging.config import fileConfig
 
@@ -30,8 +32,12 @@ from src.backend.domain.user import UserModel, TokenBlacklistModel
 from src.backend.domain.case_acl import CaseACLModel
 
 config = context.config
+# Allow override via DATABASE_URL env var (used in CI with SQLite)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+db_url = os.environ.get("DATABASE_URL")
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
 
 target_metadata = Base.metadata
 
