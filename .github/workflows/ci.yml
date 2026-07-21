@@ -52,7 +52,7 @@ jobs:
       - name: Test migration
         env:
           DATABASE_URL: sqlite+aiosqlite:///test_ci.db
-        run: alembic upgrade head
+        run: alembic -c alembic.ini upgrade head
 
   frontend:
     runs-on: ubuntu-latest
