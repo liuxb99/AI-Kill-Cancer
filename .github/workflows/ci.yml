@@ -54,7 +54,7 @@ jobs:
           DATABASE_URL: sqlite+aiosqlite:///test_migration_ci.db
           PYTHONPATH: .
         run: |
-          rm -f test_migration_ci.db
+          rm -f test_migration_ci.db test_migration_ci.db-wal test_migration_ci.db-shm
           alembic -c migrations/alembic.ini upgrade head
 
   frontend:
