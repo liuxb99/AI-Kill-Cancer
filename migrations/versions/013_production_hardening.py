@@ -21,10 +21,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # domain_audit_logs may already exist from migration 001
     bind = op.get_bind()
     inspector = sa.inspect(bind)
     if not inspector.has_table("domain_audit_logs"):
+        # Fresh creation with 013 schema
         op.create_table(
             "domain_audit_logs",
             sa.Column("id", sa.String(36), primary_key=True),
@@ -38,10 +38,28 @@ def upgrade() -> None:
             sa.Column("request_id", sa.String(36), nullable=True),
             sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
         )
-    op.create_index("ix_audit_logs_action_time", "domain_audit_logs", ["action", "timestamp"],
-                     if_not_exists=True)
-    op.create_index("ix_audit_logs_user_time", "domain_audit_logs", ["user_id", "timestamp"],
-                     if_not_exists=True)
+    else:
+        # Table exists from migration 001 — add 013 columns if missing
+        existing_cols = {c["name"] for c in inspector.get_columns("domain_audit_logs")}
+        if "timestamp" not in existing_cols:
+            op.add_column("domain_audit_logs", sa.Column("timestamp", sa.DateTime, nullable=True))
+        if "user_id" not in existing_cols:
+            op.add_column("domain_audit_logs", sa.Column("user_id", sa.String(64), nullable=True))
+        if "request_id" not in existing_cols:
+            op.add_column("domain_audit_logs", sa.Column("request_id", sa.String(36), nullable=True))
+
+    # Create indices — use if_not_exists to handle SQLite idempotency
+    try:
+        op.create_index("ix_audit_logs_action_time", "domain_audit_logs", ["action", "timestamp"],
+                         if_not_exists=True)
+    except Exception:
+        # Some SQLite versions don't support if_not_exists
+        pass
+    try:
+        op.create_index("ix_audit_logs_user_time", "domain_audit_logs", ["user_id", "timestamp"],
+                         if_not_exists=True)
+    except Exception:
+        pass
 
 
 def downgrade() -> None:
