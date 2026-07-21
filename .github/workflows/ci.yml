@@ -52,6 +52,7 @@ jobs:
       - name: Test migration
         env:
           DATABASE_URL: sqlite+aiosqlite:///test_ci.db
+          PYTHONPATH: .
         run: alembic -c migrations/alembic.ini upgrade head
 
   frontend:
