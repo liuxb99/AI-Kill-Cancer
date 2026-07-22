@@ -39,8 +39,7 @@ from src.backend.workbench.models import (
 )
 from src.backend.workbench.repository import TumorBoardRepository, WorkbenchNoteModel
 from src.backend.reasoning.service import ClinicalReasoningService
-from src.backend.reasoning.models import ClinicalReasoningResult
-from src.backend.reasoning.repository import ReasoningRunRepository, ReasoningRunModel
+from src.backend.reasoning.repository import ReasoningRunModel
 from src.backend.reasoning.llm import get_llm_adapter
 from src.backend.domain.uploaded_file import UploadedFileModel
 
@@ -145,9 +144,59 @@ async def compare_cases(
 async def compare_variants(
     variant_ids: list[str],
     user: UserModel = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Compare variants (placeholder)."""
-    raise HTTPException(status_code=501, detail={"error": "not_implemented", "message": "Variant comparison not yet implemented"})
+    """Compare multiple variants by gene, HGVS, protein, pathogenicity, and drug associations."""
+    if not variant_ids or len(variant_ids) < 2:
+        raise HTTPException(status_code=400, detail={"error": "need_at_least_2_variants"})
+
+    from src.backend.repositories.variant_repo import VariantRepository
+    from src.backend.repositories.drug_repo import DrugRepository
+
+    vrepo = VariantRepository(db)
+    drepo = DrugRepository(db)
+
+    variants_info = []
+    for vid_str in variant_ids:
+        try:
+            vid = uuid.UUID(vid_str)
+        except ValueError:
+            raise HTTPException(status_code=400, detail={"error": "invalid_uuid", "message": f"Invalid variant ID: {vid_str}"})
+
+        v = await vrepo.get(vid)
+        if not v:
+            raise HTTPException(status_code=404, detail={"error": "not_found", "message": f"Variant not found: {vid_str}"})
+
+        gene = getattr(v, 'gene_symbol', '') or ''
+        drugs = await drepo.find_by_gene(gene)
+        variants_info.append({
+            "id": str(v.id),
+            "gene_symbol": gene,
+            "hgvs_notation": getattr(v, 'hgvs_notation', '') or '',
+            "protein_change": getattr(v, 'protein_change', '') or '',
+            "variant_type": getattr(v, 'variant_type', '') or '',
+            "clinical_significance": getattr(v, 'clinical_significance', '') or '',
+            "pathogenicity": getattr(v, 'clinical_significance', '') or '',
+            "vaf": float(getattr(v, 'vaf', 0) or 0),
+            "population_frequency": float(getattr(v, 'af', 0) or 0),
+            "drug_associations": [
+                {"name": getattr(d, 'name', ''), "status": getattr(d, 'status', '')}
+                for d in (drugs or []) if getattr(d, 'name', '')
+            ],
+            "annotation_source": getattr(v, 'annotation_source', '') or '',
+        })
+
+    # Compute shared/unique fields
+    all_genes = {v["gene_symbol"] for v in variants_info}
+    shared_genes = [g for g in all_genes if sum(1 for v in variants_info if v["gene_symbol"] == g) == len(variants_info)]
+
+    return {
+        "comparison_type": "variant",
+        "variant_ids": variant_ids,
+        "variants": variants_info,
+        "shared_genes": shared_genes,
+        "total": len(variants_info),
+    }
 
 
 # ─── NEW v1.1 endpoints ──────────────────────────────────────────────────────
@@ -196,6 +245,7 @@ async def add_tumor_board_vote(
 ):
     """Add a vote to a tumor board review.
     Reviewer identity is always derived from the JWT token — client-supplied identity is ignored.
+    Business + Audit in same transaction — audit failure rolls back the entire operation.
     """
     # Validate vote value
     valid_votes = {"approve", "reject", "abstain"}
@@ -205,10 +255,12 @@ async def add_tumor_board_vote(
             "message": f"Vote must be one of: {', '.join(valid_votes)}",
         })
 
+    from src.backend.domain.audit_log import AuditLogModel
+    from datetime import datetime, timezone
+
     repo = TumorBoardRepository(db)
     reviews = await repo.get_reviews_by_case(case_id)
     if not reviews:
-        # Auto-create a review if none exists
         review = await repo.create_review(
             case_id=case_id,
             reviewer_id=str(user.id),
@@ -224,27 +276,23 @@ async def add_tumor_board_vote(
         "reviewer_name": getattr(user, 'display_name', '') or getattr(user, 'username', ''),
         "vote": vote.vote,
         "rationale": vote.rationale,
-        "created_at": __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Write Audit Log
-    try:
-        from src.backend.domain.audit_log import AuditLogModel
-        from datetime import datetime, timezone
-        audit = AuditLogModel(
-            actor=str(user.id),
-            action="tumor_board_vote",
-            resource_type="tumor_board_review",
-            resource_id=str(review_id),
-            details={"case_id": case_id, "vote": vote.vote, "rationale": vote.rationale},
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(audit)
-        await db.commit()
-    except Exception as e:
-        logger.warning("Failed to write audit log for vote: %s", e)
+    # Add audit before business — same transaction, one commit
+    audit = AuditLogModel(
+        actor=str(user.id),
+        action="tumor_board_vote",
+        resource_type="tumor_board_review",
+        resource_id=str(review_id),
+        details={"case_id": case_id, "vote": vote.vote, "rationale": vote.rationale},
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(audit)
 
+    # repo.add_comment commits the transaction, flushing the audit too
     await repo.add_comment(review_id, vote_data)
+
     return {"status": "ok", "review_id": str(review_id), "vote": vote_data}
 
 
@@ -263,12 +311,16 @@ async def add_tumor_board_comment(
 ):
     """Add a comment to a tumor board review.
     User identity is always derived from the JWT token.
+    Business + Audit in same transaction — audit failure rolls back the entire operation.
     """
     if not comment.content or not comment.content.strip():
         raise HTTPException(status_code=422, detail={
             "error": "empty_comment",
             "message": "Comment content cannot be empty",
         })
+
+    from src.backend.domain.audit_log import AuditLogModel
+    from datetime import datetime, timezone
 
     repo = TumorBoardRepository(db)
     reviews = await repo.get_reviews_by_case(case_id)
@@ -287,26 +339,21 @@ async def add_tumor_board_comment(
         "user_name": getattr(user, 'display_name', '') or getattr(user, 'username', ''),
         "content": comment.content,
         "comment_type": comment.comment_type,
-        "created_at": __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Write Audit Log
-    try:
-        from src.backend.domain.audit_log import AuditLogModel
-        from datetime import datetime, timezone
-        audit = AuditLogModel(
-            actor=str(user.id),
-            action="tumor_board_comment",
-            resource_type="tumor_board_review",
-            resource_id=str(review_id),
-            details={"case_id": case_id, "comment_type": comment.comment_type},
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(audit)
-        await db.commit()
-    except Exception as e:
-        logger.warning("Failed to write audit log for comment: %s", e)
+    # Add audit before business — same transaction
+    audit = AuditLogModel(
+        actor=str(user.id),
+        action="tumor_board_comment",
+        resource_type="tumor_board_review",
+        resource_id=str(review_id),
+        details={"case_id": case_id, "comment_type": comment.comment_type},
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(audit)
 
+    # repo.add_comment commits the transaction, flushing the audit too
     await repo.add_comment(review_id, comment_data)
     return {"status": "ok", "review_id": str(review_id)}
 
@@ -379,11 +426,13 @@ async def create_note(
     user: UserModel = Depends(require_case_access(CaseRole.EDITOR)),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new note for a case."""
+    """Create a new note for a case. Business + Audit in same transaction."""
     if not note.content or not note.content.strip():
         raise HTTPException(status_code=422, detail={"error": "empty_content", "message": "Note content cannot be empty"})
 
     from datetime import datetime, timezone
+    from src.backend.domain.audit_log import AuditLogModel
+
     model = WorkbenchNoteModel(
         case_id=case_id,
         user_id=str(user.id),
@@ -392,24 +441,23 @@ async def create_note(
         created_at=datetime.now(timezone.utc),
     )
     db.add(model)
+
+    audit = AuditLogModel(
+        actor=str(user.id),
+        action="note_created",
+        resource_type="workbench_note",
+        resource_id=str(case_id),
+        details={"note_id": "pending", "case_id": case_id},
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(audit)
+
     await db.commit()
     await db.refresh(model)
 
-    # Audit log
-    try:
-        from src.backend.domain.audit_log import AuditLogModel
-        audit = AuditLogModel(
-            actor=str(user.id),
-            action="note_created",
-            resource_type="workbench_note",
-            resource_id=case_id,
-            details={"note_id": str(model.id)},
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(audit)
-        await db.commit()
-    except Exception as e:
-        logger.debug("Failed to write audit log for note creation: %s", e)
+    # Update audit with real note_id
+    audit.details = {"note_id": str(model.id), "case_id": case_id}
+    await db.commit()
 
     return {
         "id": str(model.id),
@@ -429,7 +477,7 @@ async def update_note(
     user: UserModel = Depends(require_case_access(CaseRole.EDITOR)),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update a note."""
+    """Update a note. Business + Audit in same transaction."""
     try:
         nid = uuid.UUID(note_id)
     except ValueError:
@@ -439,6 +487,9 @@ async def update_note(
         raise HTTPException(status_code=422, detail={"error": "empty_content", "message": "Note content cannot be empty"})
 
     from sqlalchemy import select
+    from src.backend.domain.audit_log import AuditLogModel
+    from datetime import datetime, timezone
+
     stmt = select(WorkbenchNoteModel).where(
         WorkbenchNoteModel.id == nid,
         WorkbenchNoteModel.case_id == case_id,
@@ -449,6 +500,17 @@ async def update_note(
         raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Note not found"})
 
     model.content = note.content
+
+    audit = AuditLogModel(
+        actor=str(user.id),
+        action="note_updated",
+        resource_type="workbench_note",
+        resource_id=str(note_id),
+        details={"case_id": case_id, "note_id": note_id},
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(audit)
+
     await db.commit()
     await db.refresh(model)
 
@@ -469,13 +531,16 @@ async def delete_note(
     user: UserModel = Depends(require_case_access(CaseRole.EDITOR)),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a note."""
+    """Delete a note. Business + Audit in same transaction."""
     try:
         nid = uuid.UUID(note_id)
     except ValueError:
         raise HTTPException(status_code=400, detail={"error": "invalid_uuid", "message": "Invalid note ID"})
 
     from sqlalchemy import select
+    from src.backend.domain.audit_log import AuditLogModel
+    from datetime import datetime, timezone
+
     stmt = select(WorkbenchNoteModel).where(
         WorkbenchNoteModel.id == nid,
         WorkbenchNoteModel.case_id == case_id,
@@ -486,13 +551,23 @@ async def delete_note(
         raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Note not found"})
 
     await db.delete(model)
+
+    audit = AuditLogModel(
+        actor=str(user.id),
+        action="note_deleted",
+        resource_type="workbench_note",
+        resource_id=str(note_id),
+        details={"case_id": case_id, "note_id": note_id},
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(audit)
+
     await db.commit()
 
     return {"status": "deleted"}
 
 
 # ─── Reasoning Session ──────────────────────────────────────────────────────
-
 
 
 class ReasoningQuestion(BaseModel):
@@ -506,55 +581,56 @@ async def create_reasoning_session(
     user: UserModel = Depends(require_case_access(CaseRole.EDITOR)),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a reasoning session and get AI response."""
+    """Create a reasoning session and get AI response.
+    User question is passed to the LLM adapter prompt and persisted in reasoning_data.
+    """
     if not question.question or not question.question.strip():
         raise HTTPException(status_code=422, detail={"error": "empty_question", "message": "Question cannot be empty"})
 
     llm_adapter = get_llm_adapter()
     service = ClinicalReasoningService(db=db, llm_adapter=llm_adapter)
 
+    # service.reason() now accepts question and saves it in reasoning_data internally
     result = await service.reason(
         case_id=case_id,
         gene_symbol="",
         disease="",
+        question=question.question,
     )
 
-    # Create reasoning run in DB
-    repo = ReasoningRunRepository(db)
-    run = await repo.create(
-        case_id=case_id,
-        status="completed",
-        reasoning_data=result.model_dump() if hasattr(result, 'model_dump') else {},
-    )
-
-    messages = [
-        {
-            "id": str(run.id) + "-user",
+    # The service already created the run via repo.create() — just return result
+    reasoning = result.reasoning
+    messages = []
+    if reasoning:
+        messages.append({
+            "id": result.run_id + "-user",
             "role": "user",
-            "content": question.question,
+            "content": reasoning.user_question or question.question,
             "created_at": datetime.now(timezone.utc).isoformat(),
-        },
-        {
-            "id": str(run.id),
+        })
+        messages.append({
+            "id": result.run_id,
             "role": "assistant",
-            "content": result.summary if hasattr(result, 'summary') and result.summary else "Analysis completed.",
-            "confidence": result.confidence_score if hasattr(result, 'confidence_score') else None,
+            "content": reasoning.summary or "Analysis completed.",
+            "confidence": reasoning.confidence_score if hasattr(reasoning, 'confidence_score') else None,
             "evidence": [
                 {"id": e.evidence_id, "summary": e.summary, "source": e.source}
-                for e in (result.supporting_evidence or [])
-            ] if hasattr(result, 'supporting_evidence') else [],
-            "references": result.references if hasattr(result, 'references') else [],
-            "decision_trace": result.decision_trace if hasattr(result, 'decision_trace') else [],
+                for e in (reasoning.citations or [])
+            ] if hasattr(reasoning, 'citations') and reasoning.citations else [
+                {"id": eid, "summary": "", "source": ""}
+                for eid in (reasoning.supporting_evidence_ids or [])
+            ],
+            "references": reasoning.supporting_evidence_ids or [],
+            "decision_trace": reasoning.key_findings or [],
             "created_at": datetime.now(timezone.utc).isoformat(),
-        },
-    ]
+        })
 
     return {
-        "id": str(run.id),
+        "id": result.run_id,
         "case_id": case_id,
         "messages": messages,
-        "created_at": run.created_at.isoformat() if hasattr(run.created_at, 'isoformat') else str(run.created_at),
-        "updated_at": run.updated_at.isoformat() if hasattr(run.updated_at, 'isoformat') else str(run.updated_at),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -564,7 +640,7 @@ async def list_reasoning_sessions(
     user: UserModel = Depends(require_case_access(CaseRole.VIEWER)),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all reasoning sessions for a case."""
+    """List all reasoning sessions for a case with message summaries."""
     from sqlalchemy import select
     stmt = (select(ReasoningRunModel)
             .where(ReasoningRunModel.case_id == case_id)
@@ -576,7 +652,7 @@ async def list_reasoning_sessions(
         {
             "id": str(r.id),
             "case_id": r.case_id,
-            "messages": [],
+            "messages": _build_messages_from_reasoning_run(r),
             "created_at": r.created_at.isoformat() if hasattr(r.created_at, 'isoformat') else str(r.created_at),
             "updated_at": r.updated_at.isoformat() if hasattr(r.updated_at, 'isoformat') else str(r.updated_at),
         }
@@ -607,24 +683,7 @@ async def get_reasoning_session(
     if not run:
         raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Reasoning session not found"})
 
-    reasoning_data = run.reasoning_data if isinstance(run.reasoning_data, dict) else {}
-    reasoning_result = ClinicalReasoningResult(**reasoning_data) if reasoning_data else None
-
-    messages = []
-    if reasoning_result:
-        messages.append({
-            "id": str(run.id),
-            "role": "assistant",
-            "content": reasoning_result.summary if hasattr(reasoning_result, 'summary') and reasoning_result.summary else "",
-            "confidence": reasoning_result.confidence_score if hasattr(reasoning_result, 'confidence_score') else None,
-            "evidence": [
-                {"id": e.evidence_id, "summary": e.summary, "source": e.source}
-                for e in (reasoning_result.supporting_evidence or [])
-            ] if hasattr(reasoning_result, 'supporting_evidence') else [],
-            "references": reasoning_result.references if hasattr(reasoning_result, 'references') else [],
-            "decision_trace": reasoning_result.decision_trace if hasattr(reasoning_result, 'decision_trace') else [],
-            "created_at": run.created_at.isoformat() if hasattr(run.created_at, 'isoformat') else str(run.created_at),
-        })
+    messages = _build_messages_from_reasoning_run(run)
 
     return {
         "id": str(run.id),
@@ -633,6 +692,38 @@ async def get_reasoning_session(
         "created_at": run.created_at.isoformat() if hasattr(run.created_at, 'isoformat') else str(run.created_at),
         "updated_at": run.updated_at.isoformat() if hasattr(run.updated_at, 'isoformat') else str(run.updated_at),
     }
+
+
+def _build_messages_from_reasoning_run(run: ReasoningRunModel) -> list[dict]:
+    """Build user+assistant messages from a reasoning run's persisted data."""
+    reasoning_data = run.reasoning_data if isinstance(run.reasoning_data, dict) else {}
+    messages = []
+
+    user_question = reasoning_data.get("user_question", "")
+    if user_question:
+        messages.append({
+            "id": str(run.id) + "-user",
+            "role": "user",
+            "content": user_question,
+            "created_at": run.created_at.isoformat() if hasattr(run.created_at, 'isoformat') else str(run.created_at),
+        })
+
+    summary = reasoning_data.get("summary", "")
+    if summary:
+        key_findings = reasoning_data.get("key_findings", [])
+        support_ids = reasoning_data.get("supporting_evidence_ids", [])
+        messages.append({
+            "id": str(run.id),
+            "role": "assistant",
+            "content": summary,
+            "confidence": reasoning_data.get("confidence_score"),
+            "evidence": [{"id": eid, "summary": "", "source": ""} for eid in support_ids],
+            "references": support_ids,
+            "decision_trace": key_findings,
+            "created_at": run.updated_at.isoformat() if hasattr(run.updated_at, 'isoformat') else str(run.updated_at),
+        })
+
+    return messages
 
 
 # ─── Attachments ─────────────────────────────────────────────────────────────

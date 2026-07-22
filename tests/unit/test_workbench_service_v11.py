@@ -14,6 +14,7 @@ from src.backend.workbench.models import (
     WorkbenchTimeline,
 )
 from src.backend.workbench.service import WorkbenchService
+from src.backend.reasoning.service import ClinicalReasoningService
 
 
 @pytest.fixture
@@ -219,3 +220,132 @@ class TestErrorHandling:
         valid_uuid = str(uuid.uuid4())
         summary = await service.get_patient_summary(valid_uuid)
         assert isinstance(summary, PatientSummary)
+
+
+class TestReasoningQuestion:
+    """P0-1: User question enters LLM adapter prompt."""
+
+    async def test_question_in_prompt(self):
+        """Question string must appear in the built user prompt."""
+        class SpyLLM:
+            def __init__(self):
+                self.prompts = []
+                self.is_available = True
+                self.provider = "test"
+                self.model = "test"
+                self.temperature = 0.1
+                self.seed = 42
+            async def generate(self, user_prompt, system_prompt=""):
+                self.prompts.append(user_prompt)
+                from src.backend.reasoning.llm import LLMResult
+                return LLMResult(
+                    success=True,
+                    content='{"summary": "test", "key_findings": [], "drug_explanations": []}',
+                    model="test",
+                )
+
+        db = AsyncMock()
+        db.execute = AsyncMock()
+        spy = SpyLLM()
+        service = ClinicalReasoningService(db=db, llm_adapter=spy)
+
+        await service.reason(
+            case_id=str(uuid.uuid4()),
+            gene_symbol="BRAF",
+            disease="melanoma",
+            question="What is the best therapy?",
+        )
+
+        assert len(spy.prompts) >= 1
+        # The question must appear in the prompt sent to LLM
+        assert "What is the best therapy?" in spy.prompts[0]
+        # The question should be labeled
+        assert "User question:" in spy.prompts[0]
+
+    async def test_different_questions_different_prompts(self):
+        """Different questions should produce different prompt content."""
+        class SpyLLM2:
+            def __init__(self):
+                self.prompts = []
+                self.is_available = True
+                self.provider = "test"
+                self.model = "test"
+                self.temperature = 0.1
+                self.seed = 42
+            async def generate(self, user_prompt, system_prompt=""):
+                self.prompts.append(user_prompt)
+                from src.backend.reasoning.llm import LLMResult
+                return LLMResult(
+                    success=True,
+                    content='{"summary": "test", "key_findings": [], "drug_explanations": []}',
+                    model="test",
+                )
+
+        db = AsyncMock()
+        db.execute = AsyncMock()
+        spy = SpyLLM2()
+        service = ClinicalReasoningService(db=db, llm_adapter=spy)
+
+        await service.reason(
+            case_id=str(uuid.uuid4()),
+            gene_symbol="EGFR",
+            question="What resistance mechanisms exist?",
+        )
+
+        assert "What resistance mechanisms exist?" in spy.prompts[0]
+        assert "User question: What resistance mechanisms exist?" in spy.prompts[0]
+
+    async def test_user_question_saved_in_reasoning_data(self):
+        """User question is saved in the reasoning_data field."""
+        class SavingDB:
+            def __init__(self):
+                self.added = []
+                self.committed = False
+            def add(self, obj):
+                if hasattr(obj, 'id') and not obj.id:
+                    obj.id = uuid.uuid4()
+                self.added.append(obj)
+            async def commit(self):
+                self.committed = True
+            async def refresh(self, obj):
+                pass
+            async def execute(self, stmt):
+                m = MagicMock()
+                m.scalar_one_or_none.return_value = None
+                m.scalars.return_value.all.return_value = []
+                return m
+            async def close(self):
+                pass
+            def delete(self, obj):
+                pass
+
+        class SpyLLM3:
+            def __init__(self):
+                self.is_available = True
+                self.provider = "test"
+                self.model = "test"
+                self.temperature = 0.1
+                self.seed = 42
+            async def generate(self, user_prompt, system_prompt=""):
+                from src.backend.reasoning.llm import LLMResult
+                return LLMResult(
+                    success=True,
+                    content='{"summary": "test", "key_findings": [], "drug_explanations": []}',
+                    model="test",
+                )
+
+        db = SavingDB()
+        spy = SpyLLM3()
+        service = ClinicalReasoningService(db=db, llm_adapter=spy)
+
+        question = "What is the standard of care?"
+        await service.reason(
+            case_id=str(uuid.uuid4()),
+            question=question,
+        )
+
+        # Verify the reasoning_data contains user_question
+        reasoning_run = [a for a in db.added if hasattr(a, 'reasoning_data')]
+        assert len(reasoning_run) > 0
+        rd = reasoning_run[-1].reasoning_data
+        assert rd.get("user_question") == question

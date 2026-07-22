@@ -58,6 +58,7 @@ class ClinicalReasoningService:
         knowledge_data: Optional[dict] = None,
         disease: str = "",
         gene_symbol: str = "",
+        question: str = "",
     ) -> ReasoningRunResponse:
         """
         Run clinical reasoning for a case.
@@ -103,6 +104,7 @@ class ClinicalReasoningService:
             reasoning_result = ClinicalReasoningResult(
                 id=result_id,
                 case_id=case_id,
+                user_question=question,
                 summary=f"Clinical reasoning for {gene_symbol or 'variant'} - LLM not available.",
                 key_findings=[f"Found {len(evidence_items or [])} evidence items for {gene_symbol or 'unknown gene'}"],
                 supporting_evidence_ids=all_evidence_ids,
@@ -145,6 +147,7 @@ class ClinicalReasoningService:
             conflicts=conflicts,
             evidence_items=evidence_items or [],
             ranking_result=ranking_result,
+            question=question,
         )
 
         input_hash = hashlib.sha256(
@@ -178,6 +181,7 @@ class ClinicalReasoningService:
 
         # Parse structured result
         reasoning_result = self._parse_llm_output(llm_result.content, case_id, all_evidence_ids, drug_names)
+        reasoning_result.user_question = question
 
         output_hash = hashlib.sha256(
             json.dumps(reasoning_result.model_dump(), sort_keys=True).encode()
@@ -236,14 +240,18 @@ class ClinicalReasoningService:
                             evidence_count: int, drug_count: int,
                             conflicts: list[dict],
                             evidence_items: list[dict],
-                            ranking_result: Optional[dict] = None) -> str:
-        """Build the user prompt with evidence context."""
+                            ranking_result: Optional[dict] = None,
+                            question: str = "") -> str:
+        """Build the user prompt with evidence context and user question."""
         prompt_parts = [
             f"Gene: {gene_symbol or 'N/A'}",
             f"Disease: {disease or 'N/A'}",
             f"Evidence items found: {evidence_count}",
             f"Drugs mentioned: {drug_count}",
         ]
+
+        if question:
+            prompt_parts.append(f"\nUser question: {question}")
 
         if conflicts:
             prompt_parts.append("\nConflicts detected:")

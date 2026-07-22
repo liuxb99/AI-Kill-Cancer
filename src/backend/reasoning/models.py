@@ -39,6 +39,7 @@ class ClinicalReasoningResult(BaseModel):
 
     id: str = ""
     case_id: Optional[str] = None
+    user_question: str = ""
     summary: str = ""
     key_findings: list[str] = []
     supporting_evidence_ids: list[str] = []
