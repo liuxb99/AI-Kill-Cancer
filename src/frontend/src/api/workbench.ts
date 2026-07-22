@@ -170,7 +170,7 @@ export function createTumorBoardReview(caseId: string): Promise<{ review_id: str
 
 export function addTumorBoardVote(
   caseId: string,
-  vote: { reviewer_id?: string; reviewer_name?: string; vote: string; rationale: string }
+  vote: { vote: string; rationale: string }
 ): Promise<{ status: string; review_id: string }> {
   return request(`/workbench/tumor-board/${caseId}/vote`, { method: 'POST', body: vote })
 }
@@ -184,4 +184,115 @@ export function addTumorBoardComment(
 
 export function compareCases(caseIds: string[]): Promise<CaseComparisonResult> {
   return request('/workbench/compare/cases', { method: 'POST', body: caseIds })
+}
+
+// ─── Notes API ──────────────────────────────────────────────────────────────
+
+export interface WorkbenchNote {
+  id: string
+  case_id: string
+  user_id: string
+  content: string
+  note_type: string
+  created_at: string
+}
+
+export function getNotes(caseId: string): Promise<WorkbenchNote[]> {
+  return request(`/workbench/case/${caseId}/notes`)
+}
+
+export function createNote(caseId: string, content: string, noteType = 'general'): Promise<WorkbenchNote> {
+  return request(`/workbench/case/${caseId}/notes`, {
+    method: 'POST',
+    body: { content, note_type: noteType },
+  })
+}
+
+export function updateNote(caseId: string, noteId: string, content: string): Promise<WorkbenchNote> {
+  return request(`/workbench/case/${caseId}/notes/${noteId}`, {
+    method: 'PATCH',
+    body: { content },
+  })
+}
+
+export function deleteNote(caseId: string, noteId: string): Promise<{ status: string }> {
+  return request(`/workbench/case/${caseId}/notes/${noteId}`, { method: 'DELETE' })
+}
+
+// ─── Reasoning API ──────────────────────────────────────────────────────────
+
+export interface ReasoningMessage {
+  id: string
+  role: string
+  content: string
+  evidence?: Array<{ id: string; summary: string; source: string }>
+  confidence?: number
+  references?: string[]
+  decision_trace?: string[]
+  created_at: string
+}
+
+export interface ReasoningSession {
+  id: string
+  case_id: string
+  messages: ReasoningMessage[]
+  created_at: string
+  updated_at: string
+}
+
+export function createReasoningSession(caseId: string, question: string): Promise<ReasoningSession> {
+  return request(`/workbench/case/${caseId}/reasoning`, {
+    method: 'POST',
+    body: { question },
+  })
+}
+
+export function getReasoningSession(caseId: string, sessionId: string): Promise<ReasoningSession> {
+  return request(`/workbench/case/${caseId}/reasoning/${sessionId}`)
+}
+
+export function listReasoningSessions(caseId: string): Promise<ReasoningSession[]> {
+  return request(`/workbench/case/${caseId}/reasoning`)
+}
+
+// ─── Attachments API ────────────────────────────────────────────────────────
+
+export interface Attachment {
+  id: string
+  case_id: string
+  filename: string
+  file_type: string
+  media_type: string
+  size_bytes: number
+  uploaded_by: string
+  upload_status: string
+  created_at: string
+}
+
+export function getAttachments(caseId: string): Promise<Attachment[]> {
+  return request(`/workbench/case/${caseId}/attachments`)
+}
+
+// ─── Variant API ────────────────────────────────────────────────────────────
+
+export interface VariantInfo {
+  id: string
+  gene_symbol: string
+  hgvs_notation: string
+  protein_change: string
+  variant_type: string
+  clinical_significance: string
+  vaf: number
+  pathogenicity: string
+  evidence_level: string
+  population_frequency: number
+  annotation_source: string
+  created_at: string
+}
+
+export function getCaseVariants(caseId: string, gene?: string, pathogenicity?: string, page = 1, pageSize = 20): Promise<{ variants: VariantInfo[]; total: number }> {
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+  if (gene) params.set('gene', gene)
+  if (pathogenicity) params.set('pathogenicity', pathogenicity)
+  return request(`/workbench/case/${caseId}/variants?${params}`)
 }

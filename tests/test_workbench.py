@@ -1,5 +1,5 @@
 """
-Tests for Doctor Workbench (v0.9.0).
+Tests for Doctor Workbench (v1.1).
 """
 
 from __future__ import annotations
@@ -61,28 +61,32 @@ class TestWorkbenchModels:
 
 class TestKnowledgeGraph:
     def test_build_variant_graph(self):
+        """With mock DB returning no data, graph should be empty — no fake fallback."""
         from tests.test_knowledge_layer import FakeKnowledgeDB
         db = FakeKnowledgeDB()
         service = WorkbenchService(db)
 
         import asyncio
-        graph = asyncio.run(service.build_knowledge_graph(variant_id="test-var-1"))
+        # Use a valid UUID format — mock will return no data
+        valid_uuid = str(uuid.uuid4())
+        graph = asyncio.run(service.build_knowledge_graph(variant_id=valid_uuid))
 
-        assert len(graph.nodes) >= 3  # gene + variant + at least 1 drug
-        assert len(graph.edges) >= 1
-        assert any(n.node_type == "gene" for n in graph.nodes)
-        assert any(n.node_type == "variant" for n in graph.nodes)
-        assert any(n.node_type == "drug" for n in graph.nodes)
+        # Without fake fallback, mock DB returns empty graph
+        assert len(graph.nodes) == 0
+        assert len(graph.edges) == 0
 
     def test_build_case_graph(self):
+        """With mock DB returning no case, graph should be empty — no fake fallback."""
         from tests.test_knowledge_layer import FakeKnowledgeDB
         db = FakeKnowledgeDB()
         service = WorkbenchService(db)
 
         import asyncio
-        graph = asyncio.run(service.build_knowledge_graph(case_id="test-case"))
+        valid_uuid = str(uuid.uuid4())
+        graph = asyncio.run(service.build_knowledge_graph(case_id=valid_uuid))
 
-        assert len(graph.nodes) >= 1
+        # No fake data — empty result
+        assert len(graph.nodes) == 0
 
 
 class TestTumorBoardRepository:
@@ -111,12 +115,15 @@ class TestTumorBoardRepository:
 
 class TestWorkbenchService:
     async def test_get_case_timeline(self):
+        """With mock DB returning no data, timeline should be empty — no fake events."""
         from tests.test_knowledge_layer import FakeKnowledgeDB
         db = FakeKnowledgeDB()
         service = WorkbenchService(db)
 
-        timeline = await service.get_case_timeline("case-1")
-        assert len(timeline.events) >= 1
+        # Use a valid UUID — mock returns no case, so timeline is empty
+        valid_uuid = str(uuid.uuid4())
+        timeline = await service.get_case_timeline(valid_uuid)
+        assert len(timeline.events) == 0
 
     async def test_compare_cases(self):
         from tests.test_knowledge_layer import FakeKnowledgeDB

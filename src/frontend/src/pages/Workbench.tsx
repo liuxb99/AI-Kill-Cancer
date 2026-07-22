@@ -7,11 +7,24 @@ import {
   getTreatmentRecommendation,
   getActivityLog,
   addTumorBoardVote,
+  getNotes,
+  createNote,
+  updateNote,
+  deleteNote,
+  createReasoningSession,
+  getReasoningSession,
+  listReasoningSessions,
+  getAttachments,
+  getCaseVariants,
   type PatientSummary,
   type WorkbenchTimeline,
   type KnowledgeGraph,
   type TreatmentRecommendation,
   type ActivityLog,
+  type WorkbenchNote,
+  type ReasoningSession,
+  type Attachment,
+  type VariantInfo,
 } from '../api/workbench'
 
 // ─── Tab config ─────────────────────────────────────────────────────────────
@@ -41,6 +54,23 @@ function LoadingSkeleton({ lines = 3 }: { lines?: number }) {
       {Array.from({ length: lines }).map((_, i) => (
         <div key={i} className="h-4 bg-gray-200 rounded w-full" />
       ))}
+    </div>
+  )
+}
+
+function ErrorState({ message }: { message: string }) {
+  return (
+    <div className="p-8 text-center">
+      <p className="text-red-500 text-sm font-medium mb-1">⚠ 加载失败</p>
+      <p className="text-xs text-gray-400">{message}</p>
+    </div>
+  )
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="p-8 text-center">
+      <p className="text-sm text-gray-400">{message}</p>
     </div>
   )
 }
@@ -120,67 +150,326 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function ClinicalNotesPanel() {
-  const [note, setNote] = useState('')
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-500">自由文本临床笔记</p>
-      <textarea
-        className="w-full h-48 border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-        placeholder="输入临床笔记..."
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
-    </div>
-  )
-}
+// ─── Clinical Notes Panel ────────────────────────────────────────────────────
 
-function PathologyPanel() {
+function ClinicalNotesPanel({ caseId }: { caseId: string }) {
+  const [notes, setNotes] = useState<WorkbenchNote[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [newContent, setNewContent] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
+
+  const loadNotes = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getNotes(caseId)
+      setNotes(data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载笔记失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [caseId])
+
+  useEffect(() => { loadNotes() }, [loadNotes])
+
+  const handleCreate = async () => {
+    if (!newContent.trim()) return
+    setSaving(true)
+    setSaveStatus('saving')
+    try {
+      const note = await createNote(caseId, newContent)
+      setNotes(prev => [note, ...prev])
+      setNewContent('')
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch (e) {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleUpdate = async (noteId: string) => {
+    if (!editContent.trim()) return
+    try {
+      const updated = await updateNote(caseId, noteId, editContent)
+      setNotes(prev => prev.map(n => n.id === noteId ? updated : n))
+      setEditingId(null)
+      setEditContent('')
+    } catch (e) {
+      console.error('Failed to update note:', e)
+    }
+  }
+
+  const handleDelete = async (noteId: string) => {
+    try {
+      await deleteNote(caseId, noteId)
+      setNotes(prev => prev.filter(n => n.id !== noteId))
+    } catch (e) {
+      console.error('Failed to delete note:', e)
+    }
+  }
+
+  if (loading) return <LoadingSkeleton lines={5} />
+  if (error) return <ErrorState message={error} />
+
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">病理学数据将在此显示。可在"上传"模块上传病理报告。</p>
-      <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center text-gray-400">
-        <p className="text-lg mb-2">📄</p>
-        <p className="text-sm">尚未上传病理报告</p>
+      {/* New note form */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+        <textarea
+          className="w-full h-24 border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          placeholder="输入临床笔记..."
+          value={newContent}
+          onChange={(e) => setNewContent(e.target.value)}
+        />
+        <div className="flex items-center justify-between">
+          <button
+            onClick={handleCreate}
+            disabled={saving || !newContent.trim()}
+            className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 transition disabled:opacity-50"
+          >
+            {saving ? '保存中...' : '保存笔记'}
+          </button>
+          {saveStatus === 'saved' && <span className="text-xs text-green-600">✓ 已保存</span>}
+          {saveStatus === 'error' && <span className="text-xs text-red-600">✗ 保存失败</span>}
+        </div>
+      </div>
+
+      {/* Notes list */}
+      <div className="space-y-3">
+        {notes.length === 0 ? (
+          <EmptyState message="暂无笔记" />
+        ) : (
+          notes.map(note => (
+            <div key={note.id} className="bg-white border border-gray-100 rounded-lg p-4">
+              {editingId === note.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    className="w-full h-20 border border-gray-200 rounded-lg p-2 text-sm"
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={() => handleUpdate(note.id)} className="text-xs px-3 py-1 bg-primary-500 text-white rounded">保存</button>
+                    <button onClick={() => { setEditingId(null); setEditContent('') }} className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded">取消</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.content}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-gray-400">
+                      {new Date(note.created_at).toLocaleString('zh-CN')}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setEditingId(note.id); setEditContent(note.content) }}
+                        className="text-xs text-primary-500 hover:text-primary-700"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        onClick={() => handleDelete(note.id)}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
 }
 
-function VariantsPanel({ graph }: { graph: KnowledgeGraph | null }) {
-  if (!graph) return <LoadingSkeleton lines={5} />
-  const variants = graph.nodes.filter(n => n.node_type === 'variant')
-  const genes = graph.nodes.filter(n => n.node_type === 'gene')
-  if (variants.length === 0 && genes.length === 0) {
-    return <p className="text-sm text-gray-400 p-4">未检测到变异</p>
-  }
+// ─── Pathology Panel ─────────────────────────────────────────────────────────
+
+function PathologyPanel({ caseId }: { caseId: string }) {
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    getAttachments(caseId)
+      .then(data => { if (!cancelled) setAttachments(data) })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : '加载病理资料失败') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [caseId])
+
+  if (loading) return <LoadingSkeleton lines={4} />
+  if (error) return <ErrorState message={error} />
+
   return (
     <div className="space-y-4">
-      <Section title="基因">
-        <div className="flex flex-wrap gap-2">
-          {genes.map(g => (
-            <span key={g.id} className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-medium">{g.label}</span>
-          ))}
-        </div>
-      </Section>
-      <Section title="变异列表">
-        <div className="space-y-2">
-          {variants.map(v => (
-            <div key={v.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-lg p-3">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: v.color }} />
-              <span className="text-sm font-medium text-gray-700">{v.label}</span>
-              <span className="text-xs text-gray-400 ml-auto">{v.id}</span>
+      {attachments.length === 0 ? (
+        <EmptyState message="尚未上传病理报告" />
+      ) : (
+        <div className="space-y-3">
+          {attachments.map(a => (
+            <div key={a.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📄</span>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">{a.filename}</p>
+                  <p className="text-xs text-gray-400">
+                    {(a.size_bytes / 1024).toFixed(1)} KB · {a.media_type} · {new Date(a.created_at).toLocaleString('zh-CN')}
+                  </p>
+                </div>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                a.upload_status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+              }`}>
+                {a.upload_status}
+              </span>
             </div>
           ))}
         </div>
-      </Section>
+      )}
     </div>
   )
 }
 
+// ─── Variants Panel ──────────────────────────────────────────────────────────
+
+function VariantsPanel({ caseId }: { caseId: string }) {
+  const [variants, setVariants] = useState<VariantInfo[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [geneFilter, setGeneFilter] = useState('')
+  const [pathFilter, setPathFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const pageSize = 20
+
+  const loadVariants = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getCaseVariants(caseId, geneFilter, pathFilter, page, pageSize)
+      setVariants(data.variants)
+      setTotal(data.total)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载变异数据失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [caseId, geneFilter, pathFilter, page])
+
+  useEffect(() => { loadVariants() }, [loadVariants])
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex gap-3 flex-wrap">
+        <input
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-40"
+          placeholder="Gene 筛选..."
+          value={geneFilter}
+          onChange={(e) => { setGeneFilter(e.target.value); setPage(1) }}
+        />
+        <select
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+          value={pathFilter}
+          onChange={(e) => { setPathFilter(e.target.value); setPage(1) }}
+        >
+          <option value="">所有致病性</option>
+          <option value="pathogenic">Pathogenic</option>
+          <option value="likely_pathogenic">Likely Pathogenic</option>
+          <option value="benign">Benign</option>
+          <option value="uncertain">Uncertain</option>
+        </select>
+        <span className="text-xs text-gray-400 self-center">{total} 个变异</span>
+      </div>
+
+      {loading ? <LoadingSkeleton lines={6} /> : error ? <ErrorState message={error} /> : (
+        <>
+          {variants.length === 0 ? (
+            <EmptyState message="未检测到变异" />
+          ) : (
+            <div className="space-y-2">
+              {variants.map(v => (
+                <div key={v.id} className="bg-white border border-gray-100 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-gray-800">{v.gene_symbol}</span>
+                        <span className="text-xs text-gray-500">{v.hgvs_notation}</span>
+                      </div>
+                      {v.protein_change && <p className="text-xs text-gray-500 mt-0.5">{v.protein_change}</p>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {v.clinical_significance && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          v.clinical_significance.toLowerCase().includes('pathogenic') ? 'bg-red-100 text-red-700' :
+                          v.clinical_significance.toLowerCase().includes('benign') ? 'bg-green-100 text-green-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {v.clinical_significance}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-400">
+                    <span>类型: {v.variant_type || '—'}</span>
+                    <span>VAF: {v.vaf ? `${(v.vaf * 100).toFixed(1)}%` : '—'}</span>
+                    {v.population_frequency > 0 && <span>人群频率: {(v.population_frequency * 100).toFixed(3)}%</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+              >
+                上一页
+              </button>
+              <span className="text-sm text-gray-500">{page} / {totalPages}</span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+              >
+                下一页
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── Knowledge Panel ─────────────────────────────────────────────────────────
+
 function KnowledgePanel({ graph }: { graph: KnowledgeGraph | null }) {
   if (!graph) return <LoadingSkeleton lines={5} />
   const { nodes, edges } = graph
+  if (nodes.length === 0) {
+    return <EmptyState message="知识图谱暂无数据" />
+  }
   return (
     <div className="space-y-4">
       <div className="bg-white border border-gray-100 rounded-lg p-4">
@@ -196,61 +485,174 @@ function KnowledgePanel({ graph }: { graph: KnowledgeGraph | null }) {
           ))}
         </div>
       </div>
-      <Section title="关系">
-        <div className="space-y-1">
-          {edges.map((e, i) => (
-            <div key={i} className="text-xs text-gray-500 flex items-center gap-2 p-1">
-              <span className="font-medium text-gray-700">{e.source_id}</span>
-              <span className="text-primary-500">─{e.label}→</span>
-              <span className="font-medium text-gray-700">{e.target_id}</span>
-            </div>
-          ))}
-        </div>
-      </Section>
+      {edges.length > 0 && (
+        <Section title="关系">
+          <div className="space-y-1">
+            {edges.map((e, i) => (
+              <div key={i} className="text-xs text-gray-500 flex items-center gap-2 p-1">
+                <span className="font-medium text-gray-700">{e.source_id}</span>
+                <span className="text-primary-500">─{e.label}→</span>
+                <span className="font-medium text-gray-700">{e.target_id}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
     </div>
   )
 }
 
+// ─── Reasoning Panel ─────────────────────────────────────────────────────────
+
 function ReasoningPanel({ caseId }: { caseId: string }) {
-  const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([])
+  const [sessions, setSessions] = useState<ReasoningSession[]>([])
+  const [activeSession, setActiveSession] = useState<ReasoningSession | null>(null)
   const [input, setInput] = useState('')
-  const sendMessage = useCallback(() => {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    listReasoningSessions(caseId)
+      .then(data => setSessions(data))
+      .catch(() => {})
+  }, [caseId])
+
+  const sendMessage = useCallback(async () => {
     if (!input.trim()) return
-    setMessages(prev => [...prev, { role: 'user', content: input }])
-    setMessages(prev => [...prev, { role: 'ai', content: `[模拟] 基于案例 ${caseId.slice(0, 8)} 的分析结果：建议进行证据验证。` }])
-    setInput('')
+    setLoading(true)
+    setError(null)
+    try {
+      const session = await createReasoningSession(caseId, input)
+      setActiveSession(session)
+      setSessions(prev => [session, ...prev])
+      setInput('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '推理请求失败')
+    } finally {
+      setLoading(false)
+    }
   }, [input, caseId])
+
+  const loadSession = useCallback(async (sessionId: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const session = await getReasoningSession(caseId, sessionId)
+      setActiveSession(session)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载推理会话失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [caseId])
+
+  const messages = activeSession?.messages || []
+
   return (
     <div className="flex flex-col h-full space-y-4">
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {/* Session selector */}
+      {sessions.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {sessions.slice(0, 5).map(s => (
+            <button
+              key={s.id}
+              onClick={() => loadSession(s.id)}
+              className={`text-xs px-2 py-1 rounded whitespace-nowrap ${
+                activeSession?.id === s.id ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {new Date(s.created_at).toLocaleString('zh-CN')}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Messages */}
       <div className="flex-1 space-y-3 overflow-y-auto max-h-80">
         {messages.length === 0 && (
           <p className="text-sm text-gray-400 text-center py-8">开始与 AI 助手对话以进行临床推理</p>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-lg p-3 text-sm ${
-              m.role === 'user' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700'
-            }`}>
-              {m.content}
+          <div key={m.id || i} className="space-y-1">
+            <div className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] rounded-lg p-3 text-sm ${
+                m.role === 'user' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700'
+              }`}>
+                {m.content}
+              </div>
             </div>
+            {/* Evidence, confidence, references for AI messages */}
+            {m.role === 'assistant' && m.evidence && m.evidence.length > 0 && (
+              <div className="ml-4 space-y-1">
+                <p className="text-xs font-medium text-gray-500 mt-2">📚 证据</p>
+                {m.evidence.map((ev, ei) => (
+                  <p key={ei} className="text-xs text-gray-400 pl-2 border-l-2 border-primary-200">
+                    {ev.summary}
+                    <span className="text-gray-300 ml-1">({ev.source})</span>
+                  </p>
+                ))}
+              </div>
+            )}
+            {m.role === 'assistant' && m.confidence !== undefined && m.confidence !== null && (
+              <div className="ml-4 mt-1">
+                <span className="text-xs text-gray-400">
+                  置信度: {(m.confidence * 100).toFixed(0)}%
+                </span>
+              </div>
+            )}
+            {m.role === 'assistant' && m.references && m.references.length > 0 && (
+              <div className="ml-4 mt-1">
+                <p className="text-xs text-gray-400">参考文献: {m.references.join(', ')}</p>
+              </div>
+            )}
+            {m.role === 'assistant' && m.decision_trace && m.decision_trace.length > 0 && (
+              <div className="ml-4 mt-1">
+                <details>
+                  <summary className="text-xs text-gray-400 cursor-pointer">推理过程</summary>
+                  <div className="mt-1 space-y-1">
+                    {m.decision_trace.map((step, si) => (
+                      <p key={si} className="text-xs text-gray-400 pl-2">→ {step}</p>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            )}
           </div>
         ))}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-gray-100 rounded-lg p-3 text-sm text-gray-500">
+              <span className="animate-pulse">推理中...</span>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Input */}
       <div className="flex gap-2">
         <input
           className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           placeholder="向 AI 推理引擎提问..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          onKeyDown={(e) => e.key === 'Enter' && !loading && sendMessage()}
+          disabled={loading}
         />
-        <button onClick={sendMessage} className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 transition">
+        <button
+          onClick={sendMessage}
+          disabled={loading || !input.trim()}
+          className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 transition disabled:opacity-50"
+        >
           发送
         </button>
       </div>
     </div>
   )
 }
+
+// ─── Treatment Panel ─────────────────────────────────────────────────────────
 
 function TreatmentPanel({ treatment }: { treatment: TreatmentRecommendation | null }) {
   if (!treatment) return <LoadingSkeleton lines={5} />
@@ -318,21 +720,32 @@ function TreatmentPanel({ treatment }: { treatment: TreatmentRecommendation | nu
   )
 }
 
+// ─── Tumor Board Panel ───────────────────────────────────────────────────────
+
 function TumorBoardPanel({ caseId }: { caseId: string }) {
   const [votes, setVotes] = useState<Array<{ reviewer: string; vote: string; rationale: string }>>([])
   const [showForm, setShowForm] = useState(false)
   const [voteVal, setVoteVal] = useState('approve')
   const [rationale, setRationale] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const submitVote = useCallback(async () => {
+    if (!rationale.trim()) return
+    setSubmitting(true)
+    setError(null)
     try {
-      await addTumorBoardVote(caseId, { vote: voteVal, rationale, reviewer_name: 'Current User' })
-      setVotes(prev => [...prev, { reviewer: 'Current User', vote: voteVal, rationale }])
+      await addTumorBoardVote(caseId, { vote: voteVal, rationale })
+      setVotes(prev => [...prev, { reviewer: '', vote: voteVal, rationale }])
       setShowForm(false)
       setRationale('')
     } catch (e) {
-      console.error('Vote failed:', e)
+      setError(e instanceof Error ? e.message : '投票失败')
+    } finally {
+      setSubmitting(false)
     }
   }, [caseId, voteVal, rationale])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -342,6 +755,7 @@ function TumorBoardPanel({ caseId }: { caseId: string }) {
           {showForm ? '取消' : '添加投票'}
         </button>
       </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
       {showForm && (
         <div className="bg-gray-50 rounded-lg p-4 space-y-3">
           <div className="flex gap-4">
@@ -355,8 +769,9 @@ function TumorBoardPanel({ caseId }: { caseId: string }) {
           </div>
           <textarea className="w-full border border-gray-200 rounded-lg p-2 text-sm"
             placeholder="投票理由..." value={rationale} onChange={(e) => setRationale(e.target.value)} />
-          <button onClick={submitVote} className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 transition">
-            提交投票
+          <button onClick={submitVote} disabled={submitting || !rationale.trim()}
+            className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 transition disabled:opacity-50">
+            {submitting ? '提交中...' : '提交投票'}
           </button>
         </div>
       )}
@@ -367,7 +782,7 @@ function TumorBoardPanel({ caseId }: { caseId: string }) {
           votes.map((v, i) => (
             <div key={i} className="bg-white border border-gray-100 rounded-lg p-3">
               <div className="flex items-center justify-between">
-                <span className="font-medium text-sm">{v.reviewer}</span>
+                <span className="font-medium text-sm">{v.reviewer || '您'}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
                   v.vote === 'approve' ? 'bg-green-100 text-green-700' :
                   v.vote === 'reject' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
@@ -466,9 +881,9 @@ export default function Workbench() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'patient': return <PatientPanel summary={patientSummary} />
-      case 'clinical-notes': return <ClinicalNotesPanel />
-      case 'pathology': return <PathologyPanel />
-      case 'variants': return <VariantsPanel graph={graph} />
+      case 'clinical-notes': return <ClinicalNotesPanel caseId={caseId} />
+      case 'pathology': return <PathologyPanel caseId={caseId} />
+      case 'variants': return <VariantsPanel caseId={caseId} />
       case 'knowledge': return <KnowledgePanel graph={graph} />
       case 'reasoning': return <ReasoningPanel caseId={caseId} />
       case 'treatment': return <TreatmentPanel treatment={treatment} />
