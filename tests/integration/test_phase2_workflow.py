@@ -6,6 +6,8 @@ calls and verifies that outputs from each stage are correctly correlated.
 """
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -70,9 +72,10 @@ def _create_case(client: TestClient, token: str, patient_id: str) -> str:
 
 
 @pytest.fixture(scope="function")
-def workflow_setup(client):
+def workflow_setup(client, request):
     """Set up user, patient, and case for the workflow test."""
-    token = _register_user(client, "workflow_user")
+    unique_suffix = str(uuid.uuid4())[:8]
+    token = _register_user(client, f"workflow_user_{unique_suffix}")
     pid = _create_patient(client, token)
     case_id = _create_case(client, token, pid)
     return {"token": token, "case_id": case_id, "patient_id": pid}
