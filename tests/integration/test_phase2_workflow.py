@@ -143,7 +143,7 @@ class TestPhase2FullWorkflow:
         assert len(opinions) > 0
 
         agent_types = {o["agent_type"] for o in opinions}
-        expected_agents = {"diagnosis", "variant", "drug", "resistance", "guideline", "trial"}
+        expected_agents = {"diagnosis", "variant", "drug", "resistance", "guideline", "clinical_trial"}
         assert agent_types == expected_agents, (
             f"Expected agents {expected_agents}, got {agent_types}"
         )
