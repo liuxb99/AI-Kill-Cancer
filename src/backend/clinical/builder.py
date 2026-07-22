@@ -63,6 +63,10 @@ class CaseContextBuilder:
             ``context_hash``.
         """
         # ── Validate case_id ──────────────────────────────────────────────
+        if not case_id:
+            logger.warning("Empty or None case_id provided")
+            return self._empty_context()
+
         try:
             cid = uuid.UUID(case_id) if isinstance(case_id, str) else case_id
         except (ValueError, AttributeError):
@@ -86,8 +90,8 @@ class CaseContextBuilder:
             )
             patient_repo = PatientRepository(self.db)
             patient = await patient_repo.get(pid)
-        except (ValueError, AttributeError) as exc:
-            logger.debug("Could not resolve patient for case %s: %s", case_id, exc)
+        except Exception as exc:
+            logger.warning("Could not load patient for case %s: %s", case_id, exc)
 
         # ── Load variants ─────────────────────────────────────────────────
         variants: list[VariantModel] = await self._load_variants(cid)

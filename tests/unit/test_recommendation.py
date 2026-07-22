@@ -272,12 +272,23 @@ class TestOutputFormat:
 
         json_data = rec.structured_json
         assert isinstance(json_data, dict)
+        assert "patient" in json_data
+        assert "consensus" in json_data
         assert "recommendation" in json_data
-        assert "alternative_options" in json_data
-        assert "clinical_trials" in json_data
-        assert "supporting_evidence" in json_data
+        assert "evidence_summary" in json_data
         assert "benefit_risk" in json_data
         assert "monitoring_plan" in json_data
+
+        # Verify nested structure within recommendation
+        rec_block = json_data["recommendation"]
+        assert "first_line" in rec_block
+        assert "second_line" in rec_block
+        assert "clinical_trial" in rec_block
+
+        # Verify evidence_summary has expected sub-keys
+        ev_summary = json_data["evidence_summary"]
+        assert "total_items" in ev_summary
+        assert "top_level" in ev_summary
 
     @pytest.mark.asyncio
     async def test_markdown_contains_expected_sections(self, generator, context, sample_evidence):

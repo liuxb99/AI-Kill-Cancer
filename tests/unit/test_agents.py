@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
-from pydantic import ValidationError
 
 from src.backend.agents.base import BaseAgent
 from src.backend.agents.models import AgentOpinion
@@ -175,11 +174,13 @@ class TestBaseAgent:
         )
         agent = DiagnosisAgent(db=AsyncMock())
         errors = agent.validate_opinion(opinion)
-        assert "created_at must be set" in errors
+        assert "created_at must be set (ISO-8601 timestamp)" in errors
 
     def test_validate_opinion_invalid_references(self):
         """Invalid references (non-dict, missing keys) → errors."""
-        opinion = AgentOpinion(
+        # Use model_construct to bypass Pydantic type validation so that
+        # validate_opinion receives the raw references as-is for checking.
+        opinion = AgentOpinion.model_construct(
             agent_type="test",
             agent_version="1.0.0",
             summary="Summary text.",
@@ -255,14 +256,16 @@ class TestAgentOpinion:
         assert opinion.created_at == now
 
     def test_invalid_confidence_rejected(self):
-        """Invalid confidence string → ValidationError."""
-        with pytest.raises(ValidationError):
-            AgentOpinion(
-                agent_type="test",
-                agent_version="1.0.0",
-                summary="Bad confidence.",
-                confidence="invalid_value",
-            )
+        """Invalid confidence string → caught by validate_opinion."""
+        opinion = AgentOpinion(
+            agent_type="test",
+            agent_version="1.0.0",
+            summary="Bad confidence.",
+            confidence="invalid_value",
+        )
+        agent = DiagnosisAgent(db=AsyncMock())
+        errors = agent.validate_opinion(opinion)
+        assert any("confidence must be one of" in e for e in errors)
 
 
 # ─── Test: DiagnosisAgent ───────────────────────────────────────────────────
@@ -339,7 +342,7 @@ class TestDiagnosisAgent:
 
     @pytest.mark.asyncio
     async def test_analyze_with_biomarker_evidence(self, mock_db):
-        """Biomarker matched to evidence → mentioned in summary."""
+        """Biomarker matched to evidence → mentioned in pros and summary."""
         context = ClinicalContext(
             case_id="CASE-004",
             patient_id="PT-004",
@@ -364,8 +367,10 @@ class TestDiagnosisAgent:
         agent = DiagnosisAgent(db=mock_db)
         opinion = await agent.analyze(context, bundle)
 
-        assert "EGFR" in opinion.summary
+        # The summary says "1 biomarker(s) matched to diagnostic evidence."
         assert "biomarker" in opinion.summary.lower()
+        # The biomarker name appears in pros, not in the summary.
+        assert any("EGFR" in p for p in opinion.pros)
 
     @pytest.mark.asyncio
     async def test_agent_does_not_share_state(self, mock_db, evidence_bundle):

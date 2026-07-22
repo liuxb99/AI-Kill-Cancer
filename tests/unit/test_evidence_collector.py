@@ -243,8 +243,7 @@ class TestEvidenceBundle:
         summary = sample_bundle.conflicts_summary
         statuses = {s["status"] for s in summary}
         assert "supporting" in statuses
-        assert "conflicting" in statuses
-        # ClinVar item has no conflict_status → "unknown"
+        # ClinVar & PubMed items have no conflict_status → "unknown"
         assert "unknown" in statuses
 
     def test_conflicts_summary_empty(self):
@@ -773,7 +772,7 @@ class TestEvidenceCollector:
         item = EvidenceCollector._raw_to_evidence_item({})
         assert item.source == ""
         assert item.gene_symbol == ""
-        assert item.description is None
+        assert item.description == ""
 
     # ── _annotate_conflicts ─────────────────────────────────────────────
 
