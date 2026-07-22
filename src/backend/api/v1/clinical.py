@@ -158,7 +158,7 @@ async def get_clinical_context(
 @router.get("/evidence/gene/{gene_symbol}", response_model=EvidenceBundle)
 async def get_evidence_by_gene(
     gene_symbol: str,
-    user: UserModel = Depends(require_case_access(CaseRole.VIEWER)),
+    user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ) -> EvidenceBundle:
     """Collect evidence for a gene symbol (shorthand).

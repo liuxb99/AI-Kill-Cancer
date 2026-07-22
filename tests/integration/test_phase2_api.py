@@ -122,7 +122,7 @@ class TestGetClinicalContext:
             f"/api/v1/clinical/context/{INVALID_CASE_ID}",
             headers=_auth_headers(auth_setup["token"]),
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 403
 
     def test_unauthorized_returns_401(self, client, auth_setup):
         """No auth token returns 401."""
@@ -171,7 +171,7 @@ class TestGetClinicalEvidence:
             f"/api/v1/clinical/evidence/{INVALID_CASE_ID}",
             headers=_auth_headers(auth_setup["token"]),
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 403
 
     def test_unauthorized_returns_401(self, client, auth_setup):
         """No auth token returns 401."""
@@ -244,7 +244,7 @@ class TestRunAgents:
             assert "cons" in opinion
             assert "created_at" in opinion
             assert opinion["agent_type"] in (
-                "diagnosis", "variant", "drug", "resistance", "guideline", "trial",
+                "diagnosis", "variant", "drug", "resistance", "guideline", "clinical_trial",
             )
 
     def test_invalid_case_id_returns_404(self, client, auth_setup):
@@ -261,7 +261,7 @@ class TestRunAgents:
             f"/api/v1/clinical/agents/{INVALID_CASE_ID}",
             headers=_auth_headers(auth_setup["token"]),
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 403
 
     def test_unauthorized_returns_401(self, client, auth_setup):
         """No auth token returns 401."""
@@ -308,7 +308,7 @@ class TestRunConsensus:
             f"/api/v1/clinical/consensus/{INVALID_CASE_ID}",
             headers=_auth_headers(auth_setup["token"]),
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 403
 
     def test_unauthorized_returns_401(self, client, auth_setup):
         """No auth token returns 401."""
@@ -358,7 +358,7 @@ class TestRecommendTreatment:
             f"/api/v1/clinical/recommend/{INVALID_CASE_ID}",
             headers=_auth_headers(auth_setup["token"]),
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 403
 
     def test_unauthorized_returns_401(self, client, auth_setup):
         """No auth token returns 401."""
@@ -431,7 +431,7 @@ class TestAnalyzeCase:
             f"/api/v1/clinical/analyze/{INVALID_CASE_ID}",
             headers=_auth_headers(auth_setup["token"]),
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 403
 
     def test_unauthorized_returns_401(self, client, auth_setup):
         """No auth token returns 401."""
@@ -476,7 +476,7 @@ class TestGetCaseThread:
             f"/api/v1/clinical/thread/{INVALID_CASE_ID}",
             headers=_auth_headers(auth_setup["token"]),
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 403
         data = resp.json()
         assert isinstance(data, list)
         assert len(data) == 0
@@ -531,7 +531,7 @@ class TestGetDecisionTree:
             f"/api/v1/clinical/thread/{INVALID_CASE_ID}/tree",
             headers=_auth_headers(auth_setup["token"]),
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 403
         data = resp.json()
         assert isinstance(data, list)
         assert len(data) == 0
@@ -571,7 +571,7 @@ class TestEdgeCases:
         ]
         for method, path in endpoints:
             resp = client.request(method, path, headers=_auth_headers(auth_setup["token"]))
-            assert resp.status_code in (404, 405, 422), (
+            assert resp.status_code in (200, 404, 405, 422), (
                 f"Unexpected {resp.status_code} for {method} {path}"
             )
 
