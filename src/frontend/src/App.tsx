@@ -5,6 +5,7 @@ import Tools from './pages/Tools'
 import Research from './pages/Research'
 import Dashboard from './pages/Dashboard'
 import ResearchPortal from './pages/ResearchPortal'
+import Workbench from './pages/Workbench'
 import StatusBanner from './components/StatusBanner'
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
         <Route path="/research" element={<Research />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/research-portal" element={<ResearchPortal />} />
+        <Route path="/workbench" element={<Workbench />} />
       </Routes>
     </div>
   )
