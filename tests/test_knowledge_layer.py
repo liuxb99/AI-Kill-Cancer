@@ -151,6 +151,9 @@ class FakeKnowledgeDB:
         obj.id = uuid.uuid4()
         self.added.append(obj)
 
+    async def flush(self):
+        pass
+
     async def commit(self):
         pass
 

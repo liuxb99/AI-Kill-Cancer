@@ -99,11 +99,16 @@ async def create_tumor_board_review(
 ):
     """Create a tumor board review for a case."""
     repo = TumorBoardRepository(db)
-    review = await repo.create_review(
-        case_id=case_id,
-        reviewer_id=str(user.id),
-        reviewer_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
-    )
+    try:
+        review = await repo.create_review(
+            case_id=case_id,
+            reviewer_id=str(user.id),
+            reviewer_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
     return {"review_id": str(review.id), "status": "draft", "case_id": case_id}
 
 
@@ -245,7 +250,7 @@ async def add_tumor_board_vote(
 ):
     """Add a vote to a tumor board review.
     Reviewer identity is always derived from the JWT token — client-supplied identity is ignored.
-    Business + Audit in same transaction — audit failure rolls back the entire operation.
+    Business + Audit in same transaction — single commit, audit failure rolls back the entire operation.
     """
     # Validate vote value
     valid_votes = {"approve", "reject", "abstain"}
@@ -259,39 +264,44 @@ async def add_tumor_board_vote(
     from datetime import datetime, timezone
 
     repo = TumorBoardRepository(db)
-    reviews = await repo.get_reviews_by_case(case_id)
-    if not reviews:
-        review = await repo.create_review(
-            case_id=case_id,
-            reviewer_id=str(user.id),
-            reviewer_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
+
+    try:
+        reviews = await repo.get_reviews_by_case(case_id)
+        if not reviews:
+            review = await repo.create_review(
+                case_id=case_id,
+                reviewer_id=str(user.id),
+                reviewer_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
+            )
+            review_id = review.id
+        else:
+            review_id = reviews[0].id
+
+        # All identity fields come from JWT — client values are NEVER used
+        vote_data = {
+            "reviewer_id": str(user.id),
+            "reviewer_name": getattr(user, 'display_name', '') or getattr(user, 'username', ''),
+            "vote": vote.vote,
+            "rationale": vote.rationale,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        audit = AuditLogModel(
+            actor=str(user.id),
+            action="tumor_board_vote",
+            resource_type="tumor_board_review",
+            resource_id=str(review_id),
+            details={"case_id": case_id, "vote": vote.vote, "rationale": vote.rationale},
+            created_at=datetime.now(timezone.utc),
         )
-        review_id = review.id
-    else:
-        review_id = reviews[0].id
+        db.add(audit)
 
-    # All identity fields come from JWT — client values are NEVER used
-    vote_data = {
-        "reviewer_id": str(user.id),
-        "reviewer_name": getattr(user, 'display_name', '') or getattr(user, 'username', ''),
-        "vote": vote.vote,
-        "rationale": vote.rationale,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
+        await repo.add_comment(review_id, vote_data)
 
-    # Add audit before business — same transaction, one commit
-    audit = AuditLogModel(
-        actor=str(user.id),
-        action="tumor_board_vote",
-        resource_type="tumor_board_review",
-        resource_id=str(review_id),
-        details={"case_id": case_id, "vote": vote.vote, "rationale": vote.rationale},
-        created_at=datetime.now(timezone.utc),
-    )
-    db.add(audit)
-
-    # repo.add_comment commits the transaction, flushing the audit too
-    await repo.add_comment(review_id, vote_data)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
     return {"status": "ok", "review_id": str(review_id), "vote": vote_data}
 
@@ -311,7 +321,7 @@ async def add_tumor_board_comment(
 ):
     """Add a comment to a tumor board review.
     User identity is always derived from the JWT token.
-    Business + Audit in same transaction — audit failure rolls back the entire operation.
+    Business + Audit in same transaction — single commit, audit failure rolls back the entire operation.
     """
     if not comment.content or not comment.content.strip():
         raise HTTPException(status_code=422, detail={
@@ -323,38 +333,44 @@ async def add_tumor_board_comment(
     from datetime import datetime, timezone
 
     repo = TumorBoardRepository(db)
-    reviews = await repo.get_reviews_by_case(case_id)
-    if not reviews:
-        review = await repo.create_review(
-            case_id=case_id,
-            reviewer_id=str(user.id),
-            reviewer_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
+
+    try:
+        reviews = await repo.get_reviews_by_case(case_id)
+        if not reviews:
+            review = await repo.create_review(
+                case_id=case_id,
+                reviewer_id=str(user.id),
+                reviewer_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
+            )
+            review_id = review.id
+        else:
+            review_id = reviews[0].id
+
+        comment_data = {
+            "user_id": str(user.id),
+            "user_name": getattr(user, 'display_name', '') or getattr(user, 'username', ''),
+            "content": comment.content,
+            "comment_type": comment.comment_type,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        audit = AuditLogModel(
+            actor=str(user.id),
+            action="tumor_board_comment",
+            resource_type="tumor_board_review",
+            resource_id=str(review_id),
+            details={"case_id": case_id, "comment_type": comment.comment_type},
+            created_at=datetime.now(timezone.utc),
         )
-        review_id = review.id
-    else:
-        review_id = reviews[0].id
+        db.add(audit)
 
-    comment_data = {
-        "user_id": str(user.id),
-        "user_name": getattr(user, 'display_name', '') or getattr(user, 'username', ''),
-        "content": comment.content,
-        "comment_type": comment.comment_type,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
+        await repo.add_comment(review_id, comment_data)
 
-    # Add audit before business — same transaction
-    audit = AuditLogModel(
-        actor=str(user.id),
-        action="tumor_board_comment",
-        resource_type="tumor_board_review",
-        resource_id=str(review_id),
-        details={"case_id": case_id, "comment_type": comment.comment_type},
-        created_at=datetime.now(timezone.utc),
-    )
-    db.add(audit)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
-    # repo.add_comment commits the transaction, flushing the audit too
-    await repo.add_comment(review_id, comment_data)
     return {"status": "ok", "review_id": str(review_id)}
 
 
@@ -426,7 +442,7 @@ async def create_note(
     user: UserModel = Depends(require_case_access(CaseRole.EDITOR)),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new note for a case. Business + Audit in same transaction."""
+    """Create a new note for a case. Single atomic commit — note + audit in one transaction."""
     if not note.content or not note.content.strip():
         raise HTTPException(status_code=422, detail={"error": "empty_content", "message": "Note content cannot be empty"})
 
@@ -442,22 +458,26 @@ async def create_note(
     )
     db.add(model)
 
+    # Flush to get a real note.id before creating the audit
+    await db.flush()
+
     audit = AuditLogModel(
         actor=str(user.id),
         action="note_created",
         resource_type="workbench_note",
         resource_id=str(case_id),
-        details={"note_id": "pending", "case_id": case_id},
+        details={"note_id": str(model.id), "case_id": case_id},
         created_at=datetime.now(timezone.utc),
     )
     db.add(audit)
 
-    await db.commit()
-    await db.refresh(model)
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
-    # Update audit with real note_id
-    audit.details = {"note_id": str(model.id), "case_id": case_id}
-    await db.commit()
+    await db.refresh(model)
 
     return {
         "id": str(model.id),

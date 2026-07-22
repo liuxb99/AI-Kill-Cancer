@@ -68,6 +68,9 @@ class FakeAuditFailDB:
             raise Exception("Audit DB failure")
         self.committed = True
 
+    async def flush(self):
+        pass
+
     async def refresh(self, obj):
         self.refreshed = True
 
@@ -98,6 +101,9 @@ class FakeRepoDB:
 
     async def commit(self):
         self.committed = True
+
+    async def flush(self):
+        pass
 
     async def refresh(self, obj):
         pass

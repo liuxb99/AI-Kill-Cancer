@@ -56,7 +56,7 @@ class TumorBoardRepository:
             reviewer_name=reviewer_name,
         )
         self.db.add(review)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(review)
         return review
 
@@ -85,7 +85,7 @@ class TumorBoardRepository:
         current_log.append(log_entry)
         review.decision_log = current_log
         review.updated_at = datetime.utcnow()
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(review)
         return review
 
@@ -96,6 +96,6 @@ class TumorBoardRepository:
         current_comments = list(review.comments or [])
         current_comments.append(comment)
         review.comments = current_comments
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(review)
         return review

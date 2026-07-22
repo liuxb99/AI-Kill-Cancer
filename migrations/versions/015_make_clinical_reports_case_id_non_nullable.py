@@ -63,9 +63,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.alter_column(
-        "domain_clinical_reports",
-        "case_id",
-        existing_type=sa.String(36),
-        nullable=True,
-    )
+    # SQLite does not support ALTER COLUMN — use batch mode for cross-dialect compatibility
+    with op.batch_alter_table("domain_clinical_reports") as batch_op:
+        batch_op.alter_column(
+            "case_id",
+            existing_type=sa.String(36),
+            nullable=True,
+        )
