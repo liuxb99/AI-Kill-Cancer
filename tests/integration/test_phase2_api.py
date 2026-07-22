@@ -471,14 +471,13 @@ class TestGetCaseThread:
             assert node["case_id"] == auth_setup["case_id"]
 
     def test_empty_case_thread_returns_empty_list(self, client, auth_setup):
-        """Case with no decision thread returns empty list (200)."""
+        """Well-formed UUID with no matching case returns 403 (ACL)."""
         resp = client.get(
             f"/api/v1/clinical/thread/{INVALID_CASE_ID}",
             headers=_auth_headers(auth_setup["token"]),
         )
         assert resp.status_code == 403
-        data = resp.json()
-        assert isinstance(data, list)
+        assert "detail" in resp.json()
         assert len(data) == 0
 
     def test_invalid_case_id_returns_404(self, client, auth_setup):
@@ -526,14 +525,13 @@ class TestGetDecisionTree:
             assert "parent_id" in node  # may be None for root nodes
 
     def test_empty_tree_returns_empty_list(self, client, auth_setup):
-        """Case with no decision tree returns empty list (200)."""
+        """Well-formed UUID with no matching case returns 403 (ACL)."""
         resp = client.get(
             f"/api/v1/clinical/thread/{INVALID_CASE_ID}/tree",
             headers=_auth_headers(auth_setup["token"]),
         )
         assert resp.status_code == 403
-        data = resp.json()
-        assert isinstance(data, list)
+        assert "detail" in resp.json()
         assert len(data) == 0
 
     def test_invalid_case_id_returns_404(self, client, auth_setup):
