@@ -37,6 +37,7 @@ jobs:
           pip install -r src/backend/requirements-api.txt
           pip install pytest pytest-cov ruff mypy numpy httpx pytest-asyncio anyio
 
+      # Phase 2: Lint with ruff (covers src/ and tests/ including new Phase 2 files)
       - name: Lint with ruff
         run: ruff check src/ tests/
 
@@ -44,11 +45,13 @@ jobs:
       # Current approach: mypy src/ --ignore-missing-imports
       # Blocked on: missing type annotations in models/, repositories/, and domain/
 
+      # Phase 2: Run all tests (unit + integration)
       - name: Test with pytest
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
-        run: pytest -v --tb=short --cov=src/backend
+        run: pytest -v --tb=short --cov=src/backend tests/unit/ tests/integration/
 
+      # Phase 2: Test migration (database schema)
       - name: Test migration
         env:
           DATABASE_URL: sqlite+aiosqlite:///test_migration_ci.db
@@ -69,6 +72,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        working-directory: src/frontend
+
+      # Phase 2: Run frontend tests (covers src/test/tabs/)
+      - name: Test frontend
+        run: npm test
         working-directory: src/frontend
 
       - name: Build frontend

@@ -27,7 +27,14 @@ import {
   type VariantInfo,
 } from '../api/workbench'
 
-// ─── Tab config ─────────────────────────────────────────────────────────────
+import { ContextTab } from '../components/tabs/ContextTab';
+import { EvidenceTab } from '../components/tabs/EvidenceTab';
+import { AgentsTab } from '../components/tabs/AgentsTab';
+import { ConsensusTab } from '../components/tabs/ConsensusTab';
+import { RecommendationTab } from '../components/tabs/RecommendationTab';
+import { DecisionThreadTab } from '../components/tabs/DecisionThreadTab';
+
+// ─── Tab config ────────────────────────────────────────────────────────────────────────
 
 interface TabItem {
   id: string
@@ -44,6 +51,12 @@ const TABS: TabItem[] = [
   { id: 'reasoning', label: 'AI 推理', icon: '🤖' },
   { id: 'treatment', label: '治疗方案', icon: '💊' },
   { id: 'tumor-board', label: '肿瘤委员会', icon: '👥' },
+  { id: 'context', label: '上下文', icon: '📋' },
+  { id: 'evidence', label: '证据', icon: '🔍' },
+  { id: 'agents', label: '智能体', icon: '🤖' },
+  { id: 'consensus', label: '共识', icon: '✅' },
+  { id: 'recommendation', label: '治疗推荐', icon: '💊' },
+  { id: 'decision-thread', label: '决策溯源', icon: '🔗' },
 ]
 
 // ─── Loading Skeleton ────────────────────────────────────────────────────────
@@ -888,6 +901,12 @@ export default function Workbench() {
       case 'reasoning': return <ReasoningPanel caseId={caseId} />
       case 'treatment': return <TreatmentPanel treatment={treatment} />
       case 'tumor-board': return <TumorBoardPanel caseId={caseId} />
+      case 'context': return <ContextTab caseId={caseId} />;
+      case 'evidence': return <EvidenceTab caseId={caseId} />;
+      case 'agents': return <AgentsTab caseId={caseId} />;
+      case 'consensus': return <ConsensusTab caseId={caseId} />;
+      case 'recommendation': return <RecommendationTab caseId={caseId} />;
+      case 'decision-thread': return <DecisionThreadTab caseId={caseId} />;
       default: return <PatientPanel summary={patientSummary} />
     }
   }

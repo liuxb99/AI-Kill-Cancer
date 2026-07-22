@@ -296,3 +296,123 @@ export function getCaseVariants(caseId: string, gene?: string, pathogenicity?: s
   if (pathogenicity) params.set('pathogenicity', pathogenicity)
   return request(`/workbench/case/${caseId}/variants?${params}`)
 }
+
+// ─── Clinical Context & Analysis API ────────────────────────────────────────
+
+export interface ClinicalContext {
+  case_id: string;
+  patient_id: string;
+  age: number;
+  gender: string;
+  diagnosis: string;
+  stage: string;
+  histology: string;
+  cancer_type: string;
+  oncotree_code?: string;
+  biomarkers: Record<string, any>[];
+  variants: Record<string, any>[];
+  treatment_history: Record<string, any>[];
+  current_medications: Record<string, any>[];
+  allergies: string[];
+  ecog_score?: number;
+  metastatic_sites: string[];
+  recurrence_status?: string;
+  clinical_notes?: string;
+  context_hash: string;
+}
+
+export interface EvidenceBundle {
+  items: Record<string, any>[];
+  total_count: number;
+  by_source: Record<string, any>;
+  by_gene: Record<string, any>;
+  by_drug: Record<string, any>;
+  highest_level?: string;
+  conflicts_summary: Record<string, any>[];
+  retrieved_at: string;
+  context_hash?: string;
+}
+
+export interface AgentOpinion {
+  agent_type: string;
+  agent_version: string;
+  summary: string;
+  pros: string[];
+  cons: string[];
+  confidence: string;
+  references: Record<string, any>[];
+  context_hash?: string;
+  created_at: string;
+}
+
+export interface ConsensusResult {
+  agreement: string;
+  conflicts: Record<string, any>[];
+  confidence: string;
+  recommended_option: Record<string, any>;
+  alternative_options: Record<string, any>[];
+  unresolved_questions: string[];
+  context_hash?: string;
+  created_at: string;
+}
+
+export interface TreatmentRecommendation {
+  first_line: Record<string, any>;
+  second_line: Record<string, any>;
+  clinical_trial: Record<string, any>;
+  supporting_evidence: Record<string, any>[];
+  expected_benefit: Record<string, any>;
+  potential_risk: Record<string, any>;
+  monitoring_plan: Record<string, any>;
+  structured_json: Record<string, any>;
+  markdown: string;
+  context_hash?: string;
+  created_at: string;
+}
+
+export interface DecisionNode {
+  id: string;
+  case_id: string;
+  parent_id?: string;
+  node_type: string;
+  reasoning: string;
+  confidence: string;
+  decision_label: string;
+  timestamp: string;
+}
+
+export function getClinicalContext(caseId: string): Promise<ClinicalContext> {
+  return request(`/clinical/context/${caseId}`)
+}
+
+export function getClinicalEvidence(caseId: string): Promise<EvidenceBundle> {
+  return request(`/clinical/evidence/${caseId}`)
+}
+
+export function runCaseAnalysis(caseId: string): Promise<{ context: ClinicalContext; evidence: EvidenceBundle; opinions: AgentOpinion[]; consensus: ConsensusResult; recommendation: TreatmentRecommendation }> {
+  return request(`/clinical/analysis/${caseId}`, { method: 'POST' })
+}
+
+export function runAgents(caseId: string): Promise<AgentOpinion[]> {
+  return request(`/clinical/agents/${caseId}`, { method: 'POST' })
+}
+
+export function getConsensus(caseId: string): Promise<ConsensusResult> {
+  return request(`/clinical/consensus/${caseId}`)
+}
+
+export function getRecommendation(caseId: string): Promise<TreatmentRecommendation> {
+  return request(`/clinical/recommendation/${caseId}`)
+}
+
+export function getDecisionThread(caseId: string): Promise<DecisionNode[]> {
+  return request(`/clinical/thread/${caseId}`)
+}
+
+export function getDecisionTree(caseId: string): Promise<DecisionNode[]> {
+  return request(`/clinical/tree/${caseId}`)
+}
+
+export function getDecisionNode(nodeId: string): Promise<DecisionNode> {
+  return request(`/clinical/node/${nodeId}`)
+}
