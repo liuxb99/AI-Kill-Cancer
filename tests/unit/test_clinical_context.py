@@ -383,6 +383,7 @@ class TestCaseContextBuilder:
             return_value=AsyncMock(
                 get=AsyncMock(side_effect=Exception("DB connection failed")),
             ),
+        ):
             with pytest.raises(Exception, match="DB connection failed"):
                 await builder.build(str(uuid.uuid4()))
 
