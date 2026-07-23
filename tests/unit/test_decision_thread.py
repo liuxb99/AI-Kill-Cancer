@@ -6,6 +6,7 @@ Tests cover:
 - DecisionThreadRepository CRUD and query methods
 - DecisionThreadInjector record_*() methods and node chaining
 - Edge cases: invalid IDs, empty data, None values
+- Session reload and persistence round-trip with real SQLite
 """
 
 from __future__ import annotations
@@ -15,6 +16,11 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from src.backend.clinical.decision_thread import (
     DecisionNode,
@@ -22,6 +28,8 @@ from src.backend.clinical.decision_thread import (
     DecisionThreadInjector,
     DecisionThreadRepository,
 )
+from src.backend.clinical.models import ClinicalContext
+from src.backend.database.models import Base
 
 
 # ─── Fixtures ──────────────────────────────────────────────────────────────────
@@ -710,3 +718,371 @@ class TestDecisionThreadInjector:
         assert created_nodes[2].node_type == "agent_opinion"
         assert created_nodes[3].node_type == "consensus_reached"
         assert created_nodes[4].node_type == "recommendation_generated"
+
+
+# ─── Persistence / Session Reload Tests ──────────────────────────────────────
+
+
+class TestDecisionNodePersistence:
+    """Verify persistence and session reload of DecisionNode data.
+
+    Uses a real in-memory SQLite database to ensure data written in one
+    session can be read back correctly in a new session.
+    """
+
+    @pytest.fixture
+    async def db_engine(self):
+        """Create an in-memory SQLite engine with all tables."""
+        engine = create_async_engine("sqlite+aiosqlite://", echo=False)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        yield engine
+        await engine.dispose()
+
+    @pytest.fixture
+    async def session(self, db_engine):
+        """Provide a single-use async session.
+
+        The session is closed after each test so the next call creates a
+        genuinely new session (session reload simulation).
+        """
+        session_factory = async_sessionmaker(
+            db_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with session_factory() as s:
+            yield s
+
+    # ── Helper ───────────────────────────────────────────────────────────
+    async def _count_nodes(self, db_engine) -> int:
+        """Return the total number of rows in clinical_decision_nodes."""
+        from sqlalchemy import func, select
+
+        session_factory = async_sessionmaker(
+            db_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with session_factory() as s:
+            result = await s.execute(
+                select(func.count()).select_from(DecisionNodeModel)
+            )
+            return result.scalar() or 0
+
+    # ── Tests ─────────────────────────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_create_and_reload_decision_node(self, db_engine, session):
+        """Write a DecisionNode → commit → new session → read back.
+
+        Every field that was written must be identical after reload.
+        """
+        # ── Arrange: create node in first session ────────────────────────
+        repo = DecisionThreadRepository(session)
+        case_id = str(uuid.uuid4())
+        original = DecisionNode(
+            id="",
+            case_id=case_id,
+            parent_id=None,
+            node_type="context_built",
+            input_snapshot={"genome": "GRCh38", "tumor_type": "PTC"},
+            evidence_snapshot={},
+            agent_id="",
+            agent_type="",
+            reasoning="Initial context built",
+            confidence="high",
+            decision_label="Context for PTC",
+            context_hash="abc123def456",
+        )
+        saved = await repo.create_node(original)
+        saved_id = saved.id
+        saved_timestamp = saved.timestamp
+
+        # Session closes automatically after this test (fixture scope)
+
+        # ── Act: open brand-new session and read back ────────────────────
+        session_factory = async_sessionmaker(
+            db_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with session_factory() as new_session:
+            new_repo = DecisionThreadRepository(new_session)
+            reloaded = await new_repo.get_node(saved_id)
+
+        # ── Assert: all fields match original ──────────────────────────
+        assert reloaded is not None, "Node should exist after reload"
+        assert reloaded.id == saved_id
+        assert reloaded.case_id == case_id
+        assert reloaded.parent_id is None
+        assert reloaded.node_type == "context_built"
+        assert reloaded.input_snapshot == {"genome": "GRCh38", "tumor_type": "PTC"}
+        assert reloaded.evidence_snapshot == {}
+        assert reloaded.reasoning == "Initial context built"
+        assert reloaded.confidence == "high"
+        assert reloaded.decision_label == "Context for PTC"
+        assert reloaded.context_hash == "abc123def456"
+        assert reloaded.timestamp == saved_timestamp
+
+        # Also verify persistence via get_case_thread
+        async with session_factory() as new_session:
+            new_repo = DecisionThreadRepository(new_session)
+            thread = await new_repo.get_case_thread(case_id)
+        assert len(thread) == 1
+        assert thread[0].id == saved_id
+
+    @pytest.mark.asyncio
+    async def test_get_case_thread_after_reload(self, db_engine, session):
+        """Multiple nodes survive session reload and are returned ordered."""
+        # ── Arrange: create 3 nodes in one session ─────────────────────
+        repo = DecisionThreadRepository(session)
+        case_id = str(uuid.uuid4())
+        n1 = await repo.create_node(DecisionNode(
+            id="", case_id=case_id, node_type="context_built",
+            input_snapshot={"step": 1}, context_hash="h1",
+        ))
+        n2 = await repo.create_node(DecisionNode(
+            id="", case_id=case_id, node_type="evidence_collected",
+            parent_id=n1.id, input_snapshot={"step": 2}, context_hash="h2",
+        ))
+        n3 = await repo.create_node(DecisionNode(
+            id="", case_id=case_id, node_type="agent_opinion",
+            parent_id=n2.id, input_snapshot={"step": 3}, context_hash="h3",
+        ))
+
+        # ── Act: reload in new session ──────────────────────────────────
+        session_factory = async_sessionmaker(
+            db_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with session_factory() as new_session:
+            new_repo = DecisionThreadRepository(new_session)
+            thread = await new_repo.get_case_thread(case_id)
+
+        # ── Assert ──────────────────────────────────────────────────────
+        assert len(thread) == 3
+        # Order must be chronological (context_built → evidence_collected → agent_opinion)
+        assert [t.node_type for t in thread] == [
+            "context_built", "evidence_collected", "agent_opinion",
+        ]
+        # Parent chain
+        assert thread[0].parent_id is None
+        assert thread[1].parent_id == thread[0].id
+        assert thread[2].parent_id == thread[1].id
+        # Context hashes
+        assert thread[0].context_hash == "h1"
+        assert thread[1].context_hash == "h2"
+        assert thread[2].context_hash == "h3"
+
+    @pytest.mark.asyncio
+    async def test_clinical_context_roundtrip_via_injector(
+        self, db_engine, session
+    ):
+        """ClinicalContext data survives persistence and reload.
+
+        Create a ClinicalContext → pass through DecisionThreadInjector
+        → persist → reload → verify ClinicalContext fields are intact.
+        """
+        # ── Arrange ──────────────────────────────────────────────────────
+        case_id = str(uuid.uuid4())
+        ctx = ClinicalContext(
+            case_id=case_id,
+            patient_id=str(uuid.uuid4()),
+            age=45,
+            gender="F",
+            diagnosis="Papillary thyroid carcinoma",
+            stage="II",
+            histology="Classic variant",
+            cancer_type="PTC",
+            oncotree_code="PTC",
+            biomarkers=[{"gene": "BRAF", "status": "V600E"}],
+            variants=[{"gene_symbol": "BRAF", "hgvs": "c.1799T>A"}],
+            ecog_score=1,
+            metastatic_sites=["Lymph nodes"],
+            recurrence_status="new_diagnosis",
+            clinical_notes="Suspicious nodule found during routine checkup",
+        )
+        ctx.freeze()  # computes context_hash
+        assert ctx.context_hash, "context_hash must be set after freeze"
+
+        repo = DecisionThreadRepository(session)
+        injector = DecisionThreadInjector(repo, case_id=case_id)
+
+        # ── Act: record context_built ────────────────────────────────────
+        node_id = await injector.record_context_built(ctx)
+
+        # ── Reload in new session ────────────────────────────────────────
+        session_factory = async_sessionmaker(
+            db_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with session_factory() as new_session:
+            new_repo = DecisionThreadRepository(new_session)
+            reloaded = await new_repo.get_node(node_id)
+
+        # ── Assert ────────────────────────────────────────────────────────
+        assert reloaded is not None
+        assert reloaded.node_type == "context_built"
+        assert reloaded.case_id == case_id
+        assert reloaded.context_hash == ctx.context_hash
+        assert reloaded.parent_id is None
+        # The input_snapshot should contain the ClinicalContext fields
+        assert reloaded.input_snapshot["case_id"] == case_id
+        assert reloaded.input_snapshot["patient_id"] == ctx.patient_id
+        assert reloaded.input_snapshot["age"] == 45
+        assert reloaded.input_snapshot["gender"] == "F"
+        assert reloaded.input_snapshot["diagnosis"] == "Papillary thyroid carcinoma"
+        assert reloaded.input_snapshot["cancer_type"] == "PTC"
+        assert reloaded.decision_label == f"Context built for case {case_id}"
+
+    @pytest.mark.asyncio
+    async def test_injector_chain_survives_reload(self, db_engine, session):
+        """A full injector chain is correctly rebuilt after session reload."""
+        # ── Arrange: create a full chain via injector ──────────────────
+        case_id = str(uuid.uuid4())
+
+        # Mock pipeline objects
+        class FakeContext:
+            def __init__(self, cid):
+                self.case_id = cid
+            context_hash = "ch-ctx"
+            def model_dump(self):
+                return {"case_id": self.case_id, "patient_id": "p1"}
+
+        class FakeEvidence:
+            context_hash = "ch-ev"
+            def model_dump(self):
+                return {"total_count": 3, "by_source": {"pubmed": 2, "guideline": 1}, "items": ["a", "b", "c"]}
+
+        class FakeOpinion:
+            agent_type = "oncologist"
+            summary = "BRAF V600E is actionable"
+            confidence = "high"
+            context_hash = "ch-op"
+
+        class FakeConsensus:
+            recommended_option = {"treatment": "Surgery"}
+            agreement = "unanimous"
+            confidence = "high"
+            context_hash = "ch-cs"
+
+        class FakeRecommendation:
+            first_line = {"treatment": "Targeted Therapy"}
+            second_line = None
+            clinical_trial = None
+            context_hash = "ch-rec"
+
+        repo = DecisionThreadRepository(session)
+        injector = DecisionThreadInjector(repo, case_id=case_id)
+
+        id1 = await injector.record_context_built(FakeContext(case_id))
+        id2 = await injector.record_evidence_collected(FakeEvidence())
+        id3 = await injector.record_agent_opinion(FakeOpinion())
+        id4 = await injector.record_consensus_reached(FakeConsensus())
+        id5 = await injector.record_recommendation(FakeRecommendation())
+
+        # ── Act: reload in new session ─────────────────────────────────
+        session_factory = async_sessionmaker(
+            db_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with session_factory() as new_session:
+            new_repo = DecisionThreadRepository(new_session)
+            thread = await new_repo.get_case_thread(case_id)
+
+        # ── Assert ─────────────────────────────────────────────────────
+        assert len(thread) == 5
+
+        # Verify chronological order
+        node_types = [n.node_type for n in thread]
+        assert node_types == [
+            "context_built",
+            "evidence_collected",
+            "agent_opinion",
+            "consensus_reached",
+            "recommendation_generated",
+        ]
+
+        # Verify parent chain
+        assert thread[0].parent_id is None
+        assert thread[1].parent_id == thread[0].id
+        assert thread[2].parent_id == thread[1].id
+        assert thread[3].parent_id == thread[2].id
+        assert thread[4].parent_id == thread[3].id
+
+        # Verify context_hash chain
+        assert thread[0].context_hash == "ch-ctx"
+        assert thread[1].context_hash == "ch-ev"
+        assert thread[2].context_hash == "ch-op"
+        assert thread[3].context_hash == "ch-cs"
+        assert thread[4].context_hash == "ch-rec"
+
+        # Verify individual node contents
+        assert thread[0].input_snapshot["case_id"] == case_id
+        assert thread[1].evidence_snapshot["total_count"] == 3
+        assert thread[2].agent_type == "oncologist"
+        assert thread[2].reasoning == "BRAF V600E is actionable"
+        assert thread[3].decision_label == "Surgery"
+        assert thread[4].input_snapshot["first_line"] == "Targeted Therapy"
+
+    @pytest.mark.asyncio
+    async def test_persist_node_with_all_nullable_fields(self, db_engine, session):
+        """Nodes with NULL values persist correctly and return defaults."""
+        repo = DecisionThreadRepository(session)
+        case_id = str(uuid.uuid4())
+
+        # Create node with mostly None fields
+        node = await repo.create_node(DecisionNode(
+            id="",
+            case_id=case_id,
+            node_type="recommendation_generated",
+            parent_id=None,
+            input_snapshot={},
+            evidence_snapshot={},
+            agent_id="",
+            agent_type="",
+            reasoning="",
+            confidence="",
+            decision_label="",
+            context_hash=None,
+        ))
+
+        session_factory = async_sessionmaker(
+            db_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with session_factory() as new_session:
+            new_repo = DecisionThreadRepository(new_session)
+            reloaded = await new_repo.get_node(node.id)
+
+        assert reloaded is not None
+        assert reloaded.node_type == "recommendation_generated"
+        assert reloaded.parent_id is None
+        assert reloaded.context_hash is None or reloaded.context_hash == ""
+        assert reloaded.input_snapshot == {}
+        assert reloaded.evidence_snapshot == {}
+        assert reloaded.agent_id == ""
+        assert reloaded.reasoning == ""
+        assert reloaded.confidence == ""
+
+    @pytest.mark.asyncio
+    async def test_count_across_sessions(self, db_engine, session):
+        """Verify row count is consistent across session boundaries."""
+        repo = DecisionThreadRepository(session)
+        case_id = str(uuid.uuid4())
+
+        # Create 2 nodes
+        await repo.create_node(DecisionNode(
+            id="", case_id=case_id, node_type="context_built",
+        ))
+        await repo.create_node(DecisionNode(
+            id="", case_id=case_id, node_type="evidence_collected",
+        ))
+
+        # Count in a new session
+        count = await self._count_nodes(db_engine)
+        assert count == 2
+
+        # Add a third in a new session
+        session_factory = async_sessionmaker(
+            db_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with session_factory() as s2:
+            r2 = DecisionThreadRepository(s2)
+            await r2.create_node(DecisionNode(
+                id="", case_id=case_id, node_type="agent_opinion",
+            ))
+
+        count = await self._count_nodes(db_engine)
+        assert count == 3

@@ -8,6 +8,8 @@ Evidence Collector.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, Field, computed_field
@@ -35,6 +37,53 @@ LEVEL_ORDER: dict[str, int] = {v: i for i, v in enumerate(LEVEL_PRECEDENCE)}
 def evidence_level_rank(level: str) -> int:
     """Return a numeric rank for an evidence level (lower is better)."""
     return LEVEL_ORDER.get(level, len(LEVEL_PRECEDENCE))
+
+
+# ─── SourceStatus Types ────────────────────────────────────────────────────────
+
+
+class SourceStatusType(str, Enum):
+    """Operational status of a clinical evidence knowledge source.
+
+    Indicates whether the source is currently available, unavailable,
+    requires authorisation (API key / licence), or encountered an error.
+    """
+
+    AVAILABLE = "available"
+    """Source is fully accessible and returning data."""
+
+    UNAVAILABLE = "unavailable"
+    """Source is temporarily unavailable (network outage, rate-limit, etc.)."""
+
+    AUTHORIZATION_REQUIRED = "authorization_required"
+    """Source requires an API key or commercial licence that has not been configured."""
+
+    ERROR = "error"
+    """Source encountered an unrecoverable error."""
+
+
+class SourceStatus(BaseModel):
+    """Status snapshot for a single evidence knowledge source.
+
+    Carried inside ``EvidenceBundle.source_statuses`` so downstream
+    consumers can inspect whether a source was reachable, authorised,
+    or encountered a problem during collection.
+    """
+
+    source_name: str
+    """Identifier of the knowledge source (e.g. ``"nccn"``, ``"esmo"``, ``"oncokb"``)."""
+
+    status_type: SourceStatusType
+    """The operational status of this source at collection time."""
+
+    message: Optional[str] = None
+    """Optional human-readable detail describing the status (e.g. ``"requires API key / licence"``)."""
+
+    items_count: int = 0
+    """Number of evidence items retrieved from this source during collection."""
+
+    timestamp: str = ""
+    """ISO-8601 timestamp when the status was recorded."""
 
 
 # ─── EvidenceItem Model ────────────────────────────────────────────────────────
@@ -101,18 +150,30 @@ class EvidenceBundle(BaseModel):
     """Aggregated collection of evidence items with grouped views.
 
     Acts as the primary output of the Evidence Collector: a flat list of
-    items plus computed convenience views (by source, by gene, by drug)
-    and conflict/level summaries.
+    items plus computed convenience views (by source, by gene, by drug),
+    conflict/level summaries, and a per-source status list that records
+    whether each knowledge source was reachable, authorised, or errored.
     """
 
     items: list[EvidenceItem] = Field(default_factory=list)
     """All evidence items in the bundle."""
+
+    source_statuses: list[SourceStatus] = Field(default_factory=list)
+    """Per-source operational status recorded during collection.
+
+    Each entry captures whether the knowledge source was available,
+    unavailable, required authorisation, or encountered an error.
+    """
 
     retrieved_at: str = ""
     """ISO-8601 timestamp of when the data was retrieved."""
 
     context_hash: Optional[str] = None
     """SHA256 hash of the associated ClinicalContext, for traceability."""
+
+    def _current_timestamp(self) -> str:
+        """Return an ISO-8601 UTC timestamp string."""
+        return datetime.now(timezone.utc).isoformat()
 
     # ── Computed alias fields ─────────────────────────────────────────────
 
@@ -232,6 +293,8 @@ class EvidenceBundle(BaseModel):
 __all__ = [
     "EvidenceBundle",
     "EvidenceItem",
+    "SourceStatus",
+    "SourceStatusType",
     "evidence_level_rank",
     "LEVEL_PRECEDENCE",
     "LEVEL_ORDER",

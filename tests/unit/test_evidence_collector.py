@@ -15,6 +15,8 @@ import pytest
 from src.backend.clinical.evidence_models import (
     EvidenceBundle,
     EvidenceItem,
+    SourceStatus,
+    SourceStatusType,
     evidence_level_rank,
 )
 from src.backend.clinical.collector import EvidenceCollector
@@ -162,6 +164,74 @@ class TestEvidenceItem:
         """EvidenceItem should allow empty source string."""
         item = EvidenceItem(source="")
         assert item.source == ""
+
+
+# ─── SourceStatus ────────────────────────────────────────────────────────────
+
+
+class TestSourceStatus:
+    """Tests for the SourceStatus model."""
+
+    def test_enum_values(self):
+        """SourceStatusType should have expected values."""
+        assert SourceStatusType.AVAILABLE.value == "available"
+        assert SourceStatusType.UNAVAILABLE.value == "unavailable"
+        assert SourceStatusType.AUTHORIZATION_REQUIRED.value == "authorization_required"
+        assert SourceStatusType.ERROR.value == "error"
+
+    def test_create_minimal(self):
+        """Create a SourceStatus with only required fields."""
+        status = SourceStatus(
+            source_name="clinvar",
+            status_type=SourceStatusType.AVAILABLE,
+        )
+        assert status.source_name == "clinvar"
+        assert status.status_type == SourceStatusType.AVAILABLE
+        assert status.message is None
+        assert status.timestamp == ""
+        assert status.items_count == 0
+
+    def test_create_full(self):
+        """Create a SourceStatus with all fields."""
+        status = SourceStatus(
+            source_name="civic",
+            status_type=SourceStatusType.ERROR,
+            message="API timeout",
+            timestamp="2025-01-15T12:00:00+00:00",
+            items_count=5,
+        )
+        assert status.source_name == "civic"
+        assert status.status_type == SourceStatusType.ERROR
+        assert status.message == "API timeout"
+        assert status.timestamp == "2025-01-15T12:00:00+00:00"
+        assert status.items_count == 5
+
+    def test_items_count_default_zero(self):
+        """items_count should default to 0."""
+        status = SourceStatus(
+            source_name="pubmed",
+            status_type=SourceStatusType.AVAILABLE,
+        )
+        assert status.items_count == 0
+
+    def test_items_count_custom(self):
+        """items_count should accept custom values."""
+        status = SourceStatus(
+            source_name="pubmed",
+            status_type=SourceStatusType.AVAILABLE,
+            items_count=42,
+        )
+        assert status.items_count == 42
+
+    def test_all_status_types(self):
+        """Exercise every SourceStatusType value."""
+        for st in SourceStatusType:
+            status = SourceStatus(
+                source_name="test",
+                status_type=st,
+            )
+            assert status.status_type == st
+            assert status.source_name == "test"
 
 
 # ─── EvidenceBundle ───────────────────────────────────────────────────────────
@@ -334,10 +404,11 @@ class TestEvidenceCollector:
 
     async def test_collect_basic_flow(self, collector, sample_context):
         """collect() should return an EvidenceBundle with items when all sources succeed."""
+        mock_items = ([
+            EvidenceItem(source="CIViC", gene_symbol="BRAF", evidence_type="predictive"),
+        ], [])
         with (
-            patch.object(collector, "_collect_for_gene", AsyncMock(return_value=[
-                EvidenceItem(source="CIViC", gene_symbol="BRAF", evidence_type="predictive"),
-            ])),
+            patch.object(collector, "_collect_for_gene", AsyncMock(return_value=mock_items)),
             patch("src.backend.clinical.collector._AUTH_SOURCES", []),
         ):
             bundle = await collector.collect(sample_context)
@@ -348,6 +419,7 @@ class TestEvidenceCollector:
         assert bundle.items[0].gene_symbol == "BRAF"
         assert bundle.context_hash == sample_context.context_hash
         assert bundle.retrieved_at != ""
+        assert bundle.source_statuses == []  # auth sources empty, gene returned empty statuses
 
     async def test_collect_empty_variants(self, collector):
         """collect() should return empty bundle when context has no variants."""
@@ -380,7 +452,7 @@ class TestEvidenceCollector:
         async def collecting(gene, ctx):
             nonlocal call_count
             call_count += 1
-            return [EvidenceItem(source="CIViC", gene_symbol=gene)]
+            return [EvidenceItem(source="CIViC", gene_symbol=gene)], []
 
         with (
             patch.object(collector, "_collect_for_gene", side_effect=collecting),
@@ -410,7 +482,7 @@ class TestEvidenceCollector:
 
         async def collecting(gene, ctx):
             calls[gene] = calls.get(gene, 0) + 1
-            return [EvidenceItem(source="Test", gene_symbol=gene)]
+            return [EvidenceItem(source="Test", gene_symbol=gene)], []
 
         with (
             patch.object(collector, "_collect_for_gene", side_effect=collecting),
@@ -429,7 +501,7 @@ class TestEvidenceCollector:
         with (
             patch.object(
                 collector, "_collect_for_gene",
-                AsyncMock(return_value=[]),
+                AsyncMock(return_value=([], [])),
             ),
             patch("src.backend.clinical.collector._AUTH_SOURCES", []),
         ):
@@ -441,7 +513,7 @@ class TestEvidenceCollector:
     async def test_collect_reports_auth_sources_warning(self, collector, sample_context):
         """collect() should log warnings for authorisation-required sources."""
         with (
-            patch.object(collector, "_collect_for_gene", AsyncMock(return_value=[])),
+            patch.object(collector, "_collect_for_gene", AsyncMock(return_value=([], []))),
             patch("src.backend.clinical.collector._AUTH_SOURCES", ("nccn", "esmo")),
             patch("src.backend.clinical.collector.logger") as mock_logger,
         ):
@@ -453,6 +525,52 @@ class TestEvidenceCollector:
             if "requires authorisation" in str(c)
         ]
         assert len(auth_warnings) == 2
+
+    async def test_collect_source_statuses_for_auth_sources(self, collector, sample_context):
+        """collect() should return SourceStatus entries for each auth-required source."""
+        mock_items = ([
+            EvidenceItem(source="CIViC", gene_symbol="BRAF", evidence_type="predictive"),
+        ], [])
+        with (
+            patch.object(collector, "_collect_for_gene", AsyncMock(return_value=mock_items)),
+            patch("src.backend.clinical.collector._AUTH_SOURCES", ("nccn", "esmo", "oncokb")),
+        ):
+            bundle = await collector.collect(sample_context)
+
+        # Verify source_statuses are present
+        assert len(bundle.source_statuses) == 3
+        status_names = {s.source_name for s in bundle.source_statuses}
+        assert status_names == {"nccn", "esmo", "oncokb"}
+
+        for status in bundle.source_statuses:
+            assert status.status_type == SourceStatusType.AUTHORIZATION_REQUIRED
+            assert status.message == "requires API key / licence"
+            assert status.timestamp != ""
+            assert isinstance(status.source_name, str)
+
+    async def test_collect_source_statuses_does_not_affect_items(self, collector, sample_context):
+        """collect() source_statuses should not interfere with normal evidence collection."""
+        mock_items = ([
+            EvidenceItem(source="CIViC", gene_symbol="BRAF", evidence_type="predictive",
+                         evidence_level="A"),
+            EvidenceItem(source="ClinVar", gene_symbol="BRAF", evidence_type="prognostic",
+                         evidence_level="B"),
+        ], [])
+        with (
+            patch.object(collector, "_collect_for_gene", AsyncMock(return_value=mock_items)),
+            patch("src.backend.clinical.collector._AUTH_SOURCES", ("nccn", "esmo")),
+        ):
+            bundle = await collector.collect(sample_context)
+
+        # Normal evidence items are intact
+        assert bundle.total_count == 2
+        assert bundle.items[0].source == "CIViC"
+        assert bundle.items[1].source == "ClinVar"
+
+        # SourceStatuses are separate from items
+        assert len(bundle.source_statuses) == 2
+        assert all(s.status_type == SourceStatusType.AUTHORIZATION_REQUIRED
+                   for s in bundle.source_statuses)
 
     async def test_collect_skips_empty_gene_symbol(self, collector):
         """collect() should skip variant entries with no gene_symbol."""
@@ -470,10 +588,11 @@ class TestEvidenceCollector:
         )
         ctx.freeze()
 
+        mock_items = ([
+            EvidenceItem(source="Test", gene_symbol="BRAF"),
+        ], [])
         with (
-            patch.object(collector, "_collect_for_gene", AsyncMock(return_value=[
-                EvidenceItem(source="Test", gene_symbol="BRAF"),
-            ])),
+            patch.object(collector, "_collect_for_gene", AsyncMock(return_value=mock_items)),
             patch("src.backend.clinical.collector._AUTH_SOURCES", []),
         ):
             bundle = await collector.collect(ctx)
@@ -520,6 +639,11 @@ class TestEvidenceCollector:
         assert bundle.items[0].source == "CIViC"
         assert bundle.items[0].gene_symbol == "BRAF"
         assert bundle.retrieved_at != ""
+
+        # source_statuses should contain AVAILABLE for each source that succeeded
+        assert len(bundle.source_statuses) == 4  # civic, clinvar, pubmed, clinicaltrials
+        for status in bundle.source_statuses:
+            assert status.status_type == SourceStatusType.AVAILABLE
 
     async def test_collect_by_variant_uses_cache(self, collector):
         """collect_by_variant() should return cached results when available."""
@@ -574,6 +698,14 @@ class TestEvidenceCollector:
         assert bundle.total_count == 1
         assert bundle.items[0].source == "PubMed"
 
+        # source_statuses should reflect the mixed results
+        assert len(bundle.source_statuses) == 4  # civic, clinvar, pubmed, clinicaltrials
+        status_by_name = {s.source_name: s.status_type for s in bundle.source_statuses}
+        assert status_by_name["civic"] == SourceStatusType.ERROR
+        assert status_by_name["clinvar"] == SourceStatusType.ERROR
+        assert status_by_name["pubmed"] == SourceStatusType.AVAILABLE
+        assert status_by_name["clinicaltrials"] == SourceStatusType.ERROR
+
     async def test_collect_by_variant_all_sources_fail(self, collector):
         """collect_by_variant() should return empty bundle when all sources fail."""
         with (
@@ -603,6 +735,11 @@ class TestEvidenceCollector:
         assert isinstance(bundle, EvidenceBundle)
         assert bundle.total_count == 0
         assert bundle.retrieved_at != ""
+
+        # All sources failed — all statuses should be ERROR
+        assert len(bundle.source_statuses) == 4
+        for status in bundle.source_statuses:
+            assert status.status_type == SourceStatusType.ERROR
 
     async def test_collect_by_variant_caches_result(self, collector):
         """collect_by_variant() should cache results via variant_cache.set()."""
@@ -644,10 +781,11 @@ class TestEvidenceCollector:
         with patch("src.backend.clinical.collector.gene_cache") as mock_gc:
             mock_gc.get.return_value = cached_items
 
-            items = await collector._collect_for_gene("BRAF", ctx)
+            items, statuses = await collector._collect_for_gene("BRAF", ctx)
 
         assert len(items) == 1
         assert items[0].source == "Cached"
+        assert statuses == []  # cached — no new source queries
 
     async def test_collect_for_gene_merger_failure(self, collector):
         """_collect_for_gene() should continue when merger fails."""
@@ -674,10 +812,14 @@ class TestEvidenceCollector:
             mock_ct.search = AsyncMock(return_value=[])
             mock_get_ct.return_value = mock_ct
 
-            items = await collector._collect_for_gene("BRAF", ctx)
+            items, statuses = await collector._collect_for_gene("BRAF", ctx)
 
         assert isinstance(items, list)
         assert len(items) == 0
+        # Should have recorded ERROR for merger and AVAILABLE for the rest
+        assert len(statuses) == 4
+        assert statuses[0].source_name == "civic"
+        assert statuses[0].status_type == SourceStatusType.ERROR
 
     async def test_collect_for_gene_caches_result(self, collector):
         """_collect_for_gene() should store results in gene_cache."""
@@ -705,11 +847,16 @@ class TestEvidenceCollector:
             mock_ct.search = AsyncMock(return_value=[])
             mock_get_ct.return_value = mock_ct
 
-            items = await collector._collect_for_gene("BRAF", ctx)
+            items, statuses = await collector._collect_for_gene("BRAF", ctx)
 
             mock_gc.set.assert_called_once()
             args, _ = mock_gc.set.call_args
             assert args[0] == "gene:BRAF"
+
+        # All sources returned empty — all statuses should be AVAILABLE
+        assert len(statuses) == 4
+        for s in statuses:
+            assert s.status_type == SourceStatusType.AVAILABLE
 
     # ── _raw_to_evidence_item ───────────────────────────────────────────
 

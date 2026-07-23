@@ -14,7 +14,12 @@ from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.clinical.evidence_models import EvidenceBundle, EvidenceItem
+from src.backend.clinical.evidence_models import (
+    EvidenceBundle,
+    EvidenceItem,
+    SourceStatus,
+    SourceStatusType,
+)
 from src.backend.clinical.models import ClinicalContext
 from src.backend.evidence.cache import gene_cache, variant_cache
 from src.backend.evidence.merger import EvidenceMerger
@@ -79,6 +84,7 @@ class EvidenceCollector:
             summaries pre-computed.
         """
         all_items: list[EvidenceItem] = []
+        source_statuses: list[SourceStatus] = []
         seen_genes: set[str] = set()
 
         for variant in context.variants:
@@ -87,20 +93,18 @@ class EvidenceCollector:
                 continue
             seen_genes.add(gene)
 
-            gene_items = await self._collect_for_gene(gene, context)
+            gene_items, gene_statuses = await self._collect_for_gene(gene, context)
             all_items.extend(gene_items)
+            source_statuses.extend(gene_statuses)
 
-        # ── Log warnings for authorisation-required sources ──────────────
-        for src in _AUTH_SOURCES:
-            logger.warning(
-                "Knowledge source '%s' requires authorisation — "
-                "returning empty results for now.",
-                src,
-            )
+        # ── Authorisation-required sources ──────────────────────────────
+        now_ts = datetime.now(timezone.utc).isoformat()
+        source_statuses.extend(self._report_auth_sources())
 
         bundle = EvidenceBundle(
             items=all_items,
-            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            source_statuses=source_statuses,
+            retrieved_at=now_ts,
             context_hash=context.context_hash or "",
         )
         return bundle
@@ -119,6 +123,8 @@ class EvidenceCollector:
             do not support variant-level queries.
         """
         items: list[EvidenceItem] = []
+        source_statuses: list[SourceStatus] = []
+        now_ts = datetime.now(timezone.utc).isoformat()
 
         # ── Variant-level cache ──────────────────────────────────────────
         cache_key = f"variant:{gene}:{hgvs}"
@@ -126,8 +132,33 @@ class EvidenceCollector:
         if cached is not None:
             return EvidenceBundle(
                 items=list(cached),
-                retrieved_at=datetime.now(timezone.utc).isoformat(),
+                source_statuses=source_statuses,
+                retrieved_at=now_ts,
             )
+
+        def _record(source_name: str, ok: bool, exc: Exception | None = None,
+                    count: int = 0) -> None:
+            """Append a SourceStatus entry for *source_name*."""
+            if ok:
+                source_statuses.append(
+                    SourceStatus(
+                        source_name=source_name,
+                        status_type=SourceStatusType.AVAILABLE,
+                        message="success",
+                        timestamp=now_ts,
+                        items_count=count,
+                    )
+                )
+            else:
+                source_statuses.append(
+                    SourceStatus(
+                        source_name=source_name,
+                        status_type=SourceStatusType.ERROR,
+                        message=str(exc) if exc else "unknown error",
+                        timestamp=now_ts,
+                        items_count=0,
+                    )
+                )
 
         # ── CIViC via merger (variant-level) ─────────────────────────────
         try:
@@ -136,53 +167,61 @@ class EvidenceCollector:
             )
             for raw in merger_result.get("evidence_items", []):
                 items.append(self._raw_to_evidence_item(raw))
-        except Exception:
+            _record("civic", ok=True, count=len(items))
+        except Exception as e:
+            _record("civic", ok=False, exc=e)
             logger.warning(
                 "Failed to merge variant evidence for %s %s",
                 gene, hgvs, exc_info=True,
             )
 
         # ── ClinVar ──────────────────────────────────────────────────────
+        clinvar_before = len(items)
         try:
             clinvar = self._get_clinvar()
             results = await clinvar.search_variant(hgvs)
             for raw in results:
                 items.append(self._raw_to_evidence_item(raw))
-        except Exception:
+            _record("clinvar", ok=True, count=len(items) - clinvar_before)
+        except Exception as e:
+            _record("clinvar", ok=False, exc=e)
             logger.warning(
                 "ClinVar query failed for %s %s", gene, hgvs, exc_info=True,
             )
 
         # ── PubMed ───────────────────────────────────────────────────────
+        pubmed_before = len(items)
         try:
             pubmed = self._get_pubmed()
             results = await pubmed.search(hgvs)
             for raw in results:
                 items.append(self._raw_to_evidence_item(raw))
-        except Exception:
+            _record("pubmed", ok=True, count=len(items) - pubmed_before)
+        except Exception as e:
+            _record("pubmed", ok=False, exc=e)
             logger.warning(
                 "PubMed query failed for %s %s", gene, hgvs, exc_info=True,
             )
 
         # ── ClinicalTrials ───────────────────────────────────────────────
+        ct_before = len(items)
         try:
             ct = self._get_clinicaltrials()
             results = await ct.search(hgvs)
             for raw in results:
                 items.append(self._raw_to_evidence_item(raw))
-        except Exception:
+            _record("clinicaltrials", ok=True, count=len(items) - ct_before)
+        except Exception as e:
+            _record("clinicaltrials", ok=False, exc=e)
             logger.warning(
                 "ClinicalTrials query failed for %s %s",
                 gene, hgvs, exc_info=True,
             )
 
         # ── Authorisation-required sources placeholder ───────────────────
-        for src in _AUTH_SOURCES:
-            logger.warning(
-                "Knowledge source '%s' requires authorisation — "
-                "returning empty results for variant %s %s.",
-                src, gene, hgvs,
-            )
+        source_statuses.extend(
+            self._report_auth_sources(gene=gene, hgvs=hgvs)
+        )
 
         # ── Conflict analysis ────────────────────────────────────────────
         try:
@@ -194,6 +233,7 @@ class EvidenceCollector:
         variant_cache.set(cache_key, items)
         return EvidenceBundle(
             items=items,
+            source_statuses=source_statuses,
             retrieved_at=datetime.now(timezone.utc).isoformat(),
         )
 
@@ -201,7 +241,7 @@ class EvidenceCollector:
 
     async def _collect_for_gene(
         self, gene: str, context: ClinicalContext,
-    ) -> list[EvidenceItem]:
+    ) -> tuple[list[EvidenceItem], list[SourceStatus]]:
         """Collect evidence for a single gene from all available sources.
 
         Uses the in-memory ``gene_cache`` to avoid redundant API calls
@@ -213,15 +253,43 @@ class EvidenceCollector:
                 traceability).
 
         Returns:
-            A list of ``EvidenceItem`` instances gathered from all
-            sources for this gene.
+            A tuple ``(items, source_statuses)`` where *items* is a list
+            of ``EvidenceItem`` instances gathered from all sources for
+            this gene, and *source_statuses* is a list of per-source
+            operational status records.
         """
         cache_key = f"gene:{gene}"
         cached = gene_cache.get(cache_key)
         if cached is not None:
-            return list(cached)
+            return list(cached), []
 
         items: list[EvidenceItem] = []
+        source_statuses: list[SourceStatus] = []
+        now_ts = datetime.now(timezone.utc).isoformat()
+
+        def _record(source_name: str, ok: bool, exc: Exception | None = None,
+                    count: int = 0) -> None:
+            """Append a SourceStatus entry for *source_name*."""
+            if ok:
+                source_statuses.append(
+                    SourceStatus(
+                        source_name=source_name,
+                        status_type=SourceStatusType.AVAILABLE,
+                        message="success",
+                        timestamp=now_ts,
+                        items_count=count,
+                    )
+                )
+            else:
+                source_statuses.append(
+                    SourceStatus(
+                        source_name=source_name,
+                        status_type=SourceStatusType.ERROR,
+                        message=str(exc) if exc else "unknown error",
+                        timestamp=now_ts,
+                        items_count=0,
+                    )
+                )
 
         # ── 1. CIViC / DGIdb via EvidenceMerger ──────────────────────────
         try:
@@ -232,40 +300,51 @@ class EvidenceCollector:
                 items.append(self._raw_to_evidence_item(raw))
             for raw in merger_result.get("drug_interactions", []):
                 items.append(self._raw_to_evidence_item(raw))
-        except Exception:
+            _record("civic", ok=True, count=len(items))
+        except Exception as e:
+            _record("civic", ok=False, exc=e)
             logger.warning(
                 "EvidenceMerger failed for gene %s", gene, exc_info=True,
             )
 
         # ── 2. ClinVar ────────────────────────────────────────────────────
+        clinvar_items_before = len(items)
         try:
             clinvar = self._get_clinvar()
             results = await clinvar.search_variant(gene)
             for raw in results:
                 items.append(self._raw_to_evidence_item(raw))
-        except Exception:
+            _record("clinvar", ok=True, count=len(items) - clinvar_items_before)
+        except Exception as e:
+            _record("clinvar", ok=False, exc=e)
             logger.warning(
                 "ClinVar query failed for gene %s", gene, exc_info=True,
             )
 
         # ── 3. PubMed ─────────────────────────────────────────────────────
+        pubmed_items_before = len(items)
         try:
             pubmed = self._get_pubmed()
             results = await pubmed.search(gene)
             for raw in results:
                 items.append(self._raw_to_evidence_item(raw))
-        except Exception:
+            _record("pubmed", ok=True, count=len(items) - pubmed_items_before)
+        except Exception as e:
+            _record("pubmed", ok=False, exc=e)
             logger.warning(
                 "PubMed query failed for gene %s", gene, exc_info=True,
             )
 
         # ── 4. ClinicalTrials.gov ─────────────────────────────────────────
+        ct_items_before = len(items)
         try:
             ct = self._get_clinicaltrials()
             results = await ct.search(gene)
             for raw in results:
                 items.append(self._raw_to_evidence_item(raw))
-        except Exception:
+            _record("clinicaltrials", ok=True, count=len(items) - ct_items_before)
+        except Exception as e:
+            _record("clinicaltrials", ok=False, exc=e)
             logger.warning(
                 "ClinicalTrials query failed for gene %s",
                 gene, exc_info=True,
@@ -281,9 +360,48 @@ class EvidenceCollector:
 
         # ── Cache the gene-level results ──────────────────────────────────
         gene_cache.set(cache_key, items)
-        return items
+        return items, source_statuses
 
     # ── Internal helpers ─────────────────────────────────────────────────
+
+    @staticmethod
+    def _report_auth_sources(
+        gene: str = "",
+        hgvs: str = "",
+    ) -> list[SourceStatus]:
+        """Return SourceStatus entries for all authorisation-required sources.
+
+        Logs a warning for each source and produces an
+        ``AUTHORIZATION_REQUIRED`` status entry.  When *gene* and/or
+        *hgvs* are supplied the warning message includes them.
+
+        Args:
+            gene: Optional gene symbol for context in the log message.
+            hgvs: Optional HGVS notation for context in the log message.
+
+        Returns:
+            A list of ``SourceStatus`` instances — one per auth-required
+            source, each with status ``AUTHORIZATION_REQUIRED``.
+        """
+        now_ts = datetime.now(timezone.utc).isoformat()
+        suffix = f" for variant {gene} {hgvs}" if gene and hgvs else ""
+
+        statuses: list[SourceStatus] = []
+        for src in _AUTH_SOURCES:
+            logger.warning(
+                "Knowledge source '%s' requires authorisation — "
+                "returning empty results%s.",
+                src, suffix,
+            )
+            statuses.append(
+                SourceStatus(
+                    source_name=src,
+                    status_type=SourceStatusType.AUTHORIZATION_REQUIRED,
+                    message="requires API key / licence",
+                    timestamp=now_ts,
+                )
+            )
+        return statuses
 
     @staticmethod
     def _raw_to_evidence_item(raw: dict[str, Any]) -> EvidenceItem:
