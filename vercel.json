@@ -3,7 +3,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm ci",
-  "nodeVersion": "18",
+  "nodeVersion": "22",
   "rewrites": [
     {
       "source": "/api/(.*)",
