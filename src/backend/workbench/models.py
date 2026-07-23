@@ -4,7 +4,6 @@ Pydantic models for the Doctor Workbench (v1.1).
 
 from __future__ import annotations
 
-
 from pydantic import BaseModel, Field
 
 

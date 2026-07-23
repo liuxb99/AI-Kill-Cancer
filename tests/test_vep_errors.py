@@ -3,7 +3,12 @@ Tests for VEP adapter error handling and transcript selection.
 """
 from __future__ import annotations
 
-from src.backend.pipeline.vep_adapter import VEPAdapter, _build_region_string, _extract_vep_results, _parse_vep_consequence
+from src.backend.pipeline.vep_adapter import (
+    VEPAdapter,
+    _build_region_string,
+    _extract_vep_results,
+    _parse_vep_consequence,
+)
 
 
 class TestVEPErrorHandling:

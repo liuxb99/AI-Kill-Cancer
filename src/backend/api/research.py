@@ -1,15 +1,14 @@
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.models import DataProvenance
-
-from src.backend.database.session import get_db
 from src.backend.database import create_research_paper, search_research_papers
+from src.backend.database.session import get_db
+from src.backend.models import DataProvenance
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +188,7 @@ async def sandbox_run(body: SandboxRunRequest):
     try:
         run_id = str(uuid.uuid4())
         import time
-        from datetime import datetime, timezone
+        from datetime import datetime
         start = time.monotonic()
 
         model_registry = {
@@ -224,7 +223,7 @@ async def sandbox_run(body: SandboxRunRequest):
                 data_mode="synthetic",
                 source="Mock model sandbox — simulated output for research exploration",
                 source_url=None,
-                retrieved_at=datetime.now(timezone.utc).isoformat(),
+                retrieved_at=datetime.now(UTC).isoformat(),
                 model_version=None,
                 disclaimer="Sandbox output is simulated. Not for clinical use.",
             ),

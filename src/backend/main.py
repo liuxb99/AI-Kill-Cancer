@@ -3,20 +3,19 @@ from __future__ import annotations
 import logging
 import os
 import sys
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-from src.backend.api.routes import router
 from src.backend.api.research import router as research_router
+from src.backend.api.routes import router
 from src.backend.api.v1.router import router as v1_router
 from src.backend.auth.api import router as auth_router
 from src.backend.config import settings
-from src.backend.database.session import init_db, close_db
+from src.backend.database.session import close_db, init_db
 
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),

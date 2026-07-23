@@ -31,7 +31,6 @@ from src.backend.clinical.decision_thread import (
 from src.backend.clinical.models import ClinicalContext
 from src.backend.database.models import Base
 
-
 # ─── Fixtures ──────────────────────────────────────────────────────────────────
 
 
@@ -342,7 +341,6 @@ class TestDecisionThreadRepository:
         """get_decision_tree currently returns the same ordered list as get_case_thread."""
         case_id = str(uuid.uuid4())
         # The implementation delegates to get_case_thread, so mock that
-        expected_nodes = []
         # We verify the method returns the same type and calls through
         mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = []
@@ -840,7 +838,7 @@ class TestDecisionNodePersistence:
             id="", case_id=case_id, node_type="evidence_collected",
             parent_id=n1.id, input_snapshot={"step": 2}, context_hash="h2",
         ))
-        n3 = await repo.create_node(DecisionNode(
+        await repo.create_node(DecisionNode(
             id="", case_id=case_id, node_type="agent_opinion",
             parent_id=n2.id, input_snapshot={"step": 3}, context_hash="h3",
         ))
@@ -968,11 +966,11 @@ class TestDecisionNodePersistence:
         repo = DecisionThreadRepository(session)
         injector = DecisionThreadInjector(repo, case_id=case_id)
 
-        id1 = await injector.record_context_built(FakeContext(case_id))
-        id2 = await injector.record_evidence_collected(FakeEvidence())
-        id3 = await injector.record_agent_opinion(FakeOpinion())
-        id4 = await injector.record_consensus_reached(FakeConsensus())
-        id5 = await injector.record_recommendation(FakeRecommendation())
+        await injector.record_context_built(FakeContext(case_id))
+        await injector.record_evidence_collected(FakeEvidence())
+        await injector.record_agent_opinion(FakeOpinion())
+        await injector.record_consensus_reached(FakeConsensus())
+        await injector.record_recommendation(FakeRecommendation())
 
         # ── Act: reload in new session ─────────────────────────────────
         session_factory = async_sessionmaker(

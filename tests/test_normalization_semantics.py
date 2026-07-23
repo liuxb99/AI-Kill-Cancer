@@ -3,15 +3,15 @@ Tests for normalization semantics and bcftools adapter.
 """
 from __future__ import annotations
 
+from src.backend.domain.enums import NormalizationMethodEnum, NormalizationSemanticsEnum, NormalizationStatusEnum
 from src.backend.pipeline.normalization import (
-    normalize_minimal_representation,
     BcftoolsAdapter,
-    _minimal_representation,
-    _is_symbolic,
     _is_breakend,
     _is_star,
+    _is_symbolic,
+    _minimal_representation,
+    normalize_minimal_representation,
 )
-from src.backend.domain.enums import NormalizationStatusEnum, NormalizationMethodEnum, NormalizationSemanticsEnum
 
 
 class TestMinimalRepresentation:

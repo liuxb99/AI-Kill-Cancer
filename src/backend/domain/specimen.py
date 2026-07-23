@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Date, DateTime, Boolean, Float, Enum as SAEnum, ForeignKey
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, String
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import SpecimenTypeEnum
 
 
@@ -46,22 +47,22 @@ class SpecimenCreate(BaseModel):
 
     case_id: str
     specimen_type: SpecimenTypeEnum
-    collection_site: Optional[str] = Field(None, max_length=256)
-    collection_date: Optional[date] = None
-    tumor_purity: Optional[float] = Field(None, ge=0.0, le=1.0)
+    collection_site: str | None = Field(None, max_length=256)
+    collection_date: date | None = None
+    tumor_purity: float | None = Field(None, ge=0.0, le=1.0)
     matched_normal_available: bool = False
-    storage_reference: Optional[str] = Field(None, max_length=256)
+    storage_reference: str | None = Field(None, max_length=256)
 
 
 class SpecimenUpdate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
-    specimen_type: Optional[SpecimenTypeEnum] = None
-    collection_site: Optional[str] = Field(None, max_length=256)
-    collection_date: Optional[date] = None
-    tumor_purity: Optional[float] = Field(None, ge=0.0, le=1.0)
-    matched_normal_available: Optional[bool] = None
-    storage_reference: Optional[str] = Field(None, max_length=256)
+    specimen_type: SpecimenTypeEnum | None = None
+    collection_site: str | None = Field(None, max_length=256)
+    collection_date: date | None = None
+    tumor_purity: float | None = Field(None, ge=0.0, le=1.0)
+    matched_normal_available: bool | None = None
+    storage_reference: str | None = Field(None, max_length=256)
 
 
 class SpecimenResponse(BaseModel):
@@ -70,10 +71,10 @@ class SpecimenResponse(BaseModel):
     id: str
     case_id: str
     specimen_type: str
-    collection_site: Optional[str] = None
-    collection_date: Optional[date] = None
-    tumor_purity: Optional[float] = None
+    collection_site: str | None = None
+    collection_date: date | None = None
+    tumor_purity: float | None = None
     matched_normal_available: bool = False
-    storage_reference: Optional[str] = None
+    storage_reference: str | None = None
     created_at: datetime
     updated_at: datetime

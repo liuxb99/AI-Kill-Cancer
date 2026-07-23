@@ -6,7 +6,7 @@ acquired resistance from prior treatments, and cross-referenced evidence.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from src.backend.agents.base import BaseAgent
 from src.backend.agents.models import AgentOpinion
@@ -183,7 +183,7 @@ class ResistanceAgent(BaseAgent):
             confidence=confidence,
             references=references,
             context_hash=context.context_hash or None,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
         # ── 7. Validate before returning ───────────────────────────────────

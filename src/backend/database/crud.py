@@ -1,21 +1,19 @@
 import uuid
 from datetime import date
-from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.models import (
-    Patient,
-    Diagnosis,
-    Treatment,
-    Drug,
-    ResearchPaper,
-    GenderEnum,
     CancerStageEnum,
+    Diagnosis,
+    Drug,
+    GenderEnum,
+    Patient,
+    ResearchPaper,
+    Treatment,
     TreatmentStatusEnum,
 )
-
 
 # ─── Patient CRUD ─────────────────────────────────────────────────────────────
 
@@ -24,9 +22,9 @@ async def create_patient(
     name: str,
     age: int,
     gender: GenderEnum,
-    biomarkers: Optional[dict] = None,
-    family_history: Optional[list[str]] = None,
-    smoking_history: Optional[str] = None,
+    biomarkers: dict | None = None,
+    family_history: list[str] | None = None,
+    smoking_history: str | None = None,
 ) -> Patient:
     patient = Patient(
         name=name,
@@ -42,7 +40,7 @@ async def create_patient(
     return patient
 
 
-async def get_patient(db: AsyncSession, patient_id: uuid.UUID) -> Optional[Patient]:
+async def get_patient(db: AsyncSession, patient_id: uuid.UUID) -> Patient | None:
     stmt = select(Patient).where(Patient.id == patient_id)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
@@ -52,8 +50,8 @@ async def list_patients(
     db: AsyncSession,
     skip: int = 0,
     limit: int = 100,
-    name: Optional[str] = None,
-    cancer_type: Optional[str] = None,
+    name: str | None = None,
+    cancer_type: str | None = None,
 ) -> list[Patient]:
     stmt = select(Patient)
     if name:
@@ -69,7 +67,7 @@ async def update_patient(
     db: AsyncSession,
     patient_id: uuid.UUID,
     **kwargs,
-) -> Optional[Patient]:
+) -> Patient | None:
     patient = await get_patient(db, patient_id)
     if not patient:
         return None
@@ -103,9 +101,9 @@ async def create_diagnosis(
     patient_id: uuid.UUID,
     cancer_type: str,
     stage: CancerStageEnum,
-    diagnosis_date: Optional[date] = None,
-    biomarkers_at_diagnosis: Optional[dict] = None,
-    notes: Optional[str] = None,
+    diagnosis_date: date | None = None,
+    biomarkers_at_diagnosis: dict | None = None,
+    notes: str | None = None,
 ) -> Diagnosis:
     diagnosis = Diagnosis(
         patient_id=patient_id,
@@ -136,13 +134,13 @@ async def create_treatment(
     db: AsyncSession,
     diagnosis_id: uuid.UUID,
     name: str,
-    description: Optional[str] = None,
+    description: str | None = None,
     status: TreatmentStatusEnum = TreatmentStatusEnum.PLANNED,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-    success_rate: Optional[float] = None,
-    side_effects: Optional[list[str]] = None,
-    estimated_cost: Optional[str] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    success_rate: float | None = None,
+    side_effects: list[str] | None = None,
+    estimated_cost: str | None = None,
 ) -> Treatment:
     treatment = Treatment(
         diagnosis_id=diagnosis_id,
@@ -181,11 +179,11 @@ async def create_drug(
     db: AsyncSession,
     treatment_id: uuid.UUID,
     name: str,
-    generic_name: Optional[str] = None,
-    dosage: Optional[str] = None,
-    frequency: Optional[str] = None,
-    route: Optional[str] = None,
-    mechanism: Optional[str] = None,
+    generic_name: str | None = None,
+    dosage: str | None = None,
+    frequency: str | None = None,
+    route: str | None = None,
+    mechanism: str | None = None,
 ) -> Drug:
     drug = Drug(
         treatment_id=treatment_id,
@@ -216,15 +214,15 @@ async def get_drugs_by_treatment(
 async def create_research_paper(
     db: AsyncSession,
     title: str,
-    authors: Optional[list[str]] = None,
-    journal: Optional[str] = None,
-    year: Optional[int] = None,
-    doi: Optional[str] = None,
-    pmid: Optional[str] = None,
-    cancer_types: Optional[list[str]] = None,
-    abstract: Optional[str] = None,
-    keywords: Optional[list[str]] = None,
-    url: Optional[str] = None,
+    authors: list[str] | None = None,
+    journal: str | None = None,
+    year: int | None = None,
+    doi: str | None = None,
+    pmid: str | None = None,
+    cancer_types: list[str] | None = None,
+    abstract: str | None = None,
+    keywords: list[str] | None = None,
+    url: str | None = None,
 ) -> ResearchPaper:
     paper = ResearchPaper(
         title=title,
@@ -246,10 +244,10 @@ async def create_research_paper(
 
 async def search_research_papers(
     db: AsyncSession,
-    query: Optional[str] = None,
-    cancer_type: Optional[str] = None,
-    year_from: Optional[int] = None,
-    year_to: Optional[int] = None,
+    query: str | None = None,
+    cancer_type: str | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
     skip: int = 0,
     limit: int = 50,
 ) -> list[ResearchPaper]:

@@ -17,11 +17,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.backend.api.v1.workbench import (
-    TumorBoardVote,
-    TumorBoardCommentIn,
     NoteCreate,
     NoteUpdate,
     ReasoningQuestion,
+    TumorBoardCommentIn,
+    TumorBoardVote,
     _build_messages_from_reasoning_run,
 )
 from src.backend.reasoning.service import ClinicalReasoningService
@@ -284,8 +284,8 @@ class TestAuditAtomicity:
         """When audit DB fails, the note should NOT be persisted."""
         db = FakeAuditFailDB(fail_on_commit=True)
 
-        from src.backend.workbench.repository import WorkbenchNoteModel
         from src.backend.domain.audit_log import AuditLogModel
+        from src.backend.workbench.repository import WorkbenchNoteModel
 
         note = WorkbenchNoteModel(
             case_id=str(uuid.uuid4()),
@@ -336,8 +336,8 @@ class TestNoteAudit:
     async def test_note_create_adds_audit(self):
         """Note create should add AuditLogModel entry."""
         db = FakeRepoDB()
-        from src.backend.workbench.repository import WorkbenchNoteModel
         from src.backend.domain.audit_log import AuditLogModel
+        from src.backend.workbench.repository import WorkbenchNoteModel
 
         note = WorkbenchNoteModel(
             case_id=str(uuid.uuid4()),

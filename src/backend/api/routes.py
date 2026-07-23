@@ -4,23 +4,23 @@ import logging
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 
 from src.backend.config import settings
 from src.backend.models import (
     CancerStatsResponse,
-    DashboardKPIResponse,
     DashboardKPI,
+    DashboardKPIResponse,
     DataProvenance,
     DependencyStatus,
     HealthDetailResponse,
     HealthResponse,
     InfoResponse,
+    PredictionResultsResponse,
     PredictRequest,
     PredictResponse,
-    PredictionResultsResponse,
     RecommendRequest,
     RecommendResponse,
     ResearchTrendsResponse,
@@ -44,7 +44,7 @@ _LOAD_ERROR: str | None = None
 
 def _synthetic_prov() -> DataProvenance:
     """Return provenance for demo/synthetic data."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     return DataProvenance(
         data_mode="synthetic",
         source="Simulated data for demonstration purposes only",
@@ -59,7 +59,7 @@ def _synthetic_prov() -> DataProvenance:
 
 
 def _model_unavailable_prov() -> DataProvenance:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     return DataProvenance(
         data_mode="synthetic",
         source="Model unavailable — no checkpoint loaded",
@@ -92,6 +92,7 @@ def _load_model() -> bool:
 
     try:
         import torch
+
         from src.models.cancer_classifier import CancerClassifier, CancerClassifierConfig
 
         # 1. Load checkpoint safely
@@ -239,7 +240,7 @@ async def predict(body: PredictRequest):
 
         prov: DataProvenance
         if model_ver:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             prov = DataProvenance(
                 data_mode=settings.APP_MODE,
                 source=f"CancerClassifier model checkpoint ({model_ver})",
@@ -358,7 +359,7 @@ _SYNTHETIC_SOURCE = DataProvenance(
     data_mode="synthetic",
     source="Simulated statistical data for demonstration. Not based on real cancer registry data.",
     source_url=None,
-    retrieved_at=datetime.now(timezone.utc).isoformat(),
+    retrieved_at=datetime.now(UTC).isoformat(),
     model_version=None,
     disclaimer="These charts display simulated data. Do NOT use for clinical or research conclusions.",
 )

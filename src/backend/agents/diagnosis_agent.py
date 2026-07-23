@@ -10,14 +10,13 @@ diagnostic evidence in the :class:`EvidenceBundle`, and returns an
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.backend.agents.base import BaseAgent
 from src.backend.agents.models import AgentOpinion
 from src.backend.clinical.evidence_models import EvidenceBundle
 from src.backend.clinical.models import ClinicalContext
-
 
 # ─── Helper constants ──────────────────────────────────────────────────────────
 
@@ -218,7 +217,7 @@ class DiagnosisAgent(BaseAgent):
             biomarker matches, supporting/opposing arguments, and
             references.
         """
-        created_at = datetime.now(timezone.utc).isoformat()
+        created_at = datetime.now(UTC).isoformat()
 
         # ── Step 1: Field presence ────────────────────────────────────────
         missing_fields = self._check_missing_fields(context)

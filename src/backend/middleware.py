@@ -6,10 +6,10 @@ Adds security headers, request ID tracing, and audit logging.
 
 from __future__ import annotations
 
-import uuid
-import time
 import logging
-from typing import Callable
+import time
+import uuid
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware

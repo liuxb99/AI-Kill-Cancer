@@ -9,12 +9,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from src.backend.reasoning.service import ClinicalReasoningService
 from src.backend.workbench.models import (
-    PatientSummary, ActivityLog, KnowledgeGraph, TreatmentRecommendation,
+    ActivityLog,
+    KnowledgeGraph,
+    PatientSummary,
+    TreatmentRecommendation,
     WorkbenchTimeline,
 )
 from src.backend.workbench.service import WorkbenchService
-from src.backend.reasoning.service import ClinicalReasoningService
 
 
 @pytest.fixture

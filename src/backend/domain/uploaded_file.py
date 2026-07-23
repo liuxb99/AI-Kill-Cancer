@@ -6,14 +6,21 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, DateTime, BigInteger, Integer, JSON, Enum as SAEnum, ForeignKey
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import JSON, BigInteger, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
-from src.backend.domain.enums import FileTypeEnum, UploadStatusEnum, ValidationStatusEnum, GenomeBuildConfidenceEnum, UploadEligibilityEnum
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
+from src.backend.domain.enums import (
+    FileTypeEnum,
+    GenomeBuildConfidenceEnum,
+    UploadEligibilityEnum,
+    UploadStatusEnum,
+    ValidationStatusEnum,
+)
 
 
 def _uuid() -> uuid.UUID:
@@ -56,47 +63,47 @@ class UploadedFileModel(DBBase):
 class UploadedFileCreate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
-    sequencing_test_id: Optional[str] = None
+    sequencing_test_id: str | None = None
     original_filename: str = Field(..., max_length=512)
-    storage_path: Optional[str] = Field(None, max_length=1024)
-    media_type: Optional[str] = Field(None, max_length=128)
-    file_type: Optional[FileTypeEnum] = None
-    size_bytes: Optional[int] = None
-    decompressed_size_bytes: Optional[int] = None
-    sha256: Optional[str] = Field(None, max_length=64)
-    decompressed_sha256: Optional[str] = Field(None, max_length=64)
-    genome_build: Optional[str] = Field(None, max_length=32)
-    genome_build_confidence: Optional[GenomeBuildConfidenceEnum] = None
-    compression: Optional[str] = Field(None, max_length=16)
-    record_count: Optional[int] = None
-    analysis_eligible: Optional[UploadEligibilityEnum] = None
-    quarantine_reason: Optional[str] = Field(None, max_length=256)
-    retention_until: Optional[datetime] = None
-    duplicate_of_upload_id: Optional[str] = Field(None, max_length=36)
+    storage_path: str | None = Field(None, max_length=1024)
+    media_type: str | None = Field(None, max_length=128)
+    file_type: FileTypeEnum | None = None
+    size_bytes: int | None = None
+    decompressed_size_bytes: int | None = None
+    sha256: str | None = Field(None, max_length=64)
+    decompressed_sha256: str | None = Field(None, max_length=64)
+    genome_build: str | None = Field(None, max_length=32)
+    genome_build_confidence: GenomeBuildConfidenceEnum | None = None
+    compression: str | None = Field(None, max_length=16)
+    record_count: int | None = None
+    analysis_eligible: UploadEligibilityEnum | None = None
+    quarantine_reason: str | None = Field(None, max_length=256)
+    retention_until: datetime | None = None
+    duplicate_of_upload_id: str | None = Field(None, max_length=36)
 
 
 class UploadedFileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
     id: str
-    sequencing_test_id: Optional[str] = None
+    sequencing_test_id: str | None = None
     original_filename: str
-    file_type: Optional[str] = None
-    size_bytes: Optional[int] = None
-    decompressed_size_bytes: Optional[int] = None
-    sha256: Optional[str] = None
-    decompressed_sha256: Optional[str] = None
-    genome_build: Optional[str] = None
-    genome_build_confidence: Optional[str] = None
-    compression: Optional[str] = None
-    record_count: Optional[int] = None
+    file_type: str | None = None
+    size_bytes: int | None = None
+    decompressed_size_bytes: int | None = None
+    sha256: str | None = None
+    decompressed_sha256: str | None = None
+    genome_build: str | None = None
+    genome_build_confidence: str | None = None
+    compression: str | None = None
+    record_count: int | None = None
     validation_warnings: list = []
     validation_errors: list = []
     upload_status: str
     validation_status: str
-    analysis_eligible: Optional[str] = None
-    quarantine_reason: Optional[str] = None
-    retention_until: Optional[datetime] = None
-    duplicate_of_upload_id: Optional[str] = None
-    created_at: Optional[datetime] = None
+    analysis_eligible: str | None = None
+    quarantine_reason: str | None = None
+    retention_until: datetime | None = None
+    duplicate_of_upload_id: str | None = None
+    created_at: datetime | None = None
     uploaded_at: datetime

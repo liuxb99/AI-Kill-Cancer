@@ -4,8 +4,6 @@ Pydantic domain models for drug ranking engine results.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict
 
 
@@ -50,16 +48,16 @@ class DrugRankingResult(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str = ""
-    variant_id: Optional[str] = None
+    variant_id: str | None = None
     variant_ids: list[str] = []
-    case_id: Optional[str] = None
-    gene_symbol: Optional[str] = None
-    disease: Optional[str] = None
+    case_id: str | None = None
+    gene_symbol: str | None = None
+    disease: str | None = None
     rankings: list[DrugRankItem] = []
     ranking_count: int = 0
     ranking_algorithm_version: str = "0.5.0"
     normalization_rule_version: str = "1.0.0"
-    evidence_snapshot_id: Optional[str] = None
+    evidence_snapshot_id: str | None = None
     source_versions: dict = {}
     git_commit: str = ""
     status: str = "completed"
@@ -72,7 +70,7 @@ class DrugRankingRunResponse(BaseModel):
     """API response for a ranking run."""
     run_id: str
     status: str
-    ranking: Optional[DrugRankingResult] = None
+    ranking: DrugRankingResult | None = None
     message: str = ""
 
 

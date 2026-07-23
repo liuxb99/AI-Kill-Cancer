@@ -7,10 +7,10 @@ Ensures all LLM output citations reference real evidence, PMIDs, and drugs.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from src.backend.reasoning.models import (
-    ClinicalReasoningResult, ReasoningValidationResult,
+    ClinicalReasoningResult,
+    ReasoningValidationResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class EvidenceCitationValidator:
         self._drug_set: set[str] = set()
 
     def load_snapshot(self, evidence_items: list[dict],
-                      drug_names: Optional[list[str]] = None):
+                      drug_names: list[str] | None = None):
         """Load evidence snapshot for validation."""
         self._evidence_map = {}
         self._pmid_set = set()

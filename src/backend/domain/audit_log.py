@@ -6,12 +6,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Column, String, DateTime, JSON, Enum as SAEnum, ForeignKey
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String
+from sqlalchemy import Enum as SAEnum
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import AuditActionEnum
 
 
@@ -41,11 +42,11 @@ class AuditLogEntry(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
     id: str
-    patient_id: Optional[str] = None
-    actor: Optional[str] = None
+    patient_id: str | None = None
+    actor: str | None = None
     action: str
     resource_type: str
-    resource_id: Optional[str] = None
+    resource_id: str | None = None
     details: dict = {}
-    ip_address: Optional[str] = None
+    ip_address: str | None = None
     created_at: datetime

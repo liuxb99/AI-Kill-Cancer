@@ -1,7 +1,8 @@
 """Cancer case repository."""
 from sqlalchemy import select
-from src.backend.repositories.base import BaseRepository
+
 from src.backend.domain.cancer_case import CancerCaseModel
+from src.backend.repositories.base import BaseRepository
 
 
 class CancerCaseRepository(BaseRepository[CancerCaseModel]):

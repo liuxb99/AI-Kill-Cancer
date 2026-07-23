@@ -71,8 +71,8 @@ class TestDockerSmoke:
 
     def test_05_api_health(self):
         """API health endpoint should respond."""
-        import urllib.request
         import json
+        import urllib.request
         try:
             resp = urllib.request.urlopen("http://localhost:8000/api/v1/health", timeout=10)
             data = json.loads(resp.read().decode())

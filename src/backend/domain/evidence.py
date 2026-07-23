@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Text, Integer, Date, DateTime, Enum as SAEnum, ForeignKey
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import EvidenceDirectionEnum, EvidenceLevelEnum, EvidenceTypeEnum
 
 
@@ -58,23 +59,23 @@ class EvidenceCreate(BaseModel):
 
     evidence_type: EvidenceTypeEnum
     source_name: str = Field(..., max_length=128)
-    source_record_id: Optional[str] = Field(None, max_length=256)
-    publication_id: Optional[str] = None
-    clinical_trial_id: Optional[str] = None
-    gene_symbol: Optional[str] = Field(None, max_length=32)
-    variant_id: Optional[str] = None
-    drug_id: Optional[str] = None
-    cancer_type: Optional[str] = Field(None, max_length=64)
-    study_type: Optional[str] = Field(None, max_length=64)
-    sample_size: Optional[int] = None
+    source_record_id: str | None = Field(None, max_length=256)
+    publication_id: str | None = None
+    clinical_trial_id: str | None = None
+    gene_symbol: str | None = Field(None, max_length=32)
+    variant_id: str | None = None
+    drug_id: str | None = None
+    cancer_type: str | None = Field(None, max_length=64)
+    study_type: str | None = Field(None, max_length=64)
+    sample_size: int | None = None
     evidence_direction: EvidenceDirectionEnum
     evidence_level: EvidenceLevelEnum
-    quality: Optional[str] = Field(None, max_length=32)
-    summary: Optional[str] = None
-    limitations: Optional[str] = None
-    publication_date: Optional[date] = None
-    source_version: Optional[str] = Field(None, max_length=64)
-    license: Optional[str] = Field(None, max_length=128)
+    quality: str | None = Field(None, max_length=32)
+    summary: str | None = None
+    limitations: str | None = None
+    publication_date: date | None = None
+    source_version: str | None = Field(None, max_length=64)
+    license: str | None = Field(None, max_length=128)
 
 
 class EvidenceResponse(BaseModel):
@@ -83,24 +84,24 @@ class EvidenceResponse(BaseModel):
     id: str
     evidence_type: str
     source_name: str
-    source_record_id: Optional[str] = None
-    publication_id: Optional[str] = None
-    clinical_trial_id: Optional[str] = None
-    gene_symbol: Optional[str] = None
-    variant_id: Optional[str] = None
-    drug_id: Optional[str] = None
-    cancer_type: Optional[str] = None
-    study_type: Optional[str] = None
-    sample_size: Optional[int] = None
+    source_record_id: str | None = None
+    publication_id: str | None = None
+    clinical_trial_id: str | None = None
+    gene_symbol: str | None = None
+    variant_id: str | None = None
+    drug_id: str | None = None
+    cancer_type: str | None = None
+    study_type: str | None = None
+    sample_size: int | None = None
     evidence_direction: str
     evidence_level: str
-    quality: Optional[str] = None
-    summary: Optional[str] = None
-    limitations: Optional[str] = None
-    publication_date: Optional[date] = None
+    quality: str | None = None
+    summary: str | None = None
+    limitations: str | None = None
+    publication_date: date | None = None
     retrieved_at: datetime
-    source_version: Optional[str] = None
-    license: Optional[str] = None
+    source_version: str | None = None
+    license: str | None = None
     created_at: datetime
 
 

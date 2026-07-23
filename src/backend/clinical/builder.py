@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import date
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -81,7 +80,7 @@ class CaseContextBuilder:
             return self._empty_context()
 
         # ── Load patient ──────────────────────────────────────────────────
-        patient: Optional[PatientModel] = None
+        patient: PatientModel | None = None
         try:
             pid = (
                 uuid.UUID(str(case.patient_id))
@@ -137,7 +136,7 @@ class CaseContextBuilder:
     def _assemble(
         self,
         case: CancerCaseModel,
-        patient: Optional[PatientModel],
+        patient: PatientModel | None,
         variants: list[VariantModel],
         case_id: str,
     ) -> ClinicalContext:
@@ -229,7 +228,7 @@ class CaseContextBuilder:
     # ── Field-level helpers ──────────────────────────────────────────────
 
     @staticmethod
-    def _resolve_age(patient: Optional[PatientModel]) -> int:
+    def _resolve_age(patient: PatientModel | None) -> int:
         """Calculate age from the patient's birth year, or return 0."""
         if patient is None:
             return 0
@@ -241,7 +240,7 @@ class CaseContextBuilder:
         return 0
 
     @staticmethod
-    def _resolve_gender(patient: Optional[PatientModel]) -> str:
+    def _resolve_gender(patient: PatientModel | None) -> str:
         """Return the patient's sex as a string, or empty string."""
         if patient is None or patient.sex is None:
             return ""

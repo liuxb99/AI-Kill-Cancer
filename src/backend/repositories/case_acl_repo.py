@@ -1,15 +1,16 @@
 """Case ACL repository for domain_case_acl table."""
-from typing import Optional
-from sqlalchemy import select, and_, delete
-from src.backend.repositories.base import BaseRepository
+
+from sqlalchemy import and_, delete, select
+
 from src.backend.domain.case_acl import CaseACLModel
+from src.backend.repositories.base import BaseRepository
 
 
 class CaseACLRepository(BaseRepository[CaseACLModel]):
     def __init__(self, db):
         super().__init__(CaseACLModel, db)
 
-    async def get_user_case_role(self, case_id, user_id) -> Optional[CaseACLModel]:
+    async def get_user_case_role(self, case_id, user_id) -> CaseACLModel | None:
         stmt = select(CaseACLModel).where(
             and_(CaseACLModel.case_id == case_id, CaseACLModel.user_id == user_id)
         )

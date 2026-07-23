@@ -15,9 +15,9 @@ from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
 from src.backend.domain.variant import VariantImportBatch, VariantResponse
-from src.backend.repositories.variant_repo import VariantRepository
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.repositories.specimen_repo import SpecimenRepository
+from src.backend.repositories.variant_repo import VariantRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/variants", tags=["variants"])

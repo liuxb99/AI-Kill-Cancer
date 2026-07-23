@@ -6,19 +6,18 @@ GuidelineAgent, ClinicalTrialAgent, ResistanceAgent).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
 
 from src.backend.agents.base import BaseAgent
-from src.backend.agents.models import AgentOpinion
 from src.backend.agents.diagnosis_agent import DiagnosisAgent
-from src.backend.agents.variant_agent import VariantAgent
 from src.backend.agents.drug_agent import DrugAgent
+from src.backend.agents.models import AgentOpinion
+from src.backend.agents.variant_agent import VariantAgent
 from src.backend.clinical.evidence_models import EvidenceBundle, EvidenceItem
 from src.backend.clinical.models import ClinicalContext
-
 
 # ─── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -104,7 +103,7 @@ class TestBaseAgent:
             agent_version="1.0.0",
             summary="A valid summary.",
             confidence="high",
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
         # Use a concrete subclass to access validate_opinion
         agent = DiagnosisAgent(db=AsyncMock())
@@ -118,7 +117,7 @@ class TestBaseAgent:
             agent_version="1.0.0",
             summary="Summary text.",
             confidence="high",
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
         agent = DiagnosisAgent(db=AsyncMock())
         errors = agent.validate_opinion(opinion)
@@ -131,7 +130,7 @@ class TestBaseAgent:
             agent_version="",
             summary="Summary text.",
             confidence="high",
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
         agent = DiagnosisAgent(db=AsyncMock())
         errors = agent.validate_opinion(opinion)
@@ -144,7 +143,7 @@ class TestBaseAgent:
             agent_version="1.0.0",
             summary="",
             confidence="high",
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
         agent = DiagnosisAgent(db=AsyncMock())
         errors = agent.validate_opinion(opinion)
@@ -157,7 +156,7 @@ class TestBaseAgent:
             agent_version="1.0.0",
             summary="Summary text.",
             confidence="very_high",
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
         agent = DiagnosisAgent(db=AsyncMock())
         errors = agent.validate_opinion(opinion)
@@ -185,7 +184,7 @@ class TestBaseAgent:
             agent_version="1.0.0",
             summary="Summary text.",
             confidence="low",
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             references=[
                 "not a dict",
                 {"source": "NCCN"},  # missing 'citation'
@@ -236,7 +235,7 @@ class TestAgentOpinion:
 
     def test_fully_populated(self):
         """Fully populated AgentOpinion with all fields."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         opinion = AgentOpinion(
             agent_type="diagnosis",
             agent_version="2.0.0",

@@ -9,16 +9,18 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from src.backend.reasoning.context import ReasoningContextBuilder
-from src.backend.reasoning.validator import EvidenceCitationValidator, HallucinationGuard
 from src.backend.reasoning.conflicts import ConflictAnalyzer
-from src.backend.reasoning.repository import ReasoningRunRepository
-from src.backend.reasoning.llm import get_llm_adapter, LLMAdapter
+from src.backend.reasoning.context import ReasoningContextBuilder
+from src.backend.reasoning.llm import LLMAdapter, get_llm_adapter
 from src.backend.reasoning.models import (
-    ClinicalReasoningResult, ReasoningRunResponse, ReasoningDrugExplanation, SafetyNotice,
+    ClinicalReasoningResult,
+    ReasoningDrugExplanation,
+    ReasoningRunResponse,
+    SafetyNotice,
 )
+from src.backend.reasoning.repository import ReasoningRunRepository
+from src.backend.reasoning.validator import EvidenceCitationValidator, HallucinationGuard
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +39,8 @@ class ClinicalReasoningService:
     7. Return result with status
     """
 
-    def __init__(self, db, llm_adapter: Optional[LLMAdapter] = None,
-                 config: Optional[dict] = None):
+    def __init__(self, db, llm_adapter: LLMAdapter | None = None,
+                 config: dict | None = None):
         self.db = db
         self.config = config or {}
         self.llm = llm_adapter or get_llm_adapter(self.config.get("llm", {}))
@@ -52,10 +54,10 @@ class ClinicalReasoningService:
     async def reason(
         self,
         case_id: str = "",
-        variant_data: Optional[dict] = None,
-        evidence_items: Optional[list[dict]] = None,
-        ranking_result: Optional[dict] = None,
-        knowledge_data: Optional[dict] = None,
+        variant_data: dict | None = None,
+        evidence_items: list[dict] | None = None,
+        ranking_result: dict | None = None,
+        knowledge_data: dict | None = None,
         disease: str = "",
         gene_symbol: str = "",
         question: str = "",
@@ -240,7 +242,7 @@ class ClinicalReasoningService:
                             evidence_count: int, drug_count: int,
                             conflicts: list[dict],
                             evidence_items: list[dict],
-                            ranking_result: Optional[dict] = None,
+                            ranking_result: dict | None = None,
                             question: str = "") -> str:
         """Build the user prompt with evidence context and user question."""
         prompt_parts = [

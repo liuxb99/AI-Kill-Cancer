@@ -11,7 +11,7 @@ structured ``AgentOpinion``.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.backend.agents.base import BaseAgent
@@ -368,7 +368,7 @@ class GuidelineAgent(BaseAgent):
                     "matching the patient's profile."
                 ),
                 confidence="low",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 context_hash=context.context_hash or None,
             )
 
@@ -556,7 +556,7 @@ class GuidelineAgent(BaseAgent):
             confidence=confidence,
             references=references,
             context_hash=context.context_hash or None,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
         # Validate before returning

@@ -8,14 +8,13 @@ assesses clinical significance, and identifies druggable alterations.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.backend.agents.base import BaseAgent
 from src.backend.agents.models import AgentOpinion
 from src.backend.clinical.evidence_models import EvidenceBundle
 from src.backend.clinical.models import ClinicalContext
-
 
 # ─── Helper constants ──────────────────────────────────────────────────────────
 
@@ -155,8 +154,8 @@ class VariantAgent(BaseAgent):
             )
         if total_pathogenic:
             pros.append(
-                f"Clinically significant variant(s) support molecular-driven "
-                f"treatment decisions."
+                "Clinically significant variant(s) support molecular-driven "
+                "treatment decisions."
             )
 
         if not druggable_genes and not total_pathogenic:
@@ -188,7 +187,7 @@ class VariantAgent(BaseAgent):
                 seen_refs.add(key)
                 unique_refs.append(ref)
 
-        created_at = datetime.now(timezone.utc).isoformat()
+        created_at = datetime.now(UTC).isoformat()
 
         return AgentOpinion(
             agent_type=self.agent_type,
@@ -404,7 +403,7 @@ class VariantAgent(BaseAgent):
         AgentOpinion
             An opinion stating that no variants were found.
         """
-        created_at = datetime.now(timezone.utc).isoformat()
+        created_at = datetime.now(UTC).isoformat()
         return AgentOpinion(
             agent_type="variant",
             agent_version="1.0.0",

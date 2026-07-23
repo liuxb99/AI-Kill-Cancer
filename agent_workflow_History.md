@@ -68,3 +68,4 @@ Commit: a64f7a1 | 796 tests passed | Pushed to origin/master ✅
 2026-07-24 00:23 | [v] task(devops) -> Phase A 調查完成（A1–A4）
 2026-07-24 00:23 | [v] task(devops) -> Phase B 根因分析完成（B1–B2）
 2026-07-24 00:23 | [v] task(devops) -> Phase C 修復完成（C1–C5）— 修改 4 個檔案：vercel.json, pyproject.toml, ci.yml, deploy.yml
+2026-07-24 00:23 | [v] 返工第1次 — 修復 ruff 配置 + 前端測試 4 個檔案（47 tests passed ✅）

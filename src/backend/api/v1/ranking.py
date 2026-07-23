@@ -15,18 +15,19 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.database.session import get_db
+from src.backend.api.v1.deps import get_variant_repo
 from src.backend.auth.dependencies import require_auth, require_case_access, verify_case_access
+from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
 from src.backend.evidence.merger import EvidenceMerger
 from src.backend.ranking.engine import DrugRankingEngine
 from src.backend.ranking.models import (
-    DrugRankingResult, DrugRankingRunResponse,
+    DrugRankingResult,
+    DrugRankingRunResponse,
 )
 from src.backend.ranking.repository import RankingRunRepository
 from src.backend.repositories.variant_repo import VariantRepository
-from src.backend.api.v1.deps import get_variant_repo
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ranking", tags=["ranking"])
@@ -125,11 +126,12 @@ async def rank_case(
     → preserves variant-specific evidence → persists ranking run.
     """
     import uuid
-    from src.backend.repositories.cancer_case_repo import CancerCaseRepository
-    from src.backend.repositories.variant_repo import VariantRepository
+
     from src.backend.evidence.merger import EvidenceMerger
     from src.backend.ranking.engine import DrugRankingEngine
     from src.backend.ranking.repository import RankingRunRepository
+    from src.backend.repositories.cancer_case_repo import CancerCaseRepository
+    from src.backend.repositories.variant_repo import VariantRepository
 
     try:
         cid = uuid.UUID(case_id)

@@ -3,8 +3,7 @@ Tests for VCF parser module.
 """
 from __future__ import annotations
 
-from src.backend.vcf.parser import parse_vcf, VCFHeader, detect_genome_build
-
+from src.backend.vcf.parser import VCFHeader, detect_genome_build, parse_vcf
 
 SAMPLE_VCF = """##fileformat=VCFv4.2
 ##reference=GRCh38

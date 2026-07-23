@@ -14,20 +14,21 @@ Provides:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.database.session import get_db
 from src.backend.auth.dependencies import require_auth
+from src.backend.database.session import get_db
 from src.backend.domain.user import UserModel
-from src.backend.knowledge.service import KnowledgeService
-from src.backend.knowledge.models import (
-    KnowledgeEntityResponse, KnowledgeEntity,
-)
-from src.backend.knowledge.adapters.pubmed import PubMedAdapter
 from src.backend.knowledge.adapters.clinicaltrials import ClinicalTrialsAdapter
+from src.backend.knowledge.adapters.pubmed import PubMedAdapter
+from src.backend.knowledge.models import (
+    KnowledgeEntity,
+    KnowledgeEntityResponse,
+)
+from src.backend.knowledge.service import KnowledgeService
 from src.backend.repositories.drug_repo import DrugRepository
 
 logger = logging.getLogger(__name__)
@@ -220,7 +221,7 @@ async def refresh_knowledge(
     db: AsyncSession = Depends(get_db),
 ):
     """Refresh knowledge base from configured public sources."""
-    from src.backend.knowledge.adapters import ClinVarAdapter, PubMedAdapter, ClinicalTrialsAdapter
+    from src.backend.knowledge.adapters import ClinicalTrialsAdapter, ClinVarAdapter, PubMedAdapter
 
     configured = []
     not_configured = ["COSMIC", "CancerHotspots", "PharmGKB", "OncoKB", "MyCancerGenome"]
@@ -253,5 +254,5 @@ async def refresh_knowledge(
         "message": f"Knowledge sources checked. {len(configured)} configured.",
         "configured_sources": configured,
         "not_configured_sources": not_configured,
-        "refreshed_at": datetime.now(timezone.utc).isoformat(),
+        "refreshed_at": datetime.now(UTC).isoformat(),
     }

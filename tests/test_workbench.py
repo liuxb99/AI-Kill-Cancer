@@ -7,14 +7,18 @@ from __future__ import annotations
 import uuid
 
 from src.backend.workbench.models import (
-    GraphNode, GraphEdge, KnowledgeGraph,
-    TumorBoardReview, WorkbenchNote, WorkbenchTimeline,
     CaseComparisonResult,
+    GraphEdge,
+    GraphNode,
+    KnowledgeGraph,
+    TumorBoardReview,
+    WorkbenchNote,
+    WorkbenchTimeline,
 )
-from src.backend.workbench.service import WorkbenchService
 from src.backend.workbench.repository import (
     TumorBoardRepository,
 )
+from src.backend.workbench.service import WorkbenchService
 
 
 class TestWorkbenchModels:

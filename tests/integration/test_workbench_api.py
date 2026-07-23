@@ -3,9 +3,13 @@
 Integration test for workbench flows.
 """
 from src.backend.workbench.models import (
-    KnowledgeGraph, GraphNode, GraphEdge,
-    TumorBoardReview, CaseComparisonResult,
+    CaseComparisonResult,
+    GraphEdge,
+    GraphNode,
+    KnowledgeGraph,
+    TumorBoardReview,
 )
+
 
 class TestWorkbenchAPIFlow:
     def test_knowledge_graph_structure(self):

@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import Column, String, Text, DateTime, JSON, select
+from sqlalchemy import JSON, Column, DateTime, String, Text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 
 
 class ClinicalReportModel(DBBase):
@@ -37,7 +37,7 @@ class ReportRepository:
         self.db = db
 
     async def create(self, case_id: str, report_data: dict, html_content: str = "",
-                      fhir_data: Optional[dict] = None) -> ClinicalReportModel:
+                      fhir_data: dict | None = None) -> ClinicalReportModel:
         """Create a new report with explicit case_id."""
         instance = ClinicalReportModel(
             case_id=case_id,
@@ -53,12 +53,12 @@ class ReportRepository:
         await self.db.refresh(instance)
         return instance
 
-    async def get(self, report_id: uuid.UUID) -> Optional[ClinicalReportModel]:
+    async def get(self, report_id: uuid.UUID) -> ClinicalReportModel | None:
         stmt = select(ClinicalReportModel).where(ClinicalReportModel.id == report_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def update_status(self, report_id: uuid.UUID, status: str) -> Optional[ClinicalReportModel]:
+    async def update_status(self, report_id: uuid.UUID, status: str) -> ClinicalReportModel | None:
         instance = await self.get(report_id)
         if not instance:
             return None

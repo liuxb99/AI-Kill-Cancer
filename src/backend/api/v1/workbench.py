@@ -21,27 +21,31 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.database.session import get_db
 from src.backend.auth.dependencies import require_auth, require_case_access, verify_case_access
+from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
+from src.backend.domain.uploaded_file import UploadedFileModel
 from src.backend.domain.user import UserModel
-from src.backend.workbench.service import WorkbenchService
+from src.backend.reasoning.llm import get_llm_adapter
+from src.backend.reasoning.repository import ReasoningRunModel
+from src.backend.reasoning.service import ClinicalReasoningService
 from src.backend.workbench.models import (
-    KnowledgeGraph, WorkbenchTimeline, CaseComparisonResult,
-    PatientSummary, TreatmentRecommendation, ActivityLog,
+    ActivityLog,
+    CaseComparisonResult,
+    KnowledgeGraph,
+    PatientSummary,
+    TreatmentRecommendation,
     TumorBoardVote,
+    WorkbenchTimeline,
 )
 from src.backend.workbench.repository import TumorBoardRepository, WorkbenchNoteModel
-from src.backend.reasoning.service import ClinicalReasoningService
-from src.backend.reasoning.repository import ReasoningRunModel
-from src.backend.reasoning.llm import get_llm_adapter
-from src.backend.domain.uploaded_file import UploadedFileModel
+from src.backend.workbench.service import WorkbenchService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workbench", tags=["workbench"])
@@ -155,8 +159,8 @@ async def compare_variants(
     if not variant_ids or len(variant_ids) < 2:
         raise HTTPException(status_code=400, detail={"error": "need_at_least_2_variants"})
 
-    from src.backend.repositories.variant_repo import VariantRepository
     from src.backend.repositories.drug_repo import DrugRepository
+    from src.backend.repositories.variant_repo import VariantRepository
 
     vrepo = VariantRepository(db)
     drepo = DrugRepository(db)
@@ -260,8 +264,9 @@ async def add_tumor_board_vote(
             "message": f"Vote must be one of: {', '.join(valid_votes)}",
         })
 
+    from datetime import datetime
+
     from src.backend.domain.audit_log import AuditLogModel
-    from datetime import datetime, timezone
 
     repo = TumorBoardRepository(db)
 
@@ -283,7 +288,7 @@ async def add_tumor_board_vote(
             "reviewer_name": getattr(user, 'display_name', '') or getattr(user, 'username', ''),
             "vote": vote.vote,
             "rationale": vote.rationale,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         audit = AuditLogModel(
@@ -292,7 +297,7 @@ async def add_tumor_board_vote(
             resource_type="tumor_board_review",
             resource_id=str(review_id),
             details={"case_id": case_id, "vote": vote.vote, "rationale": vote.rationale},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(audit)
 
@@ -329,8 +334,9 @@ async def add_tumor_board_comment(
             "message": "Comment content cannot be empty",
         })
 
+    from datetime import datetime
+
     from src.backend.domain.audit_log import AuditLogModel
-    from datetime import datetime, timezone
 
     repo = TumorBoardRepository(db)
 
@@ -351,7 +357,7 @@ async def add_tumor_board_comment(
             "user_name": getattr(user, 'display_name', '') or getattr(user, 'username', ''),
             "content": comment.content,
             "comment_type": comment.comment_type,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         audit = AuditLogModel(
@@ -360,7 +366,7 @@ async def add_tumor_board_comment(
             resource_type="tumor_board_review",
             resource_id=str(review_id),
             details={"case_id": case_id, "comment_type": comment.comment_type},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.add(audit)
 
@@ -446,7 +452,8 @@ async def create_note(
     if not note.content or not note.content.strip():
         raise HTTPException(status_code=422, detail={"error": "empty_content", "message": "Note content cannot be empty"})
 
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     from src.backend.domain.audit_log import AuditLogModel
 
     model = WorkbenchNoteModel(
@@ -454,7 +461,7 @@ async def create_note(
         user_id=str(user.id),
         content=note.content,
         note_type=note.note_type,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(model)
 
@@ -467,7 +474,7 @@ async def create_note(
         resource_type="workbench_note",
         resource_id=str(case_id),
         details={"note_id": str(model.id), "case_id": case_id},
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(audit)
 
@@ -506,9 +513,11 @@ async def update_note(
     if not note.content or not note.content.strip():
         raise HTTPException(status_code=422, detail={"error": "empty_content", "message": "Note content cannot be empty"})
 
+    from datetime import datetime
+
     from sqlalchemy import select
+
     from src.backend.domain.audit_log import AuditLogModel
-    from datetime import datetime, timezone
 
     stmt = select(WorkbenchNoteModel).where(
         WorkbenchNoteModel.id == nid,
@@ -527,7 +536,7 @@ async def update_note(
         resource_type="workbench_note",
         resource_id=str(note_id),
         details={"case_id": case_id, "note_id": note_id},
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(audit)
 
@@ -557,9 +566,11 @@ async def delete_note(
     except ValueError:
         raise HTTPException(status_code=400, detail={"error": "invalid_uuid", "message": "Invalid note ID"})
 
+    from datetime import datetime
+
     from sqlalchemy import select
+
     from src.backend.domain.audit_log import AuditLogModel
-    from datetime import datetime, timezone
 
     stmt = select(WorkbenchNoteModel).where(
         WorkbenchNoteModel.id == nid,
@@ -578,7 +589,7 @@ async def delete_note(
         resource_type="workbench_note",
         resource_id=str(note_id),
         details={"case_id": case_id, "note_id": note_id},
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(audit)
 
@@ -626,7 +637,7 @@ async def create_reasoning_session(
             "id": result.run_id + "-user",
             "role": "user",
             "content": reasoning.user_question or question.question,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         })
         messages.append({
             "id": result.run_id,
@@ -642,15 +653,15 @@ async def create_reasoning_session(
             ],
             "references": reasoning.supporting_evidence_ids or [],
             "decision_trace": reasoning.key_findings or [],
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         })
 
     return {
         "id": result.run_id,
         "case_id": case_id,
         "messages": messages,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -760,8 +771,9 @@ async def get_attachments(
     Traverses case → specimen → sequencing_test → uploaded_file relationship.
     """
     from sqlalchemy import select
-    from src.backend.domain.specimen import SpecimenModel
+
     from src.backend.domain.sequencing import SequencingTestModel
+    from src.backend.domain.specimen import SpecimenModel
 
     # Find specimens for this case
     spec_stmt = select(SpecimenModel).where(SpecimenModel.case_id == uuid.UUID(case_id))

@@ -12,12 +12,11 @@ import hashlib
 import json
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import select, and_, or_
+from sqlalchemy import and_, or_, select
 
-from src.backend.repositories.base import BaseRepository
 from src.backend.evidence.domain import EvidenceItemModel
+from src.backend.repositories.base import BaseRepository
 
 
 def _compute_payload_hash(item: dict) -> str:
@@ -41,7 +40,7 @@ class EvidenceItemRepository(BaseRepository[EvidenceItemModel]):
         super().__init__(EvidenceItemModel, db)
 
     async def upsert(self, source_id: uuid.UUID, item: dict, match_level: str = "gene_level_only",
-                     conflict_status: str = "not_evaluable", now: Optional[datetime] = None) -> EvidenceItemModel:
+                     conflict_status: str = "not_evaluable", now: datetime | None = None) -> EvidenceItemModel:
         """
         Upsert an evidence item. Uses payload hash + source_record_id for dedup.
         If the item exists, updates last_seen_at and metadata.
@@ -178,7 +177,7 @@ class EvidenceItemRepository(BaseRepository[EvidenceItemModel]):
         return len(list(result.scalars().all()))
 
     async def withdraw_by_source_record(self, source_id: uuid.UUID, source_record_ids: list[str],
-                                         now: Optional[datetime] = None) -> int:
+                                         now: datetime | None = None) -> int:
         """Mark evidence items as withdrawn if their source_record_id is no longer present."""
         if now is None:
             now = datetime.utcnow()

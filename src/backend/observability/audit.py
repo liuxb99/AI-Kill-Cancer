@@ -6,8 +6,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +14,10 @@ logger = logging.getLogger(__name__)
 class AuditLog:
     """A single audit log entry."""
     def __init__(self, action: str, user_id: str, resource_type: str,
-                 resource_id: str = "", details: Optional[dict] = None,
+                 resource_id: str = "", details: dict | None = None,
                  ip_address: str = "", request_id: str = ""):
         self.id = str(uuid.uuid4())
-        self.timestamp = datetime.now(timezone.utc).isoformat()
+        self.timestamp = datetime.now(UTC).isoformat()
         self.action = action
         self.user_id = user_id
         self.resource_type = resource_type
@@ -60,7 +59,7 @@ class AuditLogger:
         self._max_entries = 10000
 
     def log(self, action: str, user_id: str, resource_type: str,
-            resource_id: str = "", details: Optional[dict] = None,
+            resource_id: str = "", details: dict | None = None,
             ip_address: str = "", request_id: str = "") -> AuditLog:
         """Create and store an audit log entry."""
         entry = AuditLog(
@@ -95,7 +94,7 @@ class AuditLogger:
 
 
 # Global audit logger
-_audit_logger: Optional[AuditLogger] = None
+_audit_logger: AuditLogger | None = None
 
 
 def get_audit_logger() -> AuditLogger:

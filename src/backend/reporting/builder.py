@@ -5,8 +5,7 @@ ReportBuilder — assembles clinical reports from evidence, ranking, and reasoni
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from src.backend.reporting.models import ClinicalReport, ReportMetadata
 
@@ -16,17 +15,17 @@ class ReportBuilder:
     Assembles a clinical report from evidence, ranking, and reasoning data.
     """
 
-    def build(self, case_metadata: Optional[dict] = None,
-              sample_metadata: Optional[dict] = None,
-              sequencing_info: Optional[dict] = None,
-              variants: Optional[list[dict]] = None,
-              evidence_summary: Optional[list[dict]] = None,
-              drug_ranking: Optional[list[dict]] = None,
-              resistance: Optional[list[dict]] = None,
-              conflicts: Optional[list[dict]] = None,
-              clinical_reasoning: Optional[dict] = None,
-              limitations: Optional[list[str]] = None,
-              source_versions: Optional[dict] = None,
+    def build(self, case_metadata: dict | None = None,
+              sample_metadata: dict | None = None,
+              sequencing_info: dict | None = None,
+              variants: list[dict] | None = None,
+              evidence_summary: list[dict] | None = None,
+              drug_ranking: list[dict] | None = None,
+              resistance: list[dict] | None = None,
+              conflicts: list[dict] | None = None,
+              clinical_reasoning: dict | None = None,
+              limitations: list[str] | None = None,
+              source_versions: dict | None = None,
               git_commit: str = "") -> ClinicalReport:
         """Build a clinical report from provided data."""
         report_id = str(uuid.uuid4())
@@ -36,7 +35,7 @@ class ReportBuilder:
             case_id=case_metadata.get("case_id", "") if case_metadata else None,
             version="1.0.0",
             status="draft",
-            generated_at=datetime.now(timezone.utc).isoformat(),
+            generated_at=datetime.now(UTC).isoformat(),
             git_commit=git_commit,
         )
 

@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import Column, String, Text, DateTime, JSON, select
+from sqlalchemy import JSON, Column, DateTime, String, Text, select
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 
 
 class TumorBoardReviewModel(DBBase):
@@ -60,7 +60,7 @@ class TumorBoardRepository:
         await self.db.refresh(review)
         return review
 
-    async def get_review(self, review_id: uuid.UUID) -> Optional[TumorBoardReviewModel]:
+    async def get_review(self, review_id: uuid.UUID) -> TumorBoardReviewModel | None:
         stmt = select(TumorBoardReviewModel).where(TumorBoardReviewModel.id == review_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -73,7 +73,7 @@ class TumorBoardRepository:
         return list(result.scalars().all())
 
     async def update_status(self, review_id: uuid.UUID, status: str,
-                             decision: str = "") -> Optional[TumorBoardReviewModel]:
+                             decision: str = "") -> TumorBoardReviewModel | None:
         review = await self.get_review(review_id)
         if not review:
             return None
@@ -89,7 +89,7 @@ class TumorBoardRepository:
         await self.db.refresh(review)
         return review
 
-    async def add_comment(self, review_id: uuid.UUID, comment: dict) -> Optional[TumorBoardReviewModel]:
+    async def add_comment(self, review_id: uuid.UUID, comment: dict) -> TumorBoardReviewModel | None:
         review = await self.get_review(review_id)
         if not review:
             return None

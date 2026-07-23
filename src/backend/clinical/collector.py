@@ -8,9 +8,9 @@ sources (NCCN, ESMO, OncoKB) are logged as warnings and return empty results.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -60,9 +60,9 @@ class EvidenceCollector:
         self._conflict_analyzer = ConflictAnalyzer()
 
         # Adapters — lazy initialisation so they can be overridden in tests
-        self._clinvar: Optional[ClinVarAdapter] = None
-        self._pubmed: Optional[PubMedAdapter] = None
-        self._clinicaltrials: Optional[ClinicalTrialsAdapter] = None
+        self._clinvar: ClinVarAdapter | None = None
+        self._pubmed: PubMedAdapter | None = None
+        self._clinicaltrials: ClinicalTrialsAdapter | None = None
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -98,7 +98,7 @@ class EvidenceCollector:
             source_statuses.extend(gene_statuses)
 
         # ── Authorisation-required sources ──────────────────────────────
-        now_ts = datetime.now(timezone.utc).isoformat()
+        now_ts = datetime.now(UTC).isoformat()
         source_statuses.extend(self._report_auth_sources())
 
         bundle = EvidenceBundle(
@@ -124,7 +124,7 @@ class EvidenceCollector:
         """
         items: list[EvidenceItem] = []
         source_statuses: list[SourceStatus] = []
-        now_ts = datetime.now(timezone.utc).isoformat()
+        now_ts = datetime.now(UTC).isoformat()
 
         # ── Variant-level cache ──────────────────────────────────────────
         cache_key = f"variant:{gene}:{hgvs}"
@@ -234,7 +234,7 @@ class EvidenceCollector:
         return EvidenceBundle(
             items=items,
             source_statuses=source_statuses,
-            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            retrieved_at=datetime.now(UTC).isoformat(),
         )
 
     # ── Internal: per-gene collection ─────────────────────────────────────
@@ -265,7 +265,7 @@ class EvidenceCollector:
 
         items: list[EvidenceItem] = []
         source_statuses: list[SourceStatus] = []
-        now_ts = datetime.now(timezone.utc).isoformat()
+        now_ts = datetime.now(UTC).isoformat()
 
         def _record(source_name: str, ok: bool, exc: Exception | None = None,
                     count: int = 0) -> None:
@@ -383,7 +383,7 @@ class EvidenceCollector:
             A list of ``SourceStatus`` instances — one per auth-required
             source, each with status ``AUTHORIZATION_REQUIRED``.
         """
-        now_ts = datetime.now(timezone.utc).isoformat()
+        now_ts = datetime.now(UTC).isoformat()
         suffix = f" for variant {gene} {hgvs}" if gene and hgvs else ""
 
         statuses: list[SourceStatus] = []

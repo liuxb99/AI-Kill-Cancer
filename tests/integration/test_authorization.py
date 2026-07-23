@@ -1,9 +1,7 @@
 """
 Integration test for auth/authorization flows.
 """
-from src.backend.auth.models import (
-    Role, Permission, ROLE_PERMISSIONS
-)
+from src.backend.auth.models import ROLE_PERMISSIONS, Permission, Role
 
 
 class TestAuthorizationFlow:

@@ -9,18 +9,18 @@ Tests:
 """
 from __future__ import annotations
 
-
-from src.backend.domain.case_acl import (
-    CaseRole, CASE_ROLE_HIERARCHY, CASE_REQUIRED_ROLES,
-    CaseACLModel,
-)
-from src.backend.auth.models import Role, ROLE_PERMISSIONS
-
 # ─── Authorization matrix integration tests ───────────────────────────────
 import pytest
 from fastapi.testclient import TestClient
 
+from src.backend.auth.models import ROLE_PERMISSIONS, Role
 from src.backend.config import settings
+from src.backend.domain.case_acl import (
+    CASE_REQUIRED_ROLES,
+    CASE_ROLE_HIERARCHY,
+    CaseACLModel,
+    CaseRole,
+)
 from src.backend.main import create_app
 
 

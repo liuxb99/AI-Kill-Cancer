@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict, model_validator
-from sqlalchemy import Column, String, Text, Date, DateTime, Enum as SAEnum, ForeignKey, JSON
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from sqlalchemy import JSON, Column, Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import CancerTypeEnum
 
 
@@ -51,33 +52,33 @@ class CancerCaseCreate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     patient_id: str
-    oncotree_code: Optional[str] = Field(None, max_length=32)
+    oncotree_code: str | None = Field(None, max_length=32)
     cancer_type: CancerTypeEnum
-    histology: Optional[str] = Field(None, max_length=256)
-    stage: Optional[str] = Field(None, max_length=32)
-    diagnosis_date: Optional[date] = None
-    radioiodine_status: Optional[str] = Field(None, max_length=64)
-    recurrence_status: Optional[str] = Field(None, max_length=64)
-    metastatic_sites: Optional[list[str]] = None
-    treatment_history: Optional[list[dict]] = None
-    current_medications: Optional[list[dict]] = None
-    clinical_notes: Optional[str] = None
+    histology: str | None = Field(None, max_length=256)
+    stage: str | None = Field(None, max_length=32)
+    diagnosis_date: date | None = None
+    radioiodine_status: str | None = Field(None, max_length=64)
+    recurrence_status: str | None = Field(None, max_length=64)
+    metastatic_sites: list[str] | None = None
+    treatment_history: list[dict] | None = None
+    current_medications: list[dict] | None = None
+    clinical_notes: str | None = None
 
 
 class CancerCaseUpdate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
-    oncotree_code: Optional[str] = Field(None, max_length=32)
-    cancer_type: Optional[CancerTypeEnum] = None
-    histology: Optional[str] = Field(None, max_length=256)
-    stage: Optional[str] = Field(None, max_length=32)
-    diagnosis_date: Optional[date] = None
-    radioiodine_status: Optional[str] = Field(None, max_length=64)
-    recurrence_status: Optional[str] = Field(None, max_length=64)
-    metastatic_sites: Optional[list[str]] = None
-    treatment_history: Optional[list[dict]] = None
-    current_medications: Optional[list[dict]] = None
-    clinical_notes: Optional[str] = None
+    oncotree_code: str | None = Field(None, max_length=32)
+    cancer_type: CancerTypeEnum | None = None
+    histology: str | None = Field(None, max_length=256)
+    stage: str | None = Field(None, max_length=32)
+    diagnosis_date: date | None = None
+    radioiodine_status: str | None = Field(None, max_length=64)
+    recurrence_status: str | None = Field(None, max_length=64)
+    metastatic_sites: list[str] | None = None
+    treatment_history: list[dict] | None = None
+    current_medications: list[dict] | None = None
+    clinical_notes: str | None = None
 
 
 class CancerCaseResponse(BaseModel):
@@ -85,17 +86,17 @@ class CancerCaseResponse(BaseModel):
 
     id: str
     patient_id: str
-    oncotree_code: Optional[str] = None
+    oncotree_code: str | None = None
     cancer_type: str
-    histology: Optional[str] = None
-    stage: Optional[str] = None
-    diagnosis_date: Optional[date] = None
-    radioiodine_status: Optional[str] = None
-    recurrence_status: Optional[str] = None
+    histology: str | None = None
+    stage: str | None = None
+    diagnosis_date: date | None = None
+    radioiodine_status: str | None = None
+    recurrence_status: str | None = None
     metastatic_sites: list = []
     treatment_history: list = []
     current_medications: list = []
-    clinical_notes: Optional[str] = None
+    clinical_notes: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,14 +1,16 @@
 import os
 import sys
 import uuid
-import pytest
-import numpy as np
 from dataclasses import dataclass
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 try:
     import torch
+
     from src.models.cancer_classifier import CancerClassifier, CancerClassifierConfig
     from src.models.train import TrainingConfig
     TORCH_AVAILABLE = True

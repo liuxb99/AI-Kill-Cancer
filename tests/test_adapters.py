@@ -3,8 +3,7 @@ Tests for adapter interfaces.
 """
 from __future__ import annotations
 
-
-from src.backend.adapters.base import NotConfiguredAdapter, AdapterResult
+from src.backend.adapters.base import AdapterResult, NotConfiguredAdapter
 from src.backend.adapters.registry import AdapterRegistry, get_registry
 
 

@@ -6,24 +6,30 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.backend.domain.audit_log import AuditLogModel
+from src.backend.repositories.cancer_case_repo import CancerCaseRepository
+from src.backend.repositories.drug_repo import DrugRepository
+from src.backend.repositories.patient_repo import PatientRepository
+from src.backend.repositories.variant_repo import VariantRepository
 from src.backend.workbench.models import (
-    KnowledgeGraph, GraphNode, GraphEdge,
-    WorkbenchTimeline, CaseComparisonResult,
-    PatientSummary, PatientDemographics,
-    TreatmentRecommendation, DrugInfo,
-    ActivityLog, ActivityEntry,
+    ActivityEntry,
+    ActivityLog,
+    CaseComparisonResult,
+    DrugInfo,
+    GraphEdge,
+    GraphNode,
+    KnowledgeGraph,
+    PatientDemographics,
+    PatientSummary,
+    TreatmentRecommendation,
+    WorkbenchTimeline,
 )
 from src.backend.workbench.repository import TumorBoardRepository
-from src.backend.repositories.patient_repo import PatientRepository
-from src.backend.repositories.cancer_case_repo import CancerCaseRepository
-from src.backend.repositories.variant_repo import VariantRepository
-from src.backend.repositories.drug_repo import DrugRepository
-from src.backend.domain.audit_log import AuditLogModel
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +215,7 @@ class WorkbenchService:
                     "type": "variant_identified",
                     "timestamp": (var_created.isoformat()
                                   if var_created and hasattr(var_created, 'isoformat')
-                                  else datetime.now(timezone.utc).isoformat()),
+                                  else datetime.now(UTC).isoformat()),
                     "description": f"Variant identified: {gene} {hgvs}",
                 })
         except Exception as e:
@@ -227,9 +233,9 @@ class WorkbenchService:
             for a in audit_entries:
                 events.append({
                     "type": getattr(a, 'action', 'audit_event'),
-                    "timestamp": (getattr(a, 'created_at', datetime.now(timezone.utc)).isoformat()
+                    "timestamp": (getattr(a, 'created_at', datetime.now(UTC)).isoformat()
                                   if hasattr(a, 'created_at') and a.created_at
-                                  else datetime.now(timezone.utc).isoformat()),
+                                  else datetime.now(UTC).isoformat()),
                     "description": str(getattr(a, 'details', {})),
                     "user_id": str(getattr(a, 'actor', '')),
                 })
@@ -324,9 +330,9 @@ class WorkbenchService:
                     entity_type=getattr(a, 'resource_type', ''),
                     entity_id=getattr(a, 'resource_id', ''),
                     details=getattr(a, 'details', {}) if isinstance(getattr(a, 'details', {}), dict) else {},
-                    created_at=(getattr(a, 'created_at', datetime.now(timezone.utc)).isoformat()
+                    created_at=(getattr(a, 'created_at', datetime.now(UTC)).isoformat()
                                 if hasattr(a, 'created_at') and a.created_at
-                                else datetime.now(timezone.utc).isoformat()),
+                                else datetime.now(UTC).isoformat()),
                 ))
         except Exception as e:
             logger.debug("Failed to fetch activity log: %s", e)
@@ -341,9 +347,9 @@ class WorkbenchService:
             cid = uuid.UUID(case_id) if isinstance(case_id, str) else case_id
         except ValueError:
             logger.warning("Invalid case_id in get_treatment_recommendation: %s", case_id)
-            return TreatmentRecommendation(case_id=case_id, generated_at=datetime.now(timezone.utc).isoformat())
+            return TreatmentRecommendation(case_id=case_id, generated_at=datetime.now(UTC).isoformat())
 
-        rec = TreatmentRecommendation(case_id=case_id, generated_at=datetime.now(timezone.utc).isoformat())
+        rec = TreatmentRecommendation(case_id=case_id, generated_at=datetime.now(UTC).isoformat())
 
         try:
             case = await self.case_repo.get(cid)

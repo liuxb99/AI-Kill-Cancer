@@ -19,7 +19,6 @@ from src.backend.domain.enums import SexEnum
 from src.backend.domain.patient import PatientModel
 from src.backend.domain.variant import VariantModel
 
-
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 
@@ -323,11 +322,11 @@ class TestCaseContextBuilder:
                 patch(
                     "src.backend.clinical.builder.CancerCaseRepository",
                     return_value=AsyncMock(get=AsyncMock(return_value=mock_case)),
-                ) as mock_case_repo_cls,
+                ),
                 patch(
                     "src.backend.clinical.builder.PatientRepository",
                     return_value=AsyncMock(get=AsyncMock(return_value=mock_patient)),
-                ) as mock_patient_repo_cls,
+                ),
             ):
                 ctx = await builder.build(case_id)
 
@@ -423,7 +422,7 @@ class TestCaseContextBuilder:
             patch.object(
                 builder, "_load_variants",
                 AsyncMock(return_value=[]),
-            ) as mock_load_variants,
+            ),
         ):
             ctx = await builder.build(case_id)
 

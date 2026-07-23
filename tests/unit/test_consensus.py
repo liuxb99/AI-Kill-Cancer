@@ -8,25 +8,24 @@ empty-input handling, and edge cases.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from src.backend.agents.consensus import (
     ConsensusEngine,
     ConsensusResult,
+    _build_alternative_options,
+    _build_recommended_option,
     _compute_agreement_level,
     _compute_overall_confidence,
     _detect_conflicts,
     _extract_tokens,
-    _token_similarity,
-    _build_recommended_option,
-    _build_alternative_options,
     _extract_unresolved_questions,
+    _token_similarity,
 )
 from src.backend.agents.models import AgentOpinion
 from src.backend.clinical.models import ClinicalContext
-
 
 # ─── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -71,7 +70,7 @@ def _opinion(
         confidence=confidence,
         references=[],
         context_hash="test-hash",
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
     )
 
 
@@ -100,7 +99,7 @@ class TestConsensusResult:
 
     def test_fully_populated(self):
         """Fully populated ConsensusResult with all fields."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         result = ConsensusResult(
             agreement="moderate",
             conflicts=[{"agent_types": ["a", "b"], "topic": "topic", "description": "desc"}],

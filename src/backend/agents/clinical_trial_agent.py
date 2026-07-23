@@ -11,8 +11,8 @@ performance status, metastatic sites) to produce a structured opinion.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from src.backend.agents.base import BaseAgent
 from src.backend.agents.models import AgentOpinion
@@ -374,7 +374,7 @@ class ClinicalTrialAgent(BaseAgent):
                     "any studies matching the patient's profile."
                 ),
                 confidence="low",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 context_hash=context.context_hash or None,
             )
 
@@ -513,7 +513,7 @@ class ClinicalTrialAgent(BaseAgent):
             confidence=confidence,
             references=references,
             context_hash=context.context_hash or None,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
         # Validate before returning

@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import Column, String, DateTime, JSON, Float, Integer, select
+from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, select
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 
 
 class ReasoningRunModel(DBBase):
@@ -63,12 +63,12 @@ class ReasoningRunRepository:
         await self.db.refresh(instance)
         return instance
 
-    async def get(self, run_id: uuid.UUID) -> Optional[ReasoningRunModel]:
+    async def get(self, run_id: uuid.UUID) -> ReasoningRunModel | None:
         stmt = select(ReasoningRunModel).where(ReasoningRunModel.id == run_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def update(self, run_id: uuid.UUID, **kwargs) -> Optional[ReasoningRunModel]:
+    async def update(self, run_id: uuid.UUID, **kwargs) -> ReasoningRunModel | None:
         instance = await self.get(run_id)
         if not instance:
             return None

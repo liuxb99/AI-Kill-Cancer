@@ -6,21 +6,28 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from src.backend.domain.enums import (
-    CancerTypeEnum, SexEnum, ConsentStatusEnum,
-    VariantTypeEnum, VariantOriginEnum, EvidenceDirectionEnum, EvidenceLevelEnum, FileTypeEnum,
-)
-from src.backend.domain.patient import PatientCreate, PatientUpdate
-from src.backend.domain.cancer_case import CancerCaseCreate
-from src.backend.domain.specimen import SpecimenCreate, SpecimenTypeEnum
-from src.backend.domain.sequencing import SequencingTestCreate
-from src.backend.domain.uploaded_file import UploadedFileCreate, FileTypeEnum as UploadFileType
-from src.backend.domain.variant import VariantImport
-from src.backend.domain.drug import DrugCreate
-from src.backend.domain.evidence import EvidenceCreate
 from src.backend.domain.analysis_run import AnalysisRunCreate
+from src.backend.domain.cancer_case import CancerCaseCreate
 from src.backend.domain.consent import ConsentCreate, ConsentTypeEnum
-from src.backend.domain.visualization_graph import GraphNode, GraphEdge, VisualizationGraph
+from src.backend.domain.drug import DrugCreate
+from src.backend.domain.enums import (
+    CancerTypeEnum,
+    ConsentStatusEnum,
+    EvidenceDirectionEnum,
+    EvidenceLevelEnum,
+    FileTypeEnum,
+    SexEnum,
+    VariantOriginEnum,
+    VariantTypeEnum,
+)
+from src.backend.domain.evidence import EvidenceCreate
+from src.backend.domain.patient import PatientCreate, PatientUpdate
+from src.backend.domain.sequencing import SequencingTestCreate
+from src.backend.domain.specimen import SpecimenCreate, SpecimenTypeEnum
+from src.backend.domain.uploaded_file import FileTypeEnum as UploadFileType
+from src.backend.domain.uploaded_file import UploadedFileCreate
+from src.backend.domain.variant import VariantImport
+from src.backend.domain.visualization_graph import GraphEdge, GraphNode, VisualizationGraph
 
 
 class TestPatientSchema:

@@ -7,9 +7,9 @@ from __future__ import annotations
 import logging
 import uuid
 
-from src.backend.knowledge.repository import KnowledgeRepository
-from src.backend.knowledge.models import KnowledgeEntityResponse, KnowledgeEntity
 from src.backend.knowledge.identifiers import IdentifierMapper
+from src.backend.knowledge.models import KnowledgeEntity, KnowledgeEntityResponse
+from src.backend.knowledge.repository import KnowledgeRepository
 
 logger = logging.getLogger(__name__)
 

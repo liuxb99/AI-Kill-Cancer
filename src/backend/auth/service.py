@@ -9,8 +9,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
@@ -18,15 +17,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.auth.models import (
-    Permission, ROLE_PERMISSIONS,
-    AuthenticationError, PermissionDeniedError,
+    ROLE_PERMISSIONS,
+    AuthenticationError,
     DuplicateUserError,
+    Permission,
+    PermissionDeniedError,
 )
 from src.backend.config import settings
 from src.backend.domain.user import (
-    UserModel, TokenBlacklistModel,
-    UserCreate, UserResponse, TokenResponse,
     LoginRequest,
+    TokenBlacklistModel,
+    TokenResponse,
+    UserCreate,
+    UserModel,
+    UserResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,7 +56,7 @@ def _verify_password(password: str, password_hash: str) -> bool:
 
 def _create_access_token(user_id: str, role: str) -> str:
     """Create a short-lived JWT access token."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": user_id,
         "role": role,
@@ -66,7 +70,7 @@ def _create_access_token(user_id: str, role: str) -> str:
 
 def _create_refresh_token(user_id: str) -> tuple[str, datetime]:
     """Create a long-lived JWT refresh token. Returns (token, expires_at_naive_utc)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exp = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     payload = {
         "sub": user_id,
@@ -213,7 +217,7 @@ class AuthService:
             raise AuthenticationError("User account is disabled")
 
         # Blacklist the old refresh token (rotation)
-        exp_ts = datetime.fromtimestamp(payload["exp"], tz=timezone.utc).replace(tzinfo=None)
+        exp_ts = datetime.fromtimestamp(payload["exp"], tz=UTC).replace(tzinfo=None)
         blacklisted = TokenBlacklistModel(
             id=uuid.uuid4(),
             jti=payload["jti"],
@@ -240,13 +244,13 @@ class AuthService:
         self,
         db: AsyncSession,
         access_token: str,
-        refresh_token: Optional[str] = None,
+        refresh_token: str | None = None,
     ) -> None:
         """Revoke tokens by blacklisting their JTI."""
         # Blacklist access token
         try:
             access_payload = _decode_token(access_token, expected_type="access")
-            exp_ts = datetime.fromtimestamp(access_payload["exp"], tz=timezone.utc).replace(tzinfo=None)
+            exp_ts = datetime.fromtimestamp(access_payload["exp"], tz=UTC).replace(tzinfo=None)
             db.add(TokenBlacklistModel(
                 id=uuid.uuid4(),
                 jti=access_payload["jti"],
@@ -260,7 +264,7 @@ class AuthService:
         if refresh_token:
             try:
                 refresh_payload = _decode_token(refresh_token, expected_type="refresh")
-                exp_ts = datetime.fromtimestamp(refresh_payload["exp"], tz=timezone.utc).replace(tzinfo=None)
+                exp_ts = datetime.fromtimestamp(refresh_payload["exp"], tz=UTC).replace(tzinfo=None)
                 db.add(TokenBlacklistModel(
                     id=uuid.uuid4(),
                     jti=refresh_payload["jti"],
@@ -296,23 +300,23 @@ class AuthService:
 
     # ── User lookup helpers ──────────────────────────────────────────────
 
-    async def get_user(self, db: AsyncSession, user_id: uuid.UUID) -> Optional[UserModel]:
+    async def get_user(self, db: AsyncSession, user_id: uuid.UUID) -> UserModel | None:
         return await self._find_by_id(db, user_id)
 
-    async def get_user_by_username(self, db: AsyncSession, username: str) -> Optional[UserModel]:
+    async def get_user_by_username(self, db: AsyncSession, username: str) -> UserModel | None:
         return await self._find_by_username(db, username)
 
-    async def _find_by_id(self, db: AsyncSession, user_id: uuid.UUID) -> Optional[UserModel]:
+    async def _find_by_id(self, db: AsyncSession, user_id: uuid.UUID) -> UserModel | None:
         stmt = select(UserModel).where(UserModel.id == user_id)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def _find_by_username(self, db: AsyncSession, username: str) -> Optional[UserModel]:
+    async def _find_by_username(self, db: AsyncSession, username: str) -> UserModel | None:
         stmt = select(UserModel).where(UserModel.username == username)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def _find_by_email(self, db: AsyncSession, email: str) -> Optional[UserModel]:
+    async def _find_by_email(self, db: AsyncSession, email: str) -> UserModel | None:
         stmt = select(UserModel).where(UserModel.email == email)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
@@ -320,7 +324,7 @@ class AuthService:
 
 # ── Singleton provider ──────────────────────────────────────────────────
 
-_auth_service: Optional[AuthService] = None
+_auth_service: AuthService | None = None
 
 
 def get_auth_service() -> AuthService:

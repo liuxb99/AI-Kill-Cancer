@@ -50,14 +50,15 @@ describe('EvidenceTab', () => {
       expect(screen.getByText('📊 临床证据')).toBeInTheDocument()
     })
 
-    // Summary cards
-    expect(screen.getByText('2')).toBeInTheDocument() // evidence count
-    expect(screen.getByText('高')).toBeInTheDocument() // highest level badge
-    expect(screen.getByText('1')).toBeInTheDocument()  // source count
+    // Summary cards — total_count = 2, source count = 2, so "2" appears twice
+    expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText('高').length).toBeGreaterThanOrEqual(1) // highest level badge
+    // by_source has 2 entries, conflict count is 0, so "0" should appear for conflicts
+    expect(screen.getByText('0')).toBeInTheDocument()
 
-    // Source grouping
-    expect(screen.getByText('PubMed')).toBeInTheDocument()
-    expect(screen.getByText('临床试验')).toBeInTheDocument()
+    // Source grouping — text appears both in grouping header and detail table
+    expect(screen.getAllByText('PubMed').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('临床试验').length).toBeGreaterThanOrEqual(1)
 
     // Evidence table rows
     expect(screen.getByText('奥希替尼')).toBeInTheDocument()

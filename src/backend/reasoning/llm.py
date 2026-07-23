@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
-
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +18,7 @@ logger = logging.getLogger(__name__)
 class LLMResult:
     """Result from an LLM call."""
     def __init__(self, success: bool, content: str = "", error: str = "",
-                 model: str = "", token_usage: Optional[dict] = None,
+                 model: str = "", token_usage: dict | None = None,
                  latency_ms: float = 0.0):
         self.success = success
         self.content = content
@@ -33,7 +31,7 @@ class LLMResult:
 class LLMAdapter:
     """Base LLM adapter."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         self.config = config or {}
         self.provider = "unknown"
         self.model = self.config.get("model", "unknown")
@@ -55,7 +53,7 @@ class OpenAILikeAdapter(LLMAdapter):
     Uses OPENAI_API_KEY or custom endpoint from env.
     """
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         super().__init__(config)
         self.provider = "openai_compatible"
         self.api_key = os.getenv("OPENAI_API_KEY", "")
@@ -72,6 +70,7 @@ class OpenAILikeAdapter(LLMAdapter):
             return LLMResult(success=False, content="", error="API key not configured")
 
         import time
+
         import httpx
 
         start = time.monotonic()
@@ -121,7 +120,7 @@ class OpenAILikeAdapter(LLMAdapter):
 class LocalLLMAdapter(LLMAdapter):
     """Adapter for local llama.cpp server."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         super().__init__(config)
         self.provider = "local_llamacpp"
         self.api_base = self.config.get("api_base", "http://localhost:8080/v1")
@@ -133,6 +132,7 @@ class LocalLLMAdapter(LLMAdapter):
 
     async def generate(self, prompt: str, system_prompt: str = "") -> LLMResult:
         import time
+
         import httpx
 
         start = time.monotonic()
@@ -170,7 +170,7 @@ class LocalLLMAdapter(LLMAdapter):
 class DisabledLLMAdapter(LLMAdapter):
     """Adapter that returns not_configured for all requests."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         super().__init__(config)
         self.provider = "disabled"
 
@@ -187,7 +187,7 @@ class DisabledLLMAdapter(LLMAdapter):
         )
 
 
-def get_llm_adapter(config: Optional[dict] = None) -> LLMAdapter:
+def get_llm_adapter(config: dict | None = None) -> LLMAdapter:
     """
     Factory function: returns the appropriate LLM adapter based on config.
     """

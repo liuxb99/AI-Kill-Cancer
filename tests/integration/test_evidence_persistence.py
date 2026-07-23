@@ -5,6 +5,7 @@ Tests: upsert → find → withdrawn lifecycle.
 """
 from src.backend.evidence.domain import EvidenceItemModel
 
+
 class TestEvidencePersistenceFlow:
     async def test_evidence_item_model_fields(self):
         """Verify EvidenceItemModel has all Phase 2B fields."""

@@ -1,7 +1,8 @@
-import json
 import hashlib
+import json
 from datetime import datetime
 from typing import Any
+
 
 def generate_id(prefix: str = "") -> str:
     """產生唯一 ID"""
@@ -9,7 +10,7 @@ def generate_id(prefix: str = "") -> str:
     return f"{prefix}{hashlib.md5(raw.encode()).hexdigest()[:12]}"
 
 def load_json(path: str) -> Any:
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 def save_json(path: str, data: Any) -> None:

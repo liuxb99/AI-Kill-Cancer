@@ -6,11 +6,13 @@ from __future__ import annotations
 import uuid
 
 from src.backend.auth.models import (
-    Role, Permission, ROLE_PERMISSIONS,
+    ROLE_PERMISSIONS,
+    Permission,
+    Role,
 )
 from src.backend.auth.service import _hash_password, _verify_password
-from src.backend.domain.user import UserCreate
 from src.backend.domain.enums import Permission as DomainPermission
+from src.backend.domain.user import UserCreate
 
 
 class TestPasswordHashing:
@@ -80,8 +82,9 @@ class TestAuthServiceUnit:
         assert body.role == Role.VIEWER
 
     def test_token_payload_has_required_claims(self):
-        from src.backend.auth.service import _create_access_token, _create_refresh_token
         import jwt
+
+        from src.backend.auth.service import _create_access_token, _create_refresh_token
         access = _create_access_token(str(uuid.uuid4()), "admin")
         payload = jwt.decode(access, options={"verify_signature": False})
         for claim in ("sub", "jti", "type", "iat", "exp"):
@@ -94,8 +97,9 @@ class TestAuthServiceUnit:
         assert "jti" in rp
 
     def test_access_refresh_token_distinction(self):
-        from src.backend.auth.service import _create_access_token, _create_refresh_token
         import jwt
+
+        from src.backend.auth.service import _create_access_token, _create_refresh_token
         uid = str(uuid.uuid4())
         access = _create_access_token(uid, "viewer")
         refresh, _ = _create_refresh_token(uid)
@@ -108,8 +112,8 @@ class TestAuthServiceUnit:
 
     def test_config_jwt_secret_production_required(self):
         """Production mode rejects missing JWT_SECRET_KEY."""
-        import os
         import importlib
+        import os
         mode = os.environ.get("APP_MODE", "")
         key = os.environ.get("JWT_SECRET_KEY", "")
         try:

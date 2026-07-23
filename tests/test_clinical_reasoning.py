@@ -4,18 +4,22 @@ Tests for Clinical Reasoning Layer (v0.7.0).
 
 from __future__ import annotations
 
-
-from src.backend.reasoning.models import (
-    ClinicalReasoningResult, ReasoningRunResponse,
-    ReasoningEvidenceCitation, ReasoningDrugExplanation,
-    ReasoningValidationResult, SafetyNotice,
-)
-from src.backend.reasoning.validator import EvidenceCitationValidator, HallucinationGuard
 from src.backend.reasoning.conflicts import ConflictAnalyzer
 from src.backend.reasoning.context import ReasoningContextBuilder
 from src.backend.reasoning.llm import (
-    DisabledLLMAdapter, OpenAILikeAdapter, get_llm_adapter,
+    DisabledLLMAdapter,
+    OpenAILikeAdapter,
+    get_llm_adapter,
 )
+from src.backend.reasoning.models import (
+    ClinicalReasoningResult,
+    ReasoningDrugExplanation,
+    ReasoningEvidenceCitation,
+    ReasoningRunResponse,
+    ReasoningValidationResult,
+    SafetyNotice,
+)
+from src.backend.reasoning.validator import EvidenceCitationValidator, HallucinationGuard
 
 
 class TestReasoningModels:

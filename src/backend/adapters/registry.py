@@ -4,7 +4,6 @@ Adapter registry — central registry for all third-party data source integratio
 
 from __future__ import annotations
 
-from typing import Optional
 from src.backend.adapters.base import BaseAdapter, NotConfiguredAdapter
 
 
@@ -17,7 +16,7 @@ class AdapterRegistry:
     def register(self, name: str, adapter: BaseAdapter) -> None:
         self._adapters[name] = adapter
 
-    def get(self, name: str) -> Optional[BaseAdapter]:
+    def get(self, name: str) -> BaseAdapter | None:
         return self._adapters.get(name)
 
     def list(self) -> dict[str, dict]:
@@ -36,7 +35,7 @@ class AdapterRegistry:
 
 
 # Global registry instance
-_registry: Optional[AdapterRegistry] = None
+_registry: AdapterRegistry | None = None
 
 
 def get_registry() -> AdapterRegistry:
@@ -51,13 +50,13 @@ def _register_defaults(registry: AdapterRegistry) -> None:
     """Register all adapters. Phase 2A: VEP is REST API, OpenCRAVAT not_configured."""
     from src.backend.adapters.civic import CIViCAdapter
     from src.backend.adapters.dgidb import DGIdbAdapter
-    from src.backend.adapters.oncotree import OncoTreeAdapter
-    from src.backend.adapters.myvariant import MyVariantAdapter
     from src.backend.adapters.drkg import DRKGAdapter
+    from src.backend.adapters.myvariant import MyVariantAdapter
+    from src.backend.adapters.oncotree import OncoTreeAdapter
     from src.backend.adapters.pharmcat import PharmCATAdapter
-    from src.backend.pipeline.vep_adapter import VEPAdapter
-    from src.backend.pipeline.opencravat_adapter import OpenCRAVATAdapter
     from src.backend.pipeline.normalization import BcftoolsAdapter
+    from src.backend.pipeline.opencravat_adapter import OpenCRAVATAdapter
+    from src.backend.pipeline.vep_adapter import VEPAdapter
 
     registry.register("ensembl_vep", VEPAdapter())
     registry.register("opencravat", OpenCRAVATAdapter())

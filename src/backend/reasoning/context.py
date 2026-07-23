@@ -8,7 +8,6 @@ import hashlib
 import json
 import logging
 from datetime import datetime
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ class ReasoningContext:
         self.case_snapshot: dict = {}
         self.variant_snapshot: dict = {}
         self.evidence_snapshot: list[dict] = []
-        self.ranking_snapshot: Optional[dict] = None
+        self.ranking_snapshot: dict | None = None
         self.knowledge_snapshot: dict = {}
         self.built_at: str = ""
         self.context_hash: str = ""
@@ -46,11 +45,11 @@ class ReasoningContextBuilder:
     Builds frozen context for a reasoning run from evidence, ranking, and knowledge.
     """
 
-    async def build(self, variant_data: Optional[dict] = None,
-                     evidence_items: Optional[list[dict]] = None,
-                     ranking_result: Optional[dict] = None,
-                     knowledge_data: Optional[dict] = None,
-                     case_data: Optional[dict] = None) -> ReasoningContext:
+    async def build(self, variant_data: dict | None = None,
+                     evidence_items: list[dict] | None = None,
+                     ranking_result: dict | None = None,
+                     knowledge_data: dict | None = None,
+                     case_data: dict | None = None) -> ReasoningContext:
         """Build a frozen context from provided snapshots."""
         context = ReasoningContext()
         context.variant_snapshot = variant_data or {}

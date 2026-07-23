@@ -7,7 +7,7 @@ history, current medications, and known allergies / contraindications.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.backend.agents.base import BaseAgent
@@ -142,7 +142,7 @@ class DrugAgent(BaseAgent):
             for curr_rx in current_rx_names:
                 if curr_rx == drug_name_lower:
                     contraindicated_reasons.append(
-                        f"already listed in current medications"
+                        "already listed in current medications"
                     )
 
             # Check comorbidities that may contraindicate
@@ -276,7 +276,7 @@ class DrugAgent(BaseAgent):
             confidence=confidence,
             references=references,
             context_hash=context.context_hash or None,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
         # ── 7. Validate before returning ───────────────────────────────────

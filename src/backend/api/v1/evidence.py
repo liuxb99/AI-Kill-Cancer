@@ -12,24 +12,27 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.database.session import get_db
+from src.backend.api.v1.deps import get_variant_repo
 from src.backend.auth.dependencies import require_auth, verify_case_access
+from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
-from src.backend.evidence.merger import EvidenceMerger
 from src.backend.evidence.cache import gene_cache, variant_cache
 from src.backend.evidence.domain import (
-    EvidenceVariantResponse, EvidenceGeneResponse,
-    EvidenceRefreshResponse, EvidenceCacheInvalidateResponse,
-    EvidenceItemResponse, DrugInteractionResponse,
+    DrugInteractionResponse,
+    EvidenceCacheInvalidateResponse,
+    EvidenceGeneResponse,
+    EvidenceItemResponse,
+    EvidenceRefreshResponse,
+    EvidenceVariantResponse,
 )
+from src.backend.evidence.merger import EvidenceMerger
 from src.backend.repositories.variant_repo import VariantRepository
-from src.backend.api.v1.deps import get_variant_repo
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/evidence", tags=["evidence"])
@@ -126,7 +129,7 @@ async def get_variant_evidence(
         drug_count=result.get("drug_count", 0),
         highest_evidence_level=result.get("highest_evidence_level"),
         match_level=result.get("match_level", "gene_level_only"),
-        retrieved_at=result.get("retrieved_at", datetime.now(timezone.utc).isoformat()),
+        retrieved_at=result.get("retrieved_at", datetime.now(UTC).isoformat()),
     )
 
     variant_cache.set(cache_key, response.model_dump())
@@ -157,7 +160,7 @@ async def get_gene_evidence(
         drug_interactions=[_to_interaction_response(i) for i in result.get("drug_interactions", [])],
         evidence_count=result.get("evidence_count", 0),
         drug_count=result.get("drug_count", 0),
-        retrieved_at=result.get("retrieved_at", datetime.now(timezone.utc).isoformat()),
+        retrieved_at=result.get("retrieved_at", datetime.now(UTC).isoformat()),
     )
 
     gene_cache.set(cache_key, response.model_dump())
@@ -173,7 +176,7 @@ async def refresh_evidence(
     Full evidence refresh: query all sources, merge, persist to DB,
     invalidate caches, return summary.
     """
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     merger = EvidenceMerger(db=db)
     errors = []
     sources_updated = []
@@ -214,7 +217,7 @@ async def refresh_evidence(
     gene_cache.clear()
     variant_cache.clear()
 
-    finished = datetime.now(timezone.utc)
+    finished = datetime.now(UTC)
 
     return EvidenceRefreshResponse(
         status="completed" if not errors else "completed_with_errors",
@@ -232,7 +235,7 @@ async def invalidate_evidence_cache(
     user: UserModel = Depends(require_auth),
 ):
     """Invalidate in-memory evidence cache only. Does not query sources."""
-    cleared = datetime.now(timezone.utc)
+    cleared = datetime.now(UTC)
     gene_cache.clear()
     variant_cache.clear()
 

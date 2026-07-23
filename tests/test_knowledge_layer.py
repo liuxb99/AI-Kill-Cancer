@@ -6,11 +6,16 @@ from __future__ import annotations
 
 import uuid
 
-from src.backend.knowledge.models import (
-    KnowledgeEntity, KnowledgeRelation, Publication, ClinicalTrial,
-    GuidelineItem, RegulatoryApproval, KnowledgeEntityResponse,
-)
 from src.backend.knowledge.identifiers import IdentifierMapper, normalize_hgvs
+from src.backend.knowledge.models import (
+    ClinicalTrial,
+    GuidelineItem,
+    KnowledgeEntity,
+    KnowledgeEntityResponse,
+    KnowledgeRelation,
+    Publication,
+    RegulatoryApproval,
+)
 
 
 class TestIdentifierMapper:

@@ -264,7 +264,7 @@ class TestPhase2FullWorkflow:
         # Get context alone — should not create a thread node
         resp = client.get(f"/api/v1/clinical/context/{case_id}", headers=headers)
         assert resp.status_code == 200
-        context_hash = resp.json()["context_hash"]
+        resp.json()["context_hash"]
 
         # Get evidence alone — should not create a thread node
         resp = client.get(f"/api/v1/clinical/evidence/{case_id}", headers=headers)

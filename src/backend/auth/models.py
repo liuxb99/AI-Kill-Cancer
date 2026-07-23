@@ -6,7 +6,7 @@ circular imports between auth and domain packages.
 """
 from __future__ import annotations
 
-from src.backend.domain.enums import Role, Permission
+from src.backend.domain.enums import Permission, Role
 
 # Re-export for convenience
 __all__ = [

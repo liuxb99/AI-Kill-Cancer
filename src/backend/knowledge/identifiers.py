@@ -21,7 +21,6 @@ Provides stable ID mapping between:
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 
 class IdentifierMapping:
@@ -105,11 +104,11 @@ class IdentifierMapper:
         "DOID:0050903": "Ovarian Cancer", "DOID:10158": "Head and Neck Cancer",
     }
 
-    def map_gene_to_ncbi(self, symbol: str) -> Optional[str]:
+    def map_gene_to_ncbi(self, symbol: str) -> str | None:
         """Map HGNC gene symbol to NCBI Gene ID."""
         return self.GENE_TO_NCBI.get(normalize_gene_symbol(symbol))
 
-    def map_ncbi_to_gene(self, ncbi_id: str) -> Optional[str]:
+    def map_ncbi_to_gene(self, ncbi_id: str) -> str | None:
         """Map NCBI Gene ID to HGNC symbol."""
         return self.NCBI_TO_GENE.get(ncbi_id)
 
@@ -172,11 +171,11 @@ class IdentifierMapper:
 
         return "unknown"
 
-    def map_oncotree_to_disease(self, code: str) -> Optional[str]:
+    def map_oncotree_to_disease(self, code: str) -> str | None:
         """Map OncoTree code to disease name."""
         return self.ONCOTREE_MAP.get(code.upper())
 
-    def map_doid_to_disease(self, doid: str) -> Optional[str]:
+    def map_doid_to_disease(self, doid: str) -> str | None:
         """Map DOID to disease name."""
         return self.DOID_MAP.get(doid)
 

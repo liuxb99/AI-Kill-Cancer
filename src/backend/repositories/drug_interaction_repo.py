@@ -8,12 +8,11 @@ import hashlib
 import json
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 
-from src.backend.repositories.base import BaseRepository
 from src.backend.evidence.domain import DrugInteractionModel
+from src.backend.repositories.base import BaseRepository
 
 
 def _compute_interaction_hash(item: dict) -> str:
@@ -32,7 +31,7 @@ class DrugInteractionRepository(BaseRepository[DrugInteractionModel]):
     def __init__(self, db):
         super().__init__(DrugInteractionModel, db)
 
-    async def upsert(self, source_id: uuid.UUID, item: dict, now: Optional[datetime] = None) -> DrugInteractionModel:
+    async def upsert(self, source_id: uuid.UUID, item: dict, now: datetime | None = None) -> DrugInteractionModel:
         if now is None:
             now = datetime.utcnow()
 

@@ -3,8 +3,8 @@ Specimen API routes.
 """
 from __future__ import annotations
 
-import uuid
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,8 +13,8 @@ from src.backend.api.v1.deps import get_specimen_repo
 from src.backend.auth.dependencies import require_auth, verify_case_access
 from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
-from src.backend.domain.user import UserModel
 from src.backend.domain.specimen import SpecimenCreate, SpecimenResponse
+from src.backend.domain.user import UserModel
 from src.backend.repositories.specimen_repo import SpecimenRepository
 
 logger = logging.getLogger(__name__)

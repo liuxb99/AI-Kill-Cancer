@@ -27,17 +27,18 @@ import os
 import shutil
 import tempfile
 import time
-from datetime import datetime, timezone
-from typing import Any, Optional
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
 
-from src.backend.adapters.base import BaseAdapter, AdapterResult
+from src.backend.adapters.base import AdapterResult, BaseAdapter
 from src.backend.domain.enums import (
-    NormalizationStatusEnum,
     NormalizationMethodEnum,
     NormalizationSemanticsEnum,
+    NormalizationStatusEnum,
 )
-from src.backend.reference.registry import ReferenceRegistry, get_registry as get_ref_registry
+from src.backend.reference.registry import ReferenceRegistry
+from src.backend.reference.registry import get_registry as get_ref_registry
 
 logger = logging.getLogger(__name__)
 
@@ -267,14 +268,14 @@ class BcftoolsAdapter(BaseAdapter):
     but clearly labels it as non-canonical.
     """
 
-    def __init__(self, reference_registry: Optional[ReferenceRegistry] = None, config: Optional[dict] = None):
+    def __init__(self, reference_registry: ReferenceRegistry | None = None, config: dict | None = None):
         super().__init__(config)
         self._name = "bcftools"
         self._version = "0.0.0"
         self._bcftools_path = config.get("bcftools_path", "bcftools") if config else "bcftools"
         self._available = False
         self._ref_registry = reference_registry or get_ref_registry()
-        self._bcftools_version_detected: Optional[str] = None
+        self._bcftools_version_detected: str | None = None
 
     async def _detect_version(self) -> str:
         """Detect bcftools version."""
@@ -288,7 +289,7 @@ class BcftoolsAdapter(BaseAdapter):
             if proc.returncode == 0:
                 lines = stdout.decode().split("\n")
                 return lines[0].strip() if lines else "unknown"
-        except (FileNotFoundError, asyncio.TimeoutError, OSError):
+        except (TimeoutError, FileNotFoundError, OSError):
             pass
         return "not_available"
 
@@ -376,7 +377,7 @@ class BcftoolsAdapter(BaseAdapter):
         return AdapterResult(
             source="bcftools_python_fallback",
             source_version="python_minimal_representation",
-            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            retrieved_at=datetime.now(UTC).isoformat(),
             request_id=request_id,
             success=True,
             records=records,
@@ -435,12 +436,12 @@ class BcftoolsAdapter(BaseAdapter):
             )
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
                 return AdapterResult(
                     source="bcftools",
                     source_version=self._version,
-                    retrieved_at=datetime.now(timezone.utc).isoformat(),
+                    retrieved_at=datetime.now(UTC).isoformat(),
                     request_id=request_id,
                     success=False,
                     errors=["bcftools norm timed out after 300s"],
@@ -452,7 +453,7 @@ class BcftoolsAdapter(BaseAdapter):
                 return AdapterResult(
                     source="bcftools",
                     source_version=self._version,
-                    retrieved_at=datetime.now(timezone.utc).isoformat(),
+                    retrieved_at=datetime.now(UTC).isoformat(),
                     request_id=request_id,
                     success=False,
                     errors=[f"bcftools norm failed (rc={proc.returncode}): {stderr.decode()[:1000]}"],
@@ -486,7 +487,7 @@ class BcftoolsAdapter(BaseAdapter):
             return AdapterResult(
                 source="bcftools",
                 source_version=self._version,
-                retrieved_at=datetime.now(timezone.utc).isoformat(),
+                retrieved_at=datetime.now(UTC).isoformat(),
                 request_id=request_id,
                 success=True,
                 records=records,
@@ -513,7 +514,7 @@ class BcftoolsAdapter(BaseAdapter):
         return AdapterResult(
             source="bcftools",
             source_version=self._version,
-            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            retrieved_at=datetime.now(UTC).isoformat(),
             request_id="normalize",
             success=False,
             records=[],

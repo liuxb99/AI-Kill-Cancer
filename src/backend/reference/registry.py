@@ -10,8 +10,7 @@ import hashlib
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +20,13 @@ class ReferenceGenome:
     """A configured reference genome assembly."""
     build: str  # "GRCh37" or "GRCh38"
     display_name: str = ""
-    fasta_path: Optional[str] = None
-    fai_path: Optional[str] = None
-    sha256: Optional[str] = None
-    source: Optional[str] = None
-    version: Optional[str] = None
+    fasta_path: str | None = None
+    fai_path: str | None = None
+    sha256: str | None = None
+    source: str | None = None
+    version: str | None = None
     configured: bool = False
-    validated_at: Optional[str] = None
+    validated_at: str | None = None
 
 
 class ReferenceRegistry:
@@ -41,7 +40,7 @@ class ReferenceRegistry:
     def __init__(self):
         self._references: dict[str, ReferenceGenome] = {}
 
-    def register(self, build: str, fasta_path: Optional[str] = None, **kwargs) -> ReferenceGenome:
+    def register(self, build: str, fasta_path: str | None = None, **kwargs) -> ReferenceGenome:
         """Register a reference genome build."""
         ref = ReferenceGenome(
             build=build,
@@ -56,11 +55,11 @@ class ReferenceRegistry:
         if ref.configured and ref.fasta_path:
             ref.fai_path = ref.fai_path or ref.fasta_path + ".fai"
             if os.path.isfile(ref.fai_path):
-                ref.validated_at = datetime.now(timezone.utc).isoformat()
+                ref.validated_at = datetime.now(UTC).isoformat()
         self._references[build] = ref
         return ref
 
-    def get(self, build: str) -> Optional[ReferenceGenome]:
+    def get(self, build: str) -> ReferenceGenome | None:
         """Get a reference by build name."""
         return self._references.get(build)
 
@@ -77,7 +76,7 @@ class ReferenceRegistry:
         """List all registered references."""
         return list(self._references.values())
 
-    def validate_fasta(self, build: str) -> Optional[str]:
+    def validate_fasta(self, build: str) -> str | None:
         """Validate reference FASTA and return SHA256 (or None if unavailable)."""
         ref = self.get(build)
         if not ref or not ref.fasta_path or not os.path.isfile(ref.fasta_path):
@@ -92,7 +91,7 @@ class ReferenceRegistry:
             logger.error(f"Failed to compute SHA256 for {build}: {e}")
             return None
 
-    def get_build_for_genome_build(self, build: str) -> Optional[str]:
+    def get_build_for_genome_build(self, build: str) -> str | None:
         """Normalize genome build string to canonical name."""
         build_lower = build.lower().replace("_", "").replace("-", "")
         mapping = {
@@ -103,7 +102,7 @@ class ReferenceRegistry:
 
 
 # Global registry
-_registry: Optional[ReferenceRegistry] = None
+_registry: ReferenceRegistry | None = None
 
 
 def get_registry() -> ReferenceRegistry:

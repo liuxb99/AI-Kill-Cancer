@@ -3,18 +3,21 @@ Case ACL management API — grant, revoke, and list case permissions.
 """
 from __future__ import annotations
 
-import uuid
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.auth.dependencies import require_case_access
 from src.backend.auth.case_acl_service import CaseACLService
+from src.backend.auth.dependencies import require_case_access
 from src.backend.auth.models import PermissionDeniedError
 from src.backend.database.session import get_db
 from src.backend.domain.case_acl import (
-    CaseACLModel, CaseRole, CaseACLCreate, CaseACLResponse,
+    CaseACLCreate,
+    CaseACLModel,
+    CaseACLResponse,
+    CaseRole,
 )
 from src.backend.domain.user import UserModel
 

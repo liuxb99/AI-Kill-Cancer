@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import Column, String, DateTime, JSON
+from sqlalchemy import JSON, Column, DateTime, String
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 
 # We need to define SQLAlchemy models for ranking results
 # These will be created via migration 008
@@ -59,7 +59,7 @@ class RankingRunRepository:
         await self.db.refresh(instance)
         return instance
 
-    async def get(self, run_id: uuid.UUID) -> Optional[RankingRunModel]:
+    async def get(self, run_id: uuid.UUID) -> RankingRunModel | None:
         from sqlalchemy import select
         stmt = select(RankingRunModel).where(RankingRunModel.id == run_id)
         result = await self.db.execute(stmt)

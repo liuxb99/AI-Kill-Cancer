@@ -8,12 +8,10 @@ Evidence Collector.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, computed_field
-
 
 # ─── Evidence Level Utilities ──────────────────────────────────────────────────
 
@@ -76,7 +74,7 @@ class SourceStatus(BaseModel):
     status_type: SourceStatusType
     """The operational status of this source at collection time."""
 
-    message: Optional[str] = None
+    message: str | None = None
     """Optional human-readable detail describing the status (e.g. ``"requires API key / licence"``)."""
 
     items_count: int = 0
@@ -102,12 +100,12 @@ class EvidenceItem(BaseModel):
     """Name of the knowledge source (NCCN, ESMO, FDA, ClinVar, CIViC,
     OncoKB, PubMed, Internal)."""
 
-    source_record_id: Optional[str] = None
+    source_record_id: str | None = None
     """Original record identifier in the source system."""
 
-    gene_symbol: Optional[str] = None
-    drug_name: Optional[str] = None
-    disease: Optional[str] = None
+    gene_symbol: str | None = None
+    drug_name: str | None = None
+    disease: str | None = None
 
     evidence_type: str = ""
     """Clinical category — predictive, prognostic, diagnostic, etc."""
@@ -118,29 +116,29 @@ class EvidenceItem(BaseModel):
     evidence_level: str = ""
     """Normalised level string — one of A, B, C, D, E or Level_1–5."""
 
-    source_native_level: Optional[str] = None
+    source_native_level: str | None = None
     """Original evidence-level string from the source (e.g. CIViC A,
     OncoKB 3B)."""
 
-    clinical_significance: Optional[str] = None
+    clinical_significance: str | None = None
     """Sensitivity, resistance, etc."""
 
-    citation: Optional[str] = None
-    pmid: Optional[str] = None
-    url: Optional[str] = None
+    citation: str | None = None
+    pmid: str | None = None
+    url: str | None = None
 
-    confidence: Optional[str] = None
+    confidence: str | None = None
     """Assessment confidence — high, medium, low."""
 
-    match_level: Optional[str] = None
+    match_level: str | None = None
     """How this evidence matched the query — exact_variant, gene_level_only,
     etc."""
 
-    conflict_status: Optional[str] = None
+    conflict_status: str | None = None
     """Whether this item agrees or conflicts with the majority — supporting,
     conflicting, uncertain."""
 
-    description: Optional[str] = None
+    description: str | None = None
 
 
 # ─── EvidenceBundle Model ──────────────────────────────────────────────────────
@@ -168,12 +166,12 @@ class EvidenceBundle(BaseModel):
     retrieved_at: str = ""
     """ISO-8601 timestamp of when the data was retrieved."""
 
-    context_hash: Optional[str] = None
+    context_hash: str | None = None
     """SHA256 hash of the associated ClinicalContext, for traceability."""
 
     def _current_timestamp(self) -> str:
         """Return an ISO-8601 UTC timestamp string."""
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
     # ── Computed alias fields ─────────────────────────────────────────────
 
@@ -214,12 +212,12 @@ class EvidenceBundle(BaseModel):
 
     @computed_field
     @property
-    def highest_level(self) -> Optional[str]:
+    def highest_level(self) -> str | None:
         """Best (highest) evidence level among all items, or None if empty.
 
         Priority order: A > B > C > D > E > Level_1 > … > Level_5 > not_assessed.
         """
-        best: Optional[str] = None
+        best: str | None = None
         best_rank = len(LEVEL_PRECEDENCE)
         for item in self.items:
             rank = evidence_level_rank(item.evidence_level)
@@ -245,10 +243,10 @@ class EvidenceBundle(BaseModel):
 
     def filter(
         self,
-        gene: Optional[str] = None,
-        drug: Optional[str] = None,
-        source: Optional[str] = None,
-        min_level: Optional[str] = None,
+        gene: str | None = None,
+        drug: str | None = None,
+        source: str | None = None,
+        min_level: str | None = None,
     ) -> EvidenceBundle:
         """Return a new bundle containing only items matching all criteria.
 

@@ -4,6 +4,7 @@ ACL HTTP integration tests — real HTTP requests + database verification.
 from __future__ import annotations
 
 import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 

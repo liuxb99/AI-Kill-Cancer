@@ -18,10 +18,10 @@ import asyncio
 import hashlib
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
-from src.backend.adapters.base import BaseAdapter, AdapterResult
+from src.backend.adapters.base import AdapterResult, BaseAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ EVIDENCE_DIRECTION_MAP = {
 class CIViCAdapter(BaseAdapter):
     """CIViC REST API adapter for clinical evidence."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         super().__init__(config)
         self._name = "civic"
         self._version = "2.0"
@@ -113,7 +113,7 @@ class CIViCAdapter(BaseAdapter):
         return AdapterResult(source="civic", source_version=self._version, retrieved_at="",
                              request_id=request_id, success=False, errors=["Invalid lookup payload"])
 
-    async def _api_get(self, url: str, request_id: str, params: Optional[dict] = None) -> AdapterResult:
+    async def _api_get(self, url: str, request_id: str, params: dict | None = None) -> AdapterResult:
         import httpx
         request_params = params or {}
         request_hash = hashlib.sha256(f"{url}:{json.dumps(request_params, sort_keys=True)}".encode()).hexdigest()
@@ -131,12 +131,12 @@ class CIViCAdapter(BaseAdapter):
                         records = self._normalize_results(data, url)
                         return AdapterResult(
                             source="civic", source_version=self._version,
-                            retrieved_at=datetime.now(timezone.utc).isoformat(),
+                            retrieved_at=datetime.now(UTC).isoformat(),
                             request_id=request_id, success=True, records=records,
                             metadata={"api_url": url, "request_hash": request_hash, "response_hash": response_hash, "license": "CC-BY-4.0"},
                         )
                     elif resp.status_code == 404:
-                        return AdapterResult(source="civic", source_version=self._version, retrieved_at=datetime.now(timezone.utc).isoformat(),
+                        return AdapterResult(source="civic", source_version=self._version, retrieved_at=datetime.now(UTC).isoformat(),
                                              request_id=request_id, success=True, records=[], warnings=["Not found in CIViC"])
                     elif resp.status_code == 429:
                         if attempt < MAX_RETRIES:
@@ -155,7 +155,7 @@ class CIViCAdapter(BaseAdapter):
                     errors.append(f"Request failed: {e}")
                     break
 
-        return AdapterResult(source="civic", source_version=self._version, retrieved_at=datetime.now(timezone.utc).isoformat(),
+        return AdapterResult(source="civic", source_version=self._version, retrieved_at=datetime.now(UTC).isoformat(),
                              request_id=request_id, success=False, records=records, warnings=warnings, errors=errors)
 
     def _normalize_results(self, data: Any, url: str) -> list[dict]:

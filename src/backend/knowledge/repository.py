@@ -6,12 +6,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey
-from sqlalchemy import select
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text, select
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 
 
 class KnowledgeEntityModel(DBBase):
@@ -53,9 +52,9 @@ class KnowledgeRepository:
         self.db = db
 
     async def upsert_entity(self, entity_type: str, source: str, source_id: str,
-                             name: str, description: str = "", aliases: Optional[list] = None,
-                             identifiers: Optional[dict] = None,
-                             entity_metadata: Optional[dict] = None) -> KnowledgeEntityModel:
+                             name: str, description: str = "", aliases: list | None = None,
+                             identifiers: dict | None = None,
+                             entity_metadata: dict | None = None) -> KnowledgeEntityModel:
         """Upsert a knowledge entity by (source, source_id)."""
         stmt = select(KnowledgeEntityModel).where(
             (KnowledgeEntityModel.source == source) &
@@ -95,7 +94,7 @@ class KnowledgeRepository:
         await self.db.refresh(entity)
         return entity
 
-    async def get_entity(self, entity_id: uuid.UUID) -> Optional[KnowledgeEntityModel]:
+    async def get_entity(self, entity_id: uuid.UUID) -> KnowledgeEntityModel | None:
         stmt = select(KnowledgeEntityModel).where(KnowledgeEntityModel.id == entity_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()

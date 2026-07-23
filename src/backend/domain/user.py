@@ -6,12 +6,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Boolean, DateTime, Enum as SAEnum
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import Boolean, Column, DateTime, String
+from sqlalchemy import Enum as SAEnum
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import Role
 
 
@@ -54,10 +55,10 @@ class UserCreate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     username: str = Field(..., min_length=3, max_length=64)
-    email: Optional[str] = None
+    email: str | None = None
     password: str = Field(..., min_length=8)
     role: Role = Role.VIEWER
-    display_name: Optional[str] = None
+    display_name: str | None = None
 
 
 class UserResponse(BaseModel):
@@ -65,10 +66,10 @@ class UserResponse(BaseModel):
 
     id: str
     username: str
-    email: Optional[str] = None
+    email: str | None = None
     role: str
     is_active: bool
-    display_name: Optional[str] = None
+    display_name: str | None = None
     created_at: datetime
 
 
@@ -90,4 +91,4 @@ class LoginRequest(BaseModel):
 
 
 class LogoutRequest(BaseModel):
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None

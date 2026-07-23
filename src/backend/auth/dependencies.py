@@ -10,27 +10,26 @@ Provides dependency injection for:
 from __future__ import annotations
 
 import uuid
-from typing import Optional, Union
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.backend.auth.case_acl_service import CaseACLService
 from src.backend.auth.models import Permission, PermissionDeniedError
 from src.backend.auth.service import AuthService, get_auth_service
-from src.backend.auth.case_acl_service import CaseACLService
 from src.backend.database.session import get_db
-from src.backend.domain.user import UserModel
 from src.backend.domain.case_acl import CaseRole
+from src.backend.domain.user import UserModel
 
 _security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_security),
     auth: AuthService = Depends(get_auth_service),
     db: AsyncSession = Depends(get_db),
-) -> Optional[UserModel]:
+) -> UserModel | None:
     """Decode Bearer JWT and return the user, or None if unauthenticated."""
     if credentials is None:
         return None
@@ -41,7 +40,7 @@ async def get_current_user(
 
 
 async def require_auth(
-    user: Optional[UserModel] = Depends(get_current_user),
+    user: UserModel | None = Depends(get_current_user),
 ) -> UserModel:
     """Require a valid access token. Returns 401 if missing or invalid."""
     if user is None:
@@ -70,7 +69,7 @@ def require_permission(required_permission: Permission):
     return permission_checker
 
 
-def require_case_access(required_role: Union[CaseRole, str]):
+def require_case_access(required_role: CaseRole | str):
     """Return a dependency that checks case-level access.
 
     The route must have a `case_id` path parameter of type str.
@@ -111,7 +110,7 @@ async def verify_case_access(
     case_id: uuid.UUID,
     user: UserModel,
     db: AsyncSession,
-    required_role: Union[CaseRole, str] = CaseRole.VIEWER,
+    required_role: CaseRole | str = CaseRole.VIEWER,
 ) -> None:
     """Utility function for routes that resolve case_id from other resources.
 

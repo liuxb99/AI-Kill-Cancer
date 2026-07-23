@@ -8,8 +8,7 @@ All scorers produce deterministic scores (0.0 - 1.0 range per item).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +93,8 @@ REGULATORY_WEIGHT = {
 class EvidenceScorer:
     """Scores evidence items by match quality, level, direction, source."""
 
-    def __init__(self, now: Optional[datetime] = None):
-        self.now = now or datetime.now(timezone.utc)
+    def __init__(self, now: datetime | None = None):
+        self.now = now or datetime.now(UTC)
 
     def score(self, drug_name: str, evidence_items: list[dict],
               match_level: str = "gene_level_only") -> tuple[float, int, int, list[str]]:

@@ -1,7 +1,8 @@
 """Uploaded file repository."""
 from sqlalchemy import select
-from src.backend.repositories.base import BaseRepository
+
 from src.backend.domain.uploaded_file import UploadedFileModel
+from src.backend.repositories.base import BaseRepository
 
 
 class UploadedFileRepository(BaseRepository[UploadedFileModel]):

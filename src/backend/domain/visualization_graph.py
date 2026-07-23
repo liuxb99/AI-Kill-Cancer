@@ -11,9 +11,7 @@ as the single source of truth.
 
 from __future__ import annotations
 
-from typing import Optional
 from pydantic import BaseModel, Field
-
 
 # ─── Node Types ───────────────────────────────────────────────────────────────
 
@@ -81,7 +79,7 @@ class GraphNode(BaseModel):
     label: str = Field(..., description="Display label")
     category: str = Field("unknown", description=f"Category. One of: {NODE_CATEGORY_VALUES}")
     status: str = Field("active", description=f"Status. One of: {NODE_STATUS_VALUES}")
-    evidence_level: Optional[str] = Field(None, description="Highest evidence level for this node")
+    evidence_level: str | None = Field(None, description="Highest evidence level for this node")
     metadata: dict = Field(default_factory=dict, description="Arbitrary metadata (VAF, coordinates, etc.)")
 
 

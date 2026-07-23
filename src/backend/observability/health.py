@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +87,7 @@ class HealthChecker:
 
 
 # Global health checker
-_health_checker: Optional[HealthChecker] = None
+_health_checker: HealthChecker | None = None
 
 
 def get_health_checker() -> HealthChecker:

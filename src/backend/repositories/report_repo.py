@@ -1,6 +1,6 @@
 """Report repository."""
-from src.backend.repositories.base import BaseRepository
 from src.backend.domain.report import ReportModel
+from src.backend.repositories.base import BaseRepository
 
 
 class ReportRepository(BaseRepository[ReportModel]):

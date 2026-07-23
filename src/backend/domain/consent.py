@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Text, DateTime, Enum as SAEnum, ForeignKey
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import ConsentTypeEnum
 
 
@@ -45,10 +46,10 @@ class ConsentCreate(BaseModel):
 
     patient_id: str
     consent_type: ConsentTypeEnum
-    granted_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    consent_document: Optional[str] = Field(None, max_length=1024)
-    notes: Optional[str] = None
+    granted_at: datetime | None = None
+    expires_at: datetime | None = None
+    consent_document: str | None = Field(None, max_length=1024)
+    notes: str | None = None
 
 
 class ConsentResponse(BaseModel):
@@ -57,9 +58,9 @@ class ConsentResponse(BaseModel):
     id: str
     patient_id: str
     consent_type: str
-    granted_at: Optional[datetime] = None
-    revoked_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    notes: Optional[str] = None
+    granted_at: datetime | None = None
+    revoked_at: datetime | None = None
+    expires_at: datetime | None = None
+    notes: str | None = None
     created_at: datetime
     updated_at: datetime

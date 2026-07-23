@@ -7,7 +7,6 @@ Supports VCF v4.1, v4.2, v4.3.
 from __future__ import annotations
 
 import re
-from typing import Optional
 from dataclasses import dataclass, field
 
 
@@ -16,8 +15,8 @@ class VCFValidationError:
     """A single validation error with code and context."""
     code: str
     message: str
-    line: Optional[int] = None
-    field: Optional[str] = None
+    line: int | None = None
+    field: str | None = None
 
 
 @dataclass
@@ -26,16 +25,16 @@ class VCFValidationResult:
     valid: bool = True
     errors: list[VCFValidationError] = field(default_factory=list)
     warnings: list[VCFValidationError] = field(default_factory=list)
-    file_format: Optional[str] = None
-    genome_build: Optional[str] = None
+    file_format: str | None = None
+    genome_build: str | None = None
     sample_count: int = 0
     record_count: int = 0
 
-    def add_error(self, code: str, message: str, line: Optional[int] = None, field: Optional[str] = None):
+    def add_error(self, code: str, message: str, line: int | None = None, field: str | None = None):
         self.valid = False
         self.errors.append(VCFValidationError(code=code, message=message, line=line, field=field))
 
-    def add_warning(self, code: str, message: str, line: Optional[int] = None, field: Optional[str] = None):
+    def add_warning(self, code: str, message: str, line: int | None = None, field: str | None = None):
         self.warnings.append(VCFValidationError(code=code, message=message, line=line, field=field))
 
 
@@ -49,7 +48,7 @@ _POSITION_RE = re.compile(r"^\d+$")
 _REF_ALT_RE = re.compile(r"^[ACGTNacgtn.]+$")
 
 
-def _detect_fileformat(lines: list[str]) -> Optional[str]:
+def _detect_fileformat(lines: list[str]) -> str | None:
     """Detect VCF format version from fileformat header."""
     for line in lines:
         line = line.strip()
@@ -58,7 +57,7 @@ def _detect_fileformat(lines: list[str]) -> Optional[str]:
     return None
 
 
-def _detect_genome_build_from_content(lines: list[str]) -> Optional[str]:
+def _detect_genome_build_from_content(lines: list[str]) -> str | None:
     """Detect genome build from VCF content."""
     has_chr_prefix = False
     no_chr_prefix = False
@@ -87,7 +86,7 @@ def _detect_genome_build_from_content(lines: list[str]) -> Optional[str]:
 
 def validate_vcf_streaming(
     filepath: str,
-    expected_build: Optional[str] = None,
+    expected_build: str | None = None,
     max_line_length: int = 100000,
     max_record_count: int = 10_000_000,
 ) -> VCFValidationResult:
@@ -119,7 +118,7 @@ def validate_vcf_streaming(
             import gzip
             f = gzip.open(filepath, "rt", encoding="utf-8", errors="strict")
         else:
-            f = open(filepath, "r", encoding="utf-8", errors="strict")
+            f = open(filepath, encoding="utf-8", errors="strict")
     except FileNotFoundError:
         result.add_error("FILE_NOT_FOUND", f"File not found: {filepath}")
         return result
@@ -239,7 +238,7 @@ def validate_vcf_streaming(
 
     # Genome build detection from content sample (first N data lines)
     # Detect genome build from header
-    detected_build: Optional[str] = None
+    detected_build: str | None = None
     for h in header_lines:
         if h.startswith("##reference="):
             ref = h.split("=", 1)[1].strip().strip("<>").lower()
@@ -264,7 +263,7 @@ def validate_vcf_streaming(
 # ─── Legacy string-based validator (kept for test compatibility) ──────────────
 
 
-def validate_vcf(content: str, expected_build: Optional[str] = None) -> VCFValidationResult:
+def validate_vcf(content: str, expected_build: str | None = None) -> VCFValidationResult:
     """Validate VCF content string. Loads entire file — use validate_vcf_streaming for prod."""
     result = VCFValidationResult()
     lines = content.split("\n")

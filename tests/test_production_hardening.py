@@ -5,7 +5,9 @@ Tests for Production Hardening (v1.0.0).
 from __future__ import annotations
 
 from src.backend.auth.models import (
-    Role, Permission, ROLE_PERMISSIONS,
+    ROLE_PERMISSIONS,
+    Permission,
+    Role,
 )
 from src.backend.auth.service import AuthService
 from src.backend.observability.audit import AuditLogger

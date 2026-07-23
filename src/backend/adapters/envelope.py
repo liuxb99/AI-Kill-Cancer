@@ -5,7 +5,6 @@ Unified response envelope for all adapter operations.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -19,7 +18,7 @@ class AdapterResult:
     records: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
-    license: Optional[str] = None
+    license: str | None = None
     metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:

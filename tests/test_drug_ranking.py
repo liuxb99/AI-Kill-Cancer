@@ -15,19 +15,23 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-
-from src.backend.ranking.scorers import (
-    EvidenceScorer, ResistanceScorer, SensitivityScorer,
-    GuidelineScorer, RegulatoryScorer, ClinicalTrialScorer,
-)
-from src.backend.ranking.penalties import ConflictPenalty, UncertaintyPenalty
 from src.backend.ranking.engine import DrugRankingEngine
 from src.backend.ranking.models import (
-    DrugRankingResult, DrugRankItem, ScoreBreakdown,
+    DrugRankingResult,
+    DrugRankItem,
+    ScoreBreakdown,
 )
-
+from src.backend.ranking.penalties import ConflictPenalty, UncertaintyPenalty
+from src.backend.ranking.scorers import (
+    ClinicalTrialScorer,
+    EvidenceScorer,
+    GuidelineScorer,
+    RegulatoryScorer,
+    ResistanceScorer,
+    SensitivityScorer,
+)
 
 # ─── Test Helpers ─────────────────────────────────────────────────────────────
 
@@ -45,7 +49,7 @@ def make_evidence(**kwargs) -> dict:
         "evidence_direction": "Supports",
         "evidence_level": "A",
         "clinical_significance": "sensitivity",
-        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "retrieved_at": datetime.now(UTC).isoformat(),
         "_match_level": "exact_variant",
         "_conflict_status": "supporting",
     }
@@ -114,7 +118,7 @@ class TestEvidenceScorer:
         assert score < 0  # Negative for conflicting
 
     def test_fresh_evidence_bonus(self):
-        fresh = [make_evidence(retrieved_at=datetime.now(timezone.utc).isoformat())]
+        fresh = [make_evidence(retrieved_at=datetime.now(UTC).isoformat())]
         old = [make_evidence(retrieved_at="2020-01-01T00:00:00")]
         fresh_score, _, _, _ = self.scorer.score("Vemurafenib", fresh)
         old_score, _, _, _ = self.scorer.score("Vemurafenib", old)

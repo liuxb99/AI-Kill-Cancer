@@ -2,10 +2,11 @@
 """
 Integration test for clinical reasoning validation.
 """
-from src.backend.reasoning.models import ClinicalReasoningResult
-from src.backend.reasoning.validator import EvidenceCitationValidator
 from src.backend.reasoning.conflicts import ConflictAnalyzer
 from src.backend.reasoning.context import ReasoningContextBuilder
+from src.backend.reasoning.models import ClinicalReasoningResult
+from src.backend.reasoning.validator import EvidenceCitationValidator
+
 
 class TestReasoningValidationFlow:
     def test_validator_rejects_nonexistent_evidence(self):

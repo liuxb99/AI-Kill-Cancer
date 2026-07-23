@@ -4,8 +4,8 @@ Tests for database migration upgrade/downgrade.
 from __future__ import annotations
 
 import pytest
-from alembic.config import Config
 from alembic import command
+from alembic.config import Config
 
 
 @pytest.fixture

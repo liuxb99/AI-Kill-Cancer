@@ -1,7 +1,8 @@
 """Drug repository."""
 from sqlalchemy import select
-from src.backend.repositories.base import BaseRepository
+
 from src.backend.domain.drug import DrugModel, DrugTargetModel
+from src.backend.repositories.base import BaseRepository
 
 
 class DrugRepository(BaseRepository[DrugModel]):

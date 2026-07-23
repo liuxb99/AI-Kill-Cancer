@@ -9,12 +9,12 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Column, String, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, String, UniqueConstraint
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 
 
 class CaseRole(str, enum.Enum):
@@ -76,7 +76,7 @@ class CaseACLCreate(BaseModel):
     case_id: str
     user_id: str
     role: str = "viewer"
-    granted_by: Optional[str] = None
+    granted_by: str | None = None
 
 
 class CaseACLResponse(BaseModel):
@@ -94,4 +94,4 @@ class CasePermissionCheck(BaseModel):
     case_id: str
     required_role: str
     granted: bool
-    current_role: Optional[str] = None
+    current_role: str | None = None

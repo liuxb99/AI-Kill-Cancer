@@ -9,18 +9,17 @@ edge cases (empty consensus, missing data), and output format validation
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from src.backend.agents.consensus import ConsensusResult
-from src.backend.clinical.models import ClinicalContext
 from src.backend.clinical.evidence_models import EvidenceBundle, EvidenceItem
+from src.backend.clinical.models import ClinicalContext
 from src.backend.clinical.recommendation import (
     RecommendationGenerator,
     TreatmentRecommendation,
 )
-
 
 # ─── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -106,7 +105,7 @@ def _consensus_result(
         alternative_options=alternatives or [],
         unresolved_questions=questions or [],
         context_hash="test-hash-rec",
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
     )
 
 
@@ -135,7 +134,7 @@ class TestTreatmentRecommendation:
 
     def test_fully_populated(self):
         """Fully populated TreatmentRecommendation with all fields."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         rec = TreatmentRecommendation(
             first_line={"treatment": "Osimertinib", "rationale": "EGFR targeted", "drugs": [{"name": "Osimertinib"}], "supporting_agents": ["drug"]},
             second_line={"treatment": "Chemotherapy", "rationale": "Alternative", "drugs": [{"name": "Cisplatin"}], "supporting_agents": ["diag"]},

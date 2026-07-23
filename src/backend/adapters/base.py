@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 
 @dataclass
@@ -25,7 +25,7 @@ class AdapterResult:
     records: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
-    license: Optional[str] = None
+    license: str | None = None
     metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -45,7 +45,7 @@ class AdapterResult:
 class BaseAdapter(ABC):
     """Abstract base adapter for external data source integration."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         self.config = config or {}
         self._name: str = "base_adapter"
         self._version: str = "0.0.0"
@@ -90,7 +90,7 @@ class BaseAdapter(ABC):
         return {
             "source": self._name,
             "source_version": self._version,
-            "retrieved_at": datetime.now(timezone.utc).isoformat(),
+            "retrieved_at": datetime.now(UTC).isoformat(),
             "request_id": request_id,
         }
 
@@ -98,7 +98,7 @@ class BaseAdapter(ABC):
 class NotConfiguredAdapter(BaseAdapter):
     """Placeholder for adapters that are not yet configured."""
 
-    def __init__(self, name: str = "not_configured", config: Optional[dict] = None):
+    def __init__(self, name: str = "not_configured", config: dict | None = None):
         super().__init__(config)
         self._name = name
         self._version = "0.0.0"
@@ -116,7 +116,7 @@ class NotConfiguredAdapter(BaseAdapter):
         return AdapterResult(
             source=self._name,
             source_version=self._version,
-            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            retrieved_at=datetime.now(UTC).isoformat(),
             request_id="none",
             success=False,
             errors=[f"Adapter '{self._name}' is not configured"],
@@ -126,7 +126,7 @@ class NotConfiguredAdapter(BaseAdapter):
         return AdapterResult(
             source=self._name,
             source_version=self._version,
-            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            retrieved_at=datetime.now(UTC).isoformat(),
             request_id="none",
             success=False,
             errors=["Not configured"],

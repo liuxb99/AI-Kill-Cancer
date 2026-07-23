@@ -5,7 +5,6 @@ Penalty functions for the Drug Ranking Engine.
 from __future__ import annotations
 
 
-
 class ConflictPenalty:
     """Penalizes drugs with conflicting evidence."""
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+
 import pytest
 from fastapi.testclient import TestClient
 

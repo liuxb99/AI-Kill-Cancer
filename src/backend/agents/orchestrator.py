@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -168,7 +167,7 @@ class AgentOrchestrator:
         return opinions
 
 
-def _format_exception(exc: Optional[BaseException]) -> str:
+def _format_exception(exc: BaseException | None) -> str:
     """Format an exception into a human-readable error message.
 
     Parameters

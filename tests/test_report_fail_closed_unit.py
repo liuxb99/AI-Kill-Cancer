@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from src.backend.api.v1.reports import _get_report_and_verify_access, SENTINEL_CASE_ID
+from src.backend.api.v1.reports import SENTINEL_CASE_ID, _get_report_and_verify_access
 from src.backend.domain.case_acl import CaseRole
 
 

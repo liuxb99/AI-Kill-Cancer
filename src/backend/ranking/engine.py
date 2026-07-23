@@ -8,16 +8,21 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
-from src.backend.ranking.scorers import (
-    EvidenceScorer, ResistanceScorer, SensitivityScorer,
-    GuidelineScorer, RegulatoryScorer, ClinicalTrialScorer,
+from src.backend.ranking.models import (
+    DrugRankingResult,
+    DrugRankItem,
+    ScoreBreakdown,
 )
 from src.backend.ranking.penalties import ConflictPenalty, UncertaintyPenalty
-from src.backend.ranking.models import (
-    DrugRankingResult, DrugRankItem, ScoreBreakdown,
+from src.backend.ranking.scorers import (
+    ClinicalTrialScorer,
+    EvidenceScorer,
+    GuidelineScorer,
+    RegulatoryScorer,
+    ResistanceScorer,
+    SensitivityScorer,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,8 +60,8 @@ class DrugRankingEngine:
         drug_interactions: list[dict],
         disease: str = "",
         variant_match_level: str = "gene_level_only",
-        evidence_snapshot_id: Optional[str] = None,
-        source_versions: Optional[dict] = None,
+        evidence_snapshot_id: str | None = None,
+        source_versions: dict | None = None,
         git_commit: str = "",
     ) -> DrugRankingResult:
         """
@@ -69,7 +74,7 @@ class DrugRankingEngine:
         4. Compute total scores and sort
         5. Return ranked list
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         warnings = []
         errors = []
 

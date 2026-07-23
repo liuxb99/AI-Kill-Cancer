@@ -71,9 +71,9 @@ describe('AgentsTab', () => {
     expect(screen.getByText('已获批用于该适应症')).toBeInTheDocument()
     expect(screen.getByText('免疫相关不良反应需监测')).toBeInTheDocument()
 
-    // Pros / Cons headers
-    expect(screen.getByText('支持论点')).toBeInTheDocument()
-    expect(screen.getByText('反对论点')).toBeInTheDocument()
+    // Pros / Cons headers — each agent card has both, so there are 2 of each
+    expect(screen.getAllByText('支持论点').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('反对论点').length).toBeGreaterThanOrEqual(1)
 
     // References
     expect(screen.getByText('KEYNOTE-024 试验结果')).toBeInTheDocument()

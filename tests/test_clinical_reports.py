@@ -4,15 +4,16 @@ Tests for Clinical Report System (v0.8.0).
 
 from __future__ import annotations
 
-
-from src.backend.reporting.models import (
-    ClinicalReport, ReportMetadata, ReportSection,
-    ReportCreateResponse,
-)
 from src.backend.reporting.builder import ReportBuilder
-from src.backend.reporting.validator import ReportValidator
-from src.backend.reporting.renderer import ReportRenderer, FHIRExporter
+from src.backend.reporting.models import (
+    ClinicalReport,
+    ReportCreateResponse,
+    ReportMetadata,
+    ReportSection,
+)
+from src.backend.reporting.renderer import FHIRExporter, ReportRenderer
 from src.backend.reporting.templates import ReportTemplateRegistry
+from src.backend.reporting.validator import ReportValidator
 
 
 class TestReportModels:

@@ -12,10 +12,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
-from src.backend.adapters.base import BaseAdapter, AdapterResult
+from src.backend.adapters.base import AdapterResult, BaseAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +154,7 @@ class VEPAdapter(BaseAdapter):
     Phase 2A uses REST API only.
     """
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         super().__init__(config)
         self._name = "ensembl_vep"
         self._version = "rest_api_2.0"
@@ -267,7 +267,7 @@ class VEPAdapter(BaseAdapter):
         return AdapterResult(
             source="ensembl_vep",
             source_version=self._version,
-            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            retrieved_at=datetime.now(UTC).isoformat(),
             request_id=request_id,
             success=len(errors) == 0,
             records=all_results,

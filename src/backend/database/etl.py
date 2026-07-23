@@ -2,7 +2,6 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
@@ -36,7 +35,7 @@ class JSONExtractor(BaseExtractor):
 
 
 class ExcelExtractor(BaseExtractor):
-    async def extract(self, source_path: Path, sheet_name: Optional[str] = None) -> pd.DataFrame:
+    async def extract(self, source_path: Path, sheet_name: str | None = None) -> pd.DataFrame:
         logger.info(f"從 Excel 提取: {source_path} sheet={sheet_name}")
         return pd.read_excel(source_path, sheet_name=sheet_name or 0)
 
@@ -48,7 +47,7 @@ class BaseTransformer(ABC):
 
 
 class CancerDataTransformer(BaseTransformer):
-    def __init__(self, column_map: Optional[dict[str, str]] = None):
+    def __init__(self, column_map: dict[str, str] | None = None):
         self.column_map = column_map or {}
 
     async def transform(self, df: pd.DataFrame) -> pd.DataFrame:

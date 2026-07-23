@@ -1,6 +1,6 @@
 """Specimen repository."""
-from src.backend.repositories.base import BaseRepository
 from src.backend.domain.specimen import SpecimenModel
+from src.backend.repositories.base import BaseRepository
 
 
 class SpecimenRepository(BaseRepository[SpecimenModel]):

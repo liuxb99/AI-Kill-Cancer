@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Column, String, Float, Text, DateTime, JSON, Integer, ForeignKey, Boolean
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 
 
 def _uuid() -> uuid.UUID:
@@ -136,37 +136,37 @@ class KnowledgeSourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
     id: str
     name: str
-    version: Optional[str] = None
-    license: Optional[str] = None
+    version: str | None = None
+    license: str | None = None
     is_configured: str
-    last_health_check: Optional[datetime] = None
+    last_health_check: datetime | None = None
 
 
 class EvidenceItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
     id: str
-    source_name: Optional[str] = None
-    source_record_id: Optional[str] = None
-    gene_symbol: Optional[str] = None
-    disease: Optional[str] = None
-    drug_name: Optional[str] = None
-    evidence_type: Optional[str] = None
-    evidence_direction: Optional[str] = None
-    evidence_level: Optional[str] = None
-    source_native_level: Optional[str] = None
-    match_level: Optional[str] = None
-    conflict_status: Optional[str] = None
-    clinical_significance: Optional[str] = None
-    description: Optional[str] = None
-    citation: Optional[str] = None
-    pmid: Optional[str] = None
-    url: Optional[str] = None
-    interaction_type: Optional[str] = None
-    interaction_score: Optional[float] = None
-    confidence: Optional[str] = None
-    source_version: Optional[str] = None
-    retrieved_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
+    source_name: str | None = None
+    source_record_id: str | None = None
+    gene_symbol: str | None = None
+    disease: str | None = None
+    drug_name: str | None = None
+    evidence_type: str | None = None
+    evidence_direction: str | None = None
+    evidence_level: str | None = None
+    source_native_level: str | None = None
+    match_level: str | None = None
+    conflict_status: str | None = None
+    clinical_significance: str | None = None
+    description: str | None = None
+    citation: str | None = None
+    pmid: str | None = None
+    url: str | None = None
+    interaction_type: str | None = None
+    interaction_score: float | None = None
+    confidence: str | None = None
+    source_version: str | None = None
+    retrieved_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 class DrugInteractionResponse(BaseModel):
@@ -174,12 +174,12 @@ class DrugInteractionResponse(BaseModel):
     id: str
     gene_symbol: str
     drug_name: str
-    interaction_type: Optional[str] = None
-    interaction_score: Optional[float] = None
-    source_db_name: Optional[str] = None
+    interaction_type: str | None = None
+    interaction_score: float | None = None
+    source_db_name: str | None = None
     pmids: list = []
-    source_version: Optional[str] = None
-    retrieved_at: Optional[datetime] = None
+    source_version: str | None = None
+    retrieved_at: datetime | None = None
 
 
 class EvidenceVariantResponse(BaseModel):
@@ -190,8 +190,8 @@ class EvidenceVariantResponse(BaseModel):
     drug_interactions: list[DrugInteractionResponse] = []
     evidence_count: int = 0
     drug_count: int = 0
-    highest_evidence_level: Optional[str] = None
-    match_level: Optional[str] = None
+    highest_evidence_level: str | None = None
+    match_level: str | None = None
     retrieved_at: str = ""
 
 

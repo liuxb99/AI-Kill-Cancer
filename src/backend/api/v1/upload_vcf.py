@@ -22,24 +22,26 @@ import hashlib
 import logging
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.database.session import get_db
 from src.backend.auth.dependencies import require_auth, verify_case_access
+from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
-from src.backend.domain.user import UserModel
 from src.backend.domain.enums import (
-    FileTypeEnum, GenomeBuildConfidenceEnum,
-    UploadStatusEnum, ValidationStatusEnum, UploadEligibilityEnum,
+    FileTypeEnum,
+    GenomeBuildConfidenceEnum,
+    UploadEligibilityEnum,
+    UploadStatusEnum,
+    ValidationStatusEnum,
 )
-from src.backend.repositories.uploaded_file_repo import UploadedFileRepository
+from src.backend.domain.user import UserModel
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
-from src.backend.vcf.validator import validate_vcf_streaming
+from src.backend.repositories.uploaded_file_repo import UploadedFileRepository
 from src.backend.vcf.models import VCFUploadResponse
+from src.backend.vcf.validator import validate_vcf_streaming
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +133,7 @@ def _streaming_write_and_hash(
 
 def _streaming_decompress_gzip(
     src_path: str, max_size: int, max_ratio: int,
-) -> tuple[int, str, Optional[str]]:
+) -> tuple[int, str, str | None]:
     """Streaming gzip decompression with limits.
 
     Returns (decompressed_size, decompressed_sha256, error_or_None).
@@ -161,7 +163,7 @@ def _streaming_decompress_gzip(
     return total, sha.hexdigest(), None
 
 
-def _check_oversized_line(content: str, max_len: int) -> Optional[str]:
+def _check_oversized_line(content: str, max_len: int) -> str | None:
     """Check for any line exceeding max_len. Returns error or None."""
     for line in content.split("\n"):
         if len(line) > max_len:
@@ -169,7 +171,7 @@ def _check_oversized_line(content: str, max_len: int) -> Optional[str]:
     return None
 
 
-def _check_oversized_header(content: str, max_bytes: int) -> Optional[str]:
+def _check_oversized_header(content: str, max_bytes: int) -> str | None:
     """Check header size limit."""
     header_end = content.find("\n#CHROM")
     if header_end == -1:
@@ -179,7 +181,7 @@ def _check_oversized_header(content: str, max_bytes: int) -> Optional[str]:
     return None
 
 
-def _check_record_count(content: str, max_count: int) -> Optional[str]:
+def _check_record_count(content: str, max_count: int) -> str | None:
     """Check record count limit."""
     count = 0
     in_header = True
@@ -215,8 +217,8 @@ async def _resolve_storage(
     upload_id: str,
     sha256_hex: str,
     storage_path: str,
-    sequencing_test_id: Optional[str],
-) -> tuple[str, Optional[str], Optional[str]]:
+    sequencing_test_id: str | None,
+) -> tuple[str, str | None, str | None]:
     """Determine storage path for an upload.
 
     If a blob with the same SHA256 already exists for a different test,
@@ -244,9 +246,9 @@ async def _resolve_storage(
 @router.post("/upload", response_model=VCFUploadResponse)
 async def upload_vcf(
     file: UploadFile = File(...),
-    genome_build: Optional[str] = Form(None),
-    sequencing_test_id: Optional[str] = Form(None),
-    upload_mode: Optional[str] = Form(None),
+    genome_build: str | None = Form(None),
+    sequencing_test_id: str | None = Form(None),
+    upload_mode: str | None = Form(None),
     user: UserModel = Depends(require_auth),
     db_session: AsyncSession = Depends(get_db),
 ):
@@ -347,7 +349,7 @@ async def upload_vcf(
     file_type = FileTypeEnum.VCF_GZ if compression == "gzip" else FileTypeEnum.VCF
 
     # ── Genome build: check conflict BEFORE any state change ──────────
-    detected_build: Optional[str] = None
+    detected_build: str | None = None
     build_confidence = GenomeBuildConfidenceEnum.UNKNOWN
 
     # ── Streaming file validation (runs in thread to avoid event loop block) ──
@@ -396,7 +398,7 @@ async def upload_vcf(
 
     # ── Resolve storage (dedup blob) ──────────────────────────────────
     storage_path_rel = safe_name  # Relative path only
-    duplicate_of_id: Optional[str] = None
+    duplicate_of_id: str | None = None
     if sequencing_test_id:
         storage_path_rel, duplicate_of_id, dup_warn = await _resolve_storage(
             repo, upload_id, sha256_hex, storage_path, sequencing_test_id,
@@ -405,7 +407,7 @@ async def upload_vcf(
             warnings.append(dup_warn)
 
     # ── Eligibility ───────────────────────────────────────────────────
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     eligibility = UploadEligibilityEnum.ELIGIBLE if is_valid else UploadEligibilityEnum.INVALID
     quarantine_reason = None
     if not is_valid:

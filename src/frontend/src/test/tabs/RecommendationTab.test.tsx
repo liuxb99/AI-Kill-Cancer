@@ -135,13 +135,13 @@ describe('RecommendationTab', () => {
   it('renders empty state when no structured content and no markdown', async () => {
     const { getRecommendation } = await import('../../api/workbench')
     getRecommendation.mockResolvedValue({
-      first_line: {},
-      second_line: {},
-      clinical_trial: {},
+      first_line: null,
+      second_line: null,
+      clinical_trial: null,
       supporting_evidence: [],
-      expected_benefit: {},
-      potential_risk: {},
-      monitoring_plan: {},
+      expected_benefit: null,
+      potential_risk: null,
+      monitoring_plan: null,
       markdown: '',
       created_at: '',
     })

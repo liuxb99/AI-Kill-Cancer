@@ -1,12 +1,20 @@
 import uuid
+
 import pytest
 from sqlalchemy import create_engine, event
-from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from src.backend.database.models import (
-    Base, Patient, Diagnosis, Treatment, Drug, ResearchPaper,
-    GenderEnum, CancerStageEnum, TreatmentStatusEnum,
+    Base,
+    CancerStageEnum,
+    Diagnosis,
+    Drug,
+    GenderEnum,
+    Patient,
+    ResearchPaper,
+    Treatment,
+    TreatmentStatusEnum,
 )
 
 

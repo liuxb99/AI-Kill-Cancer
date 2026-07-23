@@ -1,6 +1,6 @@
 """Analysis run repository."""
-from src.backend.repositories.base import BaseRepository
 from src.backend.domain.analysis_run import AnalysisRunModel
+from src.backend.repositories.base import BaseRepository
 
 
 class AnalysisRunRepository(BaseRepository[AnalysisRunModel]):

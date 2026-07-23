@@ -10,15 +10,16 @@ Phase 2A: Returns not_configured status.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from datetime import UTC
+from typing import Any
 
-from src.backend.adapters.base import NotConfiguredAdapter, AdapterResult, BaseAdapter
+from src.backend.adapters.base import AdapterResult, BaseAdapter, NotConfiguredAdapter
 
 
 class OpenCRAVATAdapter(BaseAdapter):
     """OpenCRAVAT adapter — not configured in Phase 2A."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         super().__init__(config)
         self._name = "opencravat"
         self._version = "not_configured"
@@ -44,11 +45,11 @@ class OpenCRAVATAdapter(BaseAdapter):
 
         Never returns success=True or synthetic data.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
         return AdapterResult(
             source="opencravat",
             source_version="not_configured",
-            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            retrieved_at=datetime.now(UTC).isoformat(),
             request_id=kwargs.get("request_id", "unknown"),
             success=False,
             errors=["OpenCRAVAT is not configured. Install open-cravat and set OPENCVT_PATH."],

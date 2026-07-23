@@ -15,19 +15,25 @@ Tracks match_level, conflict_status, source-native level vs normalized tier.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional, TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.backend.repositories.evidence_repo import KnowledgeSourceRepository, EvidenceItemRepository, DrugInteractionRepository
+    from src.backend.repositories.evidence_repo import (
+        DrugInteractionRepository,
+        EvidenceItemRepository,
+        KnowledgeSourceRepository,
+    )
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.backend.evidence.domain import (
+    MATCH_LEVEL_ORDER,
+    KnowledgeSourceModel,
+)
 from src.backend.pipeline.civic_adapter import CIViCAdapter
 from src.backend.pipeline.dgidb_adapter import DGIdbAdapter
-from src.backend.evidence.domain import (
-    MATCH_LEVEL_ORDER, KnowledgeSourceModel,
-)
+
 # Lazy imports to avoid circular dependency
 # KnowledgeSourceRepository, EvidenceItemRepository, DrugInteractionRepository
 # are imported lazily in __init__ methods
@@ -40,9 +46,9 @@ class EvidenceMerger:
 
     def __init__(
         self,
-        db: Optional[AsyncSession] = None,
-        civic_adapter: Optional[CIViCAdapter] = None,
-        dgidb_adapter: Optional[DGIdbAdapter] = None,
+        db: AsyncSession | None = None,
+        civic_adapter: CIViCAdapter | None = None,
+        dgidb_adapter: DGIdbAdapter | None = None,
     ):
         self.db = db
         self.civic = civic_adapter or CIViCAdapter()
@@ -51,9 +57,9 @@ class EvidenceMerger:
         self._source_cache: dict[str, KnowledgeSourceModel] = {}
 
         # Repositories (lazy init)
-        self._ks_repo: Optional[KnowledgeSourceRepository] = None
-        self._ei_repo: Optional[EvidenceItemRepository] = None
-        self._di_repo: Optional[DrugInteractionRepository] = None
+        self._ks_repo: KnowledgeSourceRepository | None = None
+        self._ei_repo: EvidenceItemRepository | None = None
+        self._di_repo: DrugInteractionRepository | None = None
 
     @property
     def ks_repo(self):
@@ -77,7 +83,7 @@ class EvidenceMerger:
         return self._di_repo
 
     async def _ensure_source(self, source_name: str, version: str = "",
-                              license_text: str = "", base_url: str = "") -> Optional[KnowledgeSourceModel]:
+                              license_text: str = "", base_url: str = "") -> KnowledgeSourceModel | None:
         """Ensure a KnowledgeSource record exists, using cache."""
         if source_name in self._source_cache:
             return self._source_cache[source_name]
@@ -178,7 +184,7 @@ class EvidenceMerger:
           4. Molecular profile
           5. Gene symbol fallback
         """
-        self.retrieved_at = datetime.now(timezone.utc).isoformat()
+        self.retrieved_at = datetime.now(UTC).isoformat()
         now = datetime.utcnow()
 
         all_items = []

@@ -16,10 +16,10 @@ import asyncio
 import hashlib
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
-from src.backend.adapters.base import BaseAdapter, AdapterResult
+from src.backend.adapters.base import AdapterResult, BaseAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ MAX_RETRIES = 2
 class DGIdbAdapter(BaseAdapter):
     """DGIdb REST API adapter for drug-gene interactions."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         super().__init__(config)
         self._name = "dgidb"
         self._version = "v2"
@@ -74,31 +74,31 @@ class DGIdbAdapter(BaseAdapter):
                         records = self._normalize_results(data)
                         return AdapterResult(
                             source="dgidb", source_version=self._version,
-                            retrieved_at=datetime.now(timezone.utc).isoformat(),
+                            retrieved_at=datetime.now(UTC).isoformat(),
                             request_id=request_id, success=True, records=records,
                             metadata={"api_url": url, "request_hash": request_hash, "response_hash": response_hash},
                         )
                     elif resp.status_code == 404:
-                        return AdapterResult(source="dgidb", source_version=self._version, retrieved_at=datetime.now(timezone.utc).isoformat(),
+                        return AdapterResult(source="dgidb", source_version=self._version, retrieved_at=datetime.now(UTC).isoformat(),
                                              request_id=request_id, success=True, records=[], warnings=["Gene not found in DGIdb"])
                     elif resp.status_code == 429:
                         if attempt < MAX_RETRIES:
                             await asyncio.sleep(2 ** attempt)
                             continue
                     else:
-                        return AdapterResult(source="dgidb", source_version=self._version, retrieved_at=datetime.now(timezone.utc).isoformat(),
+                        return AdapterResult(source="dgidb", source_version=self._version, retrieved_at=datetime.now(UTC).isoformat(),
                                              request_id=request_id, success=False, errors=[f"DGIdb returned {resp.status_code}"])
                 except httpx.TimeoutException:
                     if attempt < MAX_RETRIES:
                         await asyncio.sleep(1)
                         continue
-                    return AdapterResult(source="dgidb", source_version=self._version, retrieved_at=datetime.now(timezone.utc).isoformat(),
+                    return AdapterResult(source="dgidb", source_version=self._version, retrieved_at=datetime.now(UTC).isoformat(),
                                          request_id=request_id, success=False, errors=["Request timed out"])
                 except Exception as e:
-                    return AdapterResult(source="dgidb", source_version=self._version, retrieved_at=datetime.now(timezone.utc).isoformat(),
+                    return AdapterResult(source="dgidb", source_version=self._version, retrieved_at=datetime.now(UTC).isoformat(),
                                          request_id=request_id, success=False, errors=[f"Request failed: {e}"])
 
-        return AdapterResult(source="dgidb", source_version=self._version, retrieved_at=datetime.now(timezone.utc).isoformat(),
+        return AdapterResult(source="dgidb", source_version=self._version, retrieved_at=datetime.now(UTC).isoformat(),
                              request_id=request_id, success=False, errors=["Max retries exceeded"])
 
     async def annotate(self, payload: Any, **kwargs) -> AdapterResult:

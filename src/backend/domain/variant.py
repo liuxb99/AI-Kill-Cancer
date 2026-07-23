@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Integer, Float, DateTime, Enum as SAEnum, ForeignKey
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import (
     ConsequenceEnum,
     DriverStatusEnum,
@@ -89,27 +90,27 @@ class VariantImport(BaseModel):
     alternate: str
     genome_build: str = Field(..., max_length=32)
     variant_type: VariantTypeEnum
-    transcript: Optional[str] = Field(None, max_length=64)
-    hgvs_g: Optional[str] = Field(None, max_length=256)
-    hgvs_c: Optional[str] = Field(None, max_length=256)
-    hgvs_p: Optional[str] = Field(None, max_length=256)
-    protein_change: Optional[str] = Field(None, max_length=128)
-    consequence: Optional[ConsequenceEnum] = None
-    dbsnp_id: Optional[str] = Field(None, max_length=32)
-    clinvar_id: Optional[str] = Field(None, max_length=32)
-    cosmic_id: Optional[str] = Field(None, max_length=32)
-    af: Optional[float] = None
-    gnomad_af: Optional[float] = None
-    vaf: Optional[float] = None
-    read_depth: Optional[int] = None
+    transcript: str | None = Field(None, max_length=64)
+    hgvs_g: str | None = Field(None, max_length=256)
+    hgvs_c: str | None = Field(None, max_length=256)
+    hgvs_p: str | None = Field(None, max_length=256)
+    protein_change: str | None = Field(None, max_length=128)
+    consequence: ConsequenceEnum | None = None
+    dbsnp_id: str | None = Field(None, max_length=32)
+    clinvar_id: str | None = Field(None, max_length=32)
+    cosmic_id: str | None = Field(None, max_length=32)
+    af: float | None = None
+    gnomad_af: float | None = None
+    vaf: float | None = None
+    read_depth: int | None = None
     origin: VariantOriginEnum = VariantOriginEnum.UNKNOWN
-    clinical_significance: Optional[str] = Field(None, max_length=128)
+    clinical_significance: str | None = Field(None, max_length=128)
     oncogenicity: OncogenicityEnum = OncogenicityEnum.NOT_ASSESSED
     driver_status: DriverStatusEnum = DriverStatusEnum.UNKNOWN
     zygosity: ZygosityEnum = ZygosityEnum.UNKNOWN
-    source_record_id: Optional[str] = Field(None, max_length=256)
-    annotation_source: Optional[str] = Field(None, max_length=64)
-    original_vcf_line: Optional[str] = Field(None, max_length=1024)
+    source_record_id: str | None = Field(None, max_length=256)
+    annotation_source: str | None = Field(None, max_length=64)
+    original_vcf_line: str | None = Field(None, max_length=1024)
 
 
 class VariantImportBatch(BaseModel):
@@ -121,7 +122,7 @@ class VariantResponse(BaseModel):
 
     id: str
     sequencing_test_id: str
-    gene_id: Optional[str] = None
+    gene_id: str | None = None
     gene_symbol: str
     chromosome: str
     position: int
@@ -129,26 +130,26 @@ class VariantResponse(BaseModel):
     alternate: str
     genome_build: str
     variant_type: str
-    transcript: Optional[str] = None
-    hgvs_g: Optional[str] = None
-    hgvs_c: Optional[str] = None
-    hgvs_p: Optional[str] = None
-    protein_change: Optional[str] = None
-    consequence: Optional[str] = None
-    dbsnp_id: Optional[str] = None
-    clinvar_id: Optional[str] = None
-    cosmic_id: Optional[str] = None
-    af: Optional[float] = None
-    gnomad_af: Optional[float] = None
-    vaf: Optional[float] = None
-    read_depth: Optional[int] = None
+    transcript: str | None = None
+    hgvs_g: str | None = None
+    hgvs_c: str | None = None
+    hgvs_p: str | None = None
+    protein_change: str | None = None
+    consequence: str | None = None
+    dbsnp_id: str | None = None
+    clinvar_id: str | None = None
+    cosmic_id: str | None = None
+    af: float | None = None
+    gnomad_af: float | None = None
+    vaf: float | None = None
+    read_depth: int | None = None
     origin: str
-    clinical_significance: Optional[str] = None
+    clinical_significance: str | None = None
     oncogenicity: str
     driver_status: str
     zygosity: str
     normalization_status: str
-    annotation_source: Optional[str] = None
+    annotation_source: str | None = None
     created_at: datetime
     updated_at: datetime
 

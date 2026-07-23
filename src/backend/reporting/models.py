@@ -4,17 +4,15 @@ Pydantic models for clinical reports.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict
 
 
 class ReportMetadata(BaseModel):
     """Metadata for a clinical report."""
     report_id: str = ""
-    case_id: Optional[str] = None
+    case_id: str | None = None
     version: str = "1.0.0"
-    supersedes_report_id: Optional[str] = None
+    supersedes_report_id: str | None = None
     status: str = "draft"  # draft, validated, final, withdrawn
     generated_at: str = ""
     git_commit: str = ""
@@ -41,7 +39,7 @@ class ClinicalReport(BaseModel):
     drug_ranking: list[dict] = []
     resistance: list[dict] = []
     conflicts: list[dict] = []
-    clinical_reasoning: Optional[dict] = None
+    clinical_reasoning: dict | None = None
     limitations: list[str] = []
     source_versions: dict = {}
     citations: list[dict] = []

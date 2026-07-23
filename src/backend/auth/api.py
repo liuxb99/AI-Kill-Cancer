@@ -11,15 +11,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.auth.dependencies import require_auth, require_permission
 from src.backend.auth.models import (
-    Permission, Role,
-    AuthenticationError, DuplicateUserError,
+    AuthenticationError,
+    DuplicateUserError,
+    Permission,
+    Role,
 )
 from src.backend.auth.service import AuthService, get_auth_service
 from src.backend.database.session import get_db
 from src.backend.domain.user import (
+    LoginRequest,
+    LogoutRequest,
+    RefreshRequest,
+    TokenResponse,
+    UserCreate,
     UserModel,
-    UserCreate, UserResponse, TokenResponse,
-    LoginRequest, RefreshRequest, LogoutRequest,
+    UserResponse,
 )
 
 _security = HTTPBearer(auto_error=False)

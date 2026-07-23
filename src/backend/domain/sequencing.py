@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Date, DateTime, Float, Text, Enum as SAEnum, ForeignKey
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import Column, Date, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import AnalysisResultTypeEnum
 
 
@@ -50,16 +51,16 @@ class SequencingTestCreate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     specimen_id: str
-    laboratory: Optional[str] = Field(None, max_length=256)
+    laboratory: str | None = Field(None, max_length=256)
     assay_name: str = Field(..., max_length=256)
-    assay_version: Optional[str] = Field(None, max_length=64)
-    panel_name: Optional[str] = Field(None, max_length=256)
-    genome_build: Optional[str] = Field(None, max_length=32)
-    sequencing_depth: Optional[float] = None
-    minimum_detectable_vaf: Optional[float] = None
-    test_date: Optional[date] = None
+    assay_version: str | None = Field(None, max_length=64)
+    panel_name: str | None = Field(None, max_length=256)
+    genome_build: str | None = Field(None, max_length=32)
+    sequencing_depth: float | None = None
+    minimum_detectable_vaf: float | None = None
+    test_date: date | None = None
     result_type: AnalysisResultTypeEnum = AnalysisResultTypeEnum.SOMATIC
-    limitations: Optional[str] = None
+    limitations: str | None = None
 
 
 class SequencingTestResponse(BaseModel):
@@ -67,15 +68,15 @@ class SequencingTestResponse(BaseModel):
 
     id: str
     specimen_id: str
-    laboratory: Optional[str] = None
+    laboratory: str | None = None
     assay_name: str
-    assay_version: Optional[str] = None
-    panel_name: Optional[str] = None
-    genome_build: Optional[str] = None
-    sequencing_depth: Optional[float] = None
-    minimum_detectable_vaf: Optional[float] = None
-    test_date: Optional[date] = None
+    assay_version: str | None = None
+    panel_name: str | None = None
+    genome_build: str | None = None
+    sequencing_depth: float | None = None
+    minimum_detectable_vaf: float | None = None
+    test_date: date | None = None
     result_type: str
-    limitations: Optional[str] = None
+    limitations: str | None = None
     created_at: datetime
     updated_at: datetime

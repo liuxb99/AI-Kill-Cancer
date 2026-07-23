@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from src.backend.vcf.validator import validate_vcf
 
-
 VALID_VCF = """##fileformat=VCFv4.2
 ##reference=GRCh38
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO

@@ -4,8 +4,6 @@ Pydantic models for clinical reasoning results.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict
 
 
@@ -38,7 +36,7 @@ class ClinicalReasoningResult(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str = ""
-    case_id: Optional[str] = None
+    case_id: str | None = None
     user_question: str = ""
     summary: str = ""
     key_findings: list[str] = []
@@ -56,8 +54,8 @@ class ReasoningRunResponse(BaseModel):
     """API response for a reasoning run."""
     run_id: str = ""
     status: str = ""  # completed, pending, failed, rejected
-    reasoning: Optional[ClinicalReasoningResult] = None
-    validation_result: Optional["ReasoningValidationResult"] = None
+    reasoning: ClinicalReasoningResult | None = None
+    validation_result: ReasoningValidationResult | None = None
     message: str = ""
 
 

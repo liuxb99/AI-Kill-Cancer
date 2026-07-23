@@ -361,8 +361,8 @@ class TestCheckpointLoading:
     def test_load_model_bad_checkpoint(self, tmp_path):
         """_load_model should handle corrupted checkpoint gracefully."""
         pytest.importorskip("torch")
-        from src.backend.api.routes import _load_model
         import src.backend.api.routes as routes
+        from src.backend.api.routes import _load_model
 
         # Create a corrupted file
         bad_ckpt = tmp_path / "bad_model.pt"
@@ -381,8 +381,9 @@ class TestCheckpointLoading:
         """_load_model should load a valid minimal checkpoint."""
         pytest.importorskip("torch")
         import torch
-        from src.backend.api.routes import _load_model
+
         import src.backend.api.routes as routes
+        from src.backend.api.routes import _load_model
         from src.models.cancer_classifier import CancerClassifier, CancerClassifierConfig
 
         # Create a real (minimal) checkpoint
@@ -421,8 +422,9 @@ class TestCheckpointLoading:
         """Empty or meaningless checkpoint should not load."""
         pytest.importorskip("torch")
         import torch
-        from src.backend.api.routes import _load_model
+
         import src.backend.api.routes as routes
+        from src.backend.api.routes import _load_model
 
         empty_ckpt = tmp_path / "empty.pt"
         torch.save({}, empty_ckpt)
@@ -448,9 +450,10 @@ class TestDatabaseUnavailable:
 
     def test_api_works_without_db(self):
         """API should start and serve health even when DB is unavailable."""
+        from fastapi.testclient import TestClient
+
         from src.backend.config import settings as s
         from src.backend.main import create_app
-        from fastapi.testclient import TestClient
 
         original_db = s.DATABASE_URL
         s.DATABASE_URL = "postgresql+asyncpg://invalid:invalid@localhost:9999/nonexistent"

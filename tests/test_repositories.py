@@ -4,17 +4,16 @@ Tests for repository layer — uses SQLite in-memory.
 from __future__ import annotations
 
 import pytest
-
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.backend.database.models import Base
+from src.backend.domain.analysis_run import AnalysisStatusEnum
+from src.backend.domain.cancer_case import CancerCaseModel, CancerTypeEnum
+from src.backend.domain.patient import ConsentStatusEnum, PatientModel, SexEnum
+from src.backend.domain.variant import VariantOriginEnum, VariantTypeEnum
+from src.backend.repositories.analysis_run_repo import AnalysisRunRepository
 from src.backend.repositories.patient_repo import PatientRepository
 from src.backend.repositories.variant_repo import VariantRepository
-from src.backend.repositories.analysis_run_repo import AnalysisRunRepository
-from src.backend.domain.patient import PatientModel, SexEnum, ConsentStatusEnum
-from src.backend.domain.cancer_case import CancerCaseModel, CancerTypeEnum
-from src.backend.domain.variant import VariantTypeEnum, VariantOriginEnum
-from src.backend.domain.analysis_run import AnalysisStatusEnum
 
 
 @pytest.fixture

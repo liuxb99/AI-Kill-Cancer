@@ -11,14 +11,13 @@ recommended option, alternatives, and unresolved questions.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
 from src.backend.clinical.models import ClinicalContext
 
 from .models import AgentOpinion
-
 
 # ─── Public models ─────────────────────────────────────────────────────────────
 
@@ -528,7 +527,7 @@ class ConsensusEngine:
                 alternative_options=[],
                 unresolved_questions=[],
                 context_hash=context.context_hash or None,
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
             )
 
         # 1. Detect cross-agent conflicts
@@ -557,7 +556,7 @@ class ConsensusEngine:
             alternative_options=alternatives,
             unresolved_questions=questions,
             context_hash=context.context_hash or None,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
 

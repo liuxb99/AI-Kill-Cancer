@@ -7,7 +7,8 @@ Prevents redundant API calls for recently-accessed genes/variants.
 from __future__ import annotations
 
 import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 
 class TTLCache:
@@ -20,14 +21,14 @@ class TTLCache:
         self,
         ttl_seconds: int = 300,
         max_size: int = 1000,
-        time_func: Optional[Callable[[], float]] = None,
+        time_func: Callable[[], float] | None = None,
     ):
         self._ttl = ttl_seconds
         self._max_size = max_size
         self._cache: dict[str, tuple[float, Any]] = {}
         self._time = time_func or time.monotonic
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         entry = self._cache.get(key)
         if entry is None:
             return None

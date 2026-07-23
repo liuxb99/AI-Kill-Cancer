@@ -11,14 +11,13 @@ All logic is rule-based — no LLM calls are made.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
 from src.backend.agents.consensus import ConsensusResult
 from src.backend.clinical.evidence_models import EvidenceBundle
 from src.backend.clinical.models import ClinicalContext
-
 
 # ─── TreatmentRecommendation Model ──────────────────────────────────────────
 
@@ -570,7 +569,7 @@ def _build_markdown(
         f"**Diagnosis:** {context.diagnosis}  ",
         f"**Cancer Type:** {context.cancer_type}  ",
         f"**Stage:** {context.stage}  ",
-        f"**Generated:** {datetime.now(timezone.utc).isoformat()}  ",
+        f"**Generated:** {datetime.now(UTC).isoformat()}  ",
         "",
         "---",
         "",
@@ -868,7 +867,7 @@ class RecommendationGenerator:
         context: ClinicalContext,
         evidence: EvidenceBundle,
     ) -> TreatmentRecommendation:
-        """Generate a structured treatment recommendation.
+        r"""Generate a structured treatment recommendation.
 
         The method performs the following steps:
 
@@ -956,7 +955,7 @@ class RecommendationGenerator:
             structured_json=structured_json,
             markdown=markdown,
             context_hash=consensus.context_hash or context.context_hash or None,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
 

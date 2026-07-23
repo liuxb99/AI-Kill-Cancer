@@ -16,18 +16,21 @@ from __future__ import annotations
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-
+from src.backend.evidence.cache import TTLCache
 from src.backend.evidence.domain import (
-    KnowledgeSourceModel, EvidenceItemModel, DrugInteractionModel,
-    MATCH_LEVEL_ORDER, MATCH_LEVEL_PRECEDENCE,
-    EvidenceVariantResponse, EvidenceRefreshResponse, EvidenceCacheInvalidateResponse,
+    MATCH_LEVEL_ORDER,
+    MATCH_LEVEL_PRECEDENCE,
+    DrugInteractionModel,
+    EvidenceCacheInvalidateResponse,
+    EvidenceItemModel,
+    EvidenceRefreshResponse,
+    EvidenceVariantResponse,
+    KnowledgeSourceModel,
 )
 from src.backend.evidence.merger import EvidenceMerger
-from src.backend.evidence.cache import TTLCache
-from src.backend.repositories.knowledge_source_repo import KnowledgeSourceRepository
-from src.backend.repositories.evidence_item_repo import EvidenceItemRepository, _compute_payload_hash
 from src.backend.repositories.drug_interaction_repo import DrugInteractionRepository, _compute_interaction_hash
-
+from src.backend.repositories.evidence_item_repo import EvidenceItemRepository, _compute_payload_hash
+from src.backend.repositories.knowledge_source_repo import KnowledgeSourceRepository
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -3,8 +3,8 @@ Tests for Evidence Merger and Cache.
 """
 from __future__ import annotations
 
-from src.backend.evidence.merger import EvidenceMerger
 from src.backend.evidence.cache import TTLCache
+from src.backend.evidence.merger import EvidenceMerger
 from src.backend.pipeline.civic_adapter import CIViCAdapter
 from src.backend.pipeline.dgidb_adapter import DGIdbAdapter
 

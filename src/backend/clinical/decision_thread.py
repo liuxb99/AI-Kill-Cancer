@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import Column, DateTime, JSON, String, Text, select
+from sqlalchemy import JSON, Column, DateTime, String, Text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 
 # ─── Node type literal ─────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ class DecisionNode(BaseModel):
 
     id: str
     case_id: str
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     node_type: NodeType
     input_snapshot: dict[str, Any] = Field(default_factory=dict)
     evidence_snapshot: dict[str, Any] = Field(default_factory=dict)
@@ -96,7 +97,7 @@ class DecisionNode(BaseModel):
     decision_label: str = ""
     timestamp: str = ""
     """ISO-8601 formatted timestamp."""
-    context_hash: Optional[str] = None
+    context_hash: str | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -238,7 +239,7 @@ class DecisionThreadRepository:
         # the flat storage model while enabling tree reconstruction.
         return await self.get_case_thread(case_id)
 
-    async def get_node(self, node_id: str) -> Optional[DecisionNode]:
+    async def get_node(self, node_id: str) -> DecisionNode | None:
         """Retrieve a single decision node by its ID.
 
         Args:
@@ -286,7 +287,7 @@ class DecisionThreadInjector:
         """
         self.repo = repo
         self.case_id = case_id
-        self._last_node_id: Optional[str] = None
+        self._last_node_id: str | None = None
 
     async def record_context_built(self, context: Any) -> str:
         """Create a decision node after the ClinicalContext has been built.

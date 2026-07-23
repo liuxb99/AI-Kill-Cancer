@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field, ConfigDict, field_serializer, field_validator
-from sqlalchemy import Column, String, Integer, DateTime, Enum as SAEnum
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import ConsentStatusEnum, SexEnum
 
 
@@ -52,34 +54,34 @@ class PatientModel(DBBase):
 class PatientCreate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
-    external_id: Optional[str] = Field(None, max_length=128)
-    display_name: Optional[str] = Field(None, max_length=128)
-    birth_year: Optional[int] = Field(None, ge=1900, le=2100)
-    age_range: Optional[str] = Field(None, max_length=32)
-    sex: Optional[SexEnum] = None
+    external_id: str | None = Field(None, max_length=128)
+    display_name: str | None = Field(None, max_length=128)
+    birth_year: int | None = Field(None, ge=1900, le=2100)
+    age_range: str | None = Field(None, max_length=32)
+    sex: SexEnum | None = None
     consent_status: ConsentStatusEnum = ConsentStatusEnum.PENDING
 
 
 class PatientUpdate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
-    external_id: Optional[str] = Field(None, max_length=128)
-    display_name: Optional[str] = Field(None, max_length=128)
-    birth_year: Optional[int] = Field(None, ge=1900, le=2100)
-    age_range: Optional[str] = Field(None, max_length=32)
-    sex: Optional[SexEnum] = None
-    consent_status: Optional[ConsentStatusEnum] = None
+    external_id: str | None = Field(None, max_length=128)
+    display_name: str | None = Field(None, max_length=128)
+    birth_year: int | None = Field(None, ge=1900, le=2100)
+    age_range: str | None = Field(None, max_length=32)
+    sex: SexEnum | None = None
+    consent_status: ConsentStatusEnum | None = None
 
 
 class PatientResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
     id: str = Field(..., description="Patient UUID as string")
-    external_id: Optional[str] = None
-    display_name: Optional[str] = None
-    birth_year: Optional[int] = None
-    age_range: Optional[str] = None
-    sex: Optional[str] = None
+    external_id: str | None = None
+    display_name: str | None = None
+    birth_year: int | None = None
+    age_range: str | None = None
+    sex: str | None = None
     consent_status: str
     created_at: datetime
     updated_at: datetime

@@ -15,17 +15,19 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.database.session import get_db
 from src.backend.auth.dependencies import require_auth, require_case_access, verify_case_access
+from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
-from src.backend.reasoning.service import ClinicalReasoningService
+from src.backend.reasoning.llm import get_llm_adapter
 from src.backend.reasoning.models import (
-    ClinicalReasoningResult, ReasoningRunResponse, ReasoningValidationResult,
+    ClinicalReasoningResult,
+    ReasoningRunResponse,
+    ReasoningValidationResult,
 )
 from src.backend.reasoning.repository import ReasoningRunRepository
+from src.backend.reasoning.service import ClinicalReasoningService
 from src.backend.reasoning.validator import EvidenceCitationValidator
-from src.backend.reasoning.llm import get_llm_adapter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/reasoning", tags=["reasoning"])

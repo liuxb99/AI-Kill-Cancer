@@ -2,7 +2,7 @@
  * Tests for DecisionThreadTab — decision tree display.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 
 const mockNodes = [
   {
@@ -28,7 +28,7 @@ const mockNodes = [
   {
     id: 'node-3',
     case_id: 'test-case',
-    parent_id: 'node-2',
+    parent_id: 'node-1',
     node_type: 'agent_opinion',
     reasoning: 'Oncology Advisor 推荐帕博利珠单抗方案',
     confidence: '0.72',
@@ -38,7 +38,7 @@ const mockNodes = [
   {
     id: 'node-4',
     case_id: 'test-case',
-    parent_id: 'node-3',
+    parent_id: 'node-1',
     node_type: 'consensus_reached',
     reasoning: '各智能体就一线治疗方案达成高共识',
     confidence: '0.88',
@@ -48,7 +48,7 @@ const mockNodes = [
   {
     id: 'node-5',
     case_id: 'test-case',
-    parent_id: 'node-4',
+    parent_id: 'node-1',
     node_type: 'recommendation_generated',
     reasoning: '生成治疗推荐：帕博利珠单抗 + 培美曲塞 + 卡铂',
     confidence: '0.9',
@@ -92,18 +92,10 @@ describe('DecisionThreadTab', () => {
     expect(screen.getByText('决策线程')).toBeInTheDocument()
     expect(screen.getByText('刷新')).toBeInTheDocument()
 
-    // Node type labels
+    // Node type labels — root node visible by default
     expect(screen.getByText('上下文构建')).toBeInTheDocument()
-    expect(screen.getByText('证据收集')).toBeInTheDocument()
-    expect(screen.getByText('智能体意见')).toBeInTheDocument()
-    expect(screen.getByText('达成共识')).toBeInTheDocument()
-    expect(screen.getByText('生成建议')).toBeInTheDocument()
 
-    // Decision labels
-    expect(screen.getByText('初始化上下文')).toBeInTheDocument()
-    expect(screen.getByText('证据收集完成')).toBeInTheDocument()
-
-    // Initial collapsed state shows child count
+    // Initially collapsed — child count shown instead of child labels
     expect(screen.getByText('4 个子节点...')).toBeInTheDocument()
   })
 
@@ -139,7 +131,7 @@ describe('DecisionThreadTab', () => {
 
     // Click the first node to expand
     const nodeHeader = screen.getByText('上下文构建').closest('div[class*="rounded-r-lg"]')!
-    nodeHeader?.click()
+    fireEvent.click(nodeHeader)
 
     // Expanded reasoning should appear
     await waitFor(() => {

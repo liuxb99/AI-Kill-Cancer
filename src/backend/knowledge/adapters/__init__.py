@@ -8,8 +8,8 @@ Each adapter implements:
 - supports(query_type) → bool
 """
 
+from src.backend.knowledge.adapters.clinicaltrials import ClinicalTrialsAdapter
 from src.backend.knowledge.adapters.clinvar import ClinVarAdapter
 from src.backend.knowledge.adapters.pubmed import PubMedAdapter
-from src.backend.knowledge.adapters.clinicaltrials import ClinicalTrialsAdapter
 
 __all__ = ["ClinVarAdapter", "PubMedAdapter", "ClinicalTrialsAdapter"]

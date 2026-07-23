@@ -1,7 +1,8 @@
 """Evidence repository."""
 from sqlalchemy import select
-from src.backend.repositories.base import BaseRepository
+
 from src.backend.domain.evidence import EvidenceModel
+from src.backend.repositories.base import BaseRepository
 
 
 class EvidenceRepository(BaseRepository[EvidenceModel]):

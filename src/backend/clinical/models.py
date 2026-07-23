@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -32,7 +31,7 @@ class ClinicalContext(BaseModel):
     stage: str
     histology: str
     cancer_type: str
-    oncotree_code: Optional[str] = None
+    oncotree_code: str | None = None
 
     biomarkers: list[dict] = Field(default_factory=list)
     variants: list[dict] = Field(
@@ -46,10 +45,10 @@ class ClinicalContext(BaseModel):
     current_medications: list[dict] = Field(default_factory=list)
     allergies: list[str] = Field(default_factory=list)
 
-    ecog_score: Optional[int] = None
+    ecog_score: int | None = None
     metastatic_sites: list[str] = Field(default_factory=list)
-    recurrence_status: Optional[str] = None
-    clinical_notes: Optional[str] = None
+    recurrence_status: str | None = None
+    clinical_notes: str | None = None
 
     context_hash: str = ""
 

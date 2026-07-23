@@ -4,21 +4,30 @@ import pytest
 torch = pytest.importorskip("torch", reason="PyTorch not installed")
 
 from src.models import (  # noqa: E402 — import after importorskip guard
-    CancerClassifier, CancerClassifierConfig,
-    Trainer, TrainingConfig,
-    MoleculeVAE, MoleculeVAEConfig,
-    DTIPredictor, DTIPredictorConfig,
+    CancerClassifier,
+    CancerClassifierConfig,
+    DrugBankIntegrator,
     DrugDiscoveryPipeline,
-    DrugBankIntegrator, FingerprintConfig,
-    validate_smiles, smiles_to_indices, indices_to_smiles,
+    DTIPredictor,
+    DTIPredictorConfig,
+    FingerprintConfig,
+    MoleculeVAE,
+    MoleculeVAEConfig,
+    Trainer,
+    TrainingConfig,
+    indices_to_smiles,
+    smiles_to_indices,
     tanimoto_similarity,
+    validate_smiles,
 )
+from src.models.drug_response import DrugResponseConfig, DrugResponsePredictor  # noqa: E402
 from src.models.treatment_recommender import (  # noqa: E402
-    TreatmentRecommender, TreatmentRecommenderConfig,
-    lookup_drug_knowledge, list_available_cancers,
     CANCER_DRUG_DB,
+    TreatmentRecommender,
+    TreatmentRecommenderConfig,
+    list_available_cancers,
+    lookup_drug_knowledge,
 )
-from src.models.drug_response import DrugResponsePredictor, DrugResponseConfig  # noqa: E402
 
 
 class TestCancerClassifier:
@@ -312,7 +321,7 @@ class TestDrugBankIntegrator:
 class TestMoleculeUtils:
 
     def test_smiles_vocab(self):
-        from src.models.molecule_utils import SMILES_VOCAB_SIZE, CHAR_TO_IDX, IDX_TO_CHAR
+        from src.models.molecule_utils import CHAR_TO_IDX, IDX_TO_CHAR, SMILES_VOCAB_SIZE
         assert SMILES_VOCAB_SIZE > 0
         assert CHAR_TO_IDX["<PAD>"] == 0
         assert IDX_TO_CHAR[0] == "<PAD>"

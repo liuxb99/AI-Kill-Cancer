@@ -11,13 +11,13 @@ Migration 016 — Phase 2 Clinical Workspace: upgrade / downgrade 循环测试.
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 
 import pytest
-from alembic.config import Config
 from alembic import command
-from sqlalchemy import create_engine, inspect as sa_inspect
+from alembic.config import Config
+from sqlalchemy import create_engine
+from sqlalchemy import inspect as sa_inspect
 
 # ── 条件跳过 ──────────────────────────────────────────────────────────────────
 _SKIP = os.environ.get("CI_SKIP_MIGRATION", "").lower() in ("1", "true", "yes")

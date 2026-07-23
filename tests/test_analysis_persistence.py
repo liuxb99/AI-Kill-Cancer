@@ -4,7 +4,7 @@ Tests for analysis job persistence and transactions.
 from __future__ import annotations
 
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.backend.database.models import Base
 from src.backend.domain.enums import AnalysisStatusEnum
@@ -26,8 +26,8 @@ class TestAnalysisPersistence:
     async def test_create_and_run_job(self, db_session):
         """Job should create DB record and run pipeline."""
         from src.backend.domain.cancer_case import CancerCaseModel
+        from src.backend.domain.enums import CancerTypeEnum, ConsentStatusEnum, SexEnum
         from src.backend.domain.patient import PatientModel
-        from src.backend.domain.enums import SexEnum, ConsentStatusEnum, CancerTypeEnum
 
         # Create required FK records
         patient = PatientModel(display_name="TEST", sex=SexEnum.M, consent_status=ConsentStatusEnum.GRANTED)
@@ -56,8 +56,8 @@ class TestAnalysisPersistence:
     async def test_load_job_from_db(self, db_session):
         """Job should be loadable from DB after creation."""
         from src.backend.domain.cancer_case import CancerCaseModel
+        from src.backend.domain.enums import CancerTypeEnum, ConsentStatusEnum, SexEnum
         from src.backend.domain.patient import PatientModel
-        from src.backend.domain.enums import SexEnum, ConsentStatusEnum, CancerTypeEnum
 
         patient = PatientModel(display_name="TEST", sex=SexEnum.M, consent_status=ConsentStatusEnum.GRANTED)
         db_session.add(patient)
@@ -85,8 +85,8 @@ class TestAnalysisPersistence:
     async def test_job_provenance(self, db_session):
         """Job should produce complete provenance."""
         from src.backend.domain.cancer_case import CancerCaseModel
+        from src.backend.domain.enums import CancerTypeEnum, ConsentStatusEnum, SexEnum
         from src.backend.domain.patient import PatientModel
-        from src.backend.domain.enums import SexEnum, ConsentStatusEnum, CancerTypeEnum
 
         patient = PatientModel(display_name="TEST", sex=SexEnum.M, consent_status=ConsentStatusEnum.GRANTED)
         db_session.add(patient)

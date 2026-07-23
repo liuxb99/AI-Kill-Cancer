@@ -7,8 +7,6 @@ publications, trials, guidelines, and regulatory approvals.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict
 
 
@@ -132,7 +130,7 @@ class GeneDiseaseAssociation(BaseModel):
 
 
 class KnowledgeEntityResponse(BaseModel):
-    entity: Optional[KnowledgeEntity] = None
+    entity: KnowledgeEntity | None = None
     relations: list[KnowledgeRelation] = []
     publications: list[Publication] = []
     trials: list[ClinicalTrial] = []

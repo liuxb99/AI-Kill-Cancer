@@ -6,20 +6,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
 from src.backend.repositories import (
-    PatientRepository,
+    AnalysisRunRepository,
     CancerCaseRepository,
-    SpecimenRepository,
-    SequencingTestRepository,
-    UploadedFileRepository,
-    VariantRepository,
     DrugRepository,
     EvidenceRepository,
-    AnalysisRunRepository,
+    PatientRepository,
     ReportRepository,
+    SequencingTestRepository,
+    SpecimenRepository,
+    UploadedFileRepository,
+    VariantRepository,
 )
-from src.backend.repositories.knowledge_source_repo import KnowledgeSourceRepository
-from src.backend.repositories.evidence_item_repo import EvidenceItemRepository
 from src.backend.repositories.drug_interaction_repo import DrugInteractionRepository
+from src.backend.repositories.evidence_item_repo import EvidenceItemRepository
+from src.backend.repositories.knowledge_source_repo import KnowledgeSourceRepository
 
 
 async def get_patient_repo(db: AsyncSession = Depends(get_db)) -> PatientRepository:

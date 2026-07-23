@@ -4,8 +4,9 @@ Integration test for report generation flow.
 Tests: builder → validator → HTML → JSON → FHIR.
 """
 from src.backend.reporting.builder import ReportBuilder
+from src.backend.reporting.renderer import FHIRExporter, ReportRenderer
 from src.backend.reporting.validator import ReportValidator
-from src.backend.reporting.renderer import ReportRenderer, FHIRExporter
+
 
 class TestReportGenerationFlow:
     def test_report_with_all_data(self):

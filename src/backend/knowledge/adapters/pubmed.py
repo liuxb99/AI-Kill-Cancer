@@ -11,8 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from xml.etree import ElementTree
 
 import httpx
@@ -27,7 +26,7 @@ RATE_LIMIT = 0.35
 class PubMedAdapter:
     """PubMed E-Utilities adapter for publication search."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         self.config = config or {}
         self._name = "pubmed"
         self._version = "1.0"
@@ -120,7 +119,7 @@ class PubMedAdapter:
                     "publication_date": pubdate,
                     "authors": authors,
                     "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else "",
-                    "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                    "retrieved_at": datetime.now(UTC).isoformat(),
                 }
                 records.append(record)
         except Exception as e:

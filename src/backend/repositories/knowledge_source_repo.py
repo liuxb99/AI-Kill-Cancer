@@ -7,12 +7,11 @@ Provides upsert, version tracking, health check recording.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import select
 
-from src.backend.repositories.base import BaseRepository
 from src.backend.evidence.domain import KnowledgeSourceModel
+from src.backend.repositories.base import BaseRepository
 
 
 class KnowledgeSourceRepository(BaseRepository[KnowledgeSourceModel]):
@@ -42,7 +41,7 @@ class KnowledgeSourceRepository(BaseRepository[KnowledgeSourceModel]):
             await self.db.refresh(instance)
             return instance
 
-    async def get_by_name(self, name: str) -> Optional[KnowledgeSourceModel]:
+    async def get_by_name(self, name: str) -> KnowledgeSourceModel | None:
         stmt = select(KnowledgeSourceModel).where(KnowledgeSourceModel.name == name)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -54,7 +53,7 @@ class KnowledgeSourceRepository(BaseRepository[KnowledgeSourceModel]):
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def record_health_check(self, name: str, status: str, version: Optional[str] = None) -> Optional[KnowledgeSourceModel]:
+    async def record_health_check(self, name: str, status: str, version: str | None = None) -> KnowledgeSourceModel | None:
         """Record a health check result for a source."""
         source = await self.get_by_name(name)
         if not source:

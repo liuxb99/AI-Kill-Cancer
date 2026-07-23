@@ -5,6 +5,7 @@ Tests the full flow: variant evidence → merge → rank → persist.
 """
 from src.backend.ranking.engine import DrugRankingEngine
 
+
 class TestCaseRankingFlow:
     async def test_rank_case_no_variants(self):
         engine = DrugRankingEngine()

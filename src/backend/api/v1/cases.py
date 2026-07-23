@@ -3,20 +3,25 @@ Cancer case API routes with case-level ACL.
 """
 from __future__ import annotations
 
-import uuid
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.auth.dependencies import require_auth, require_case_access
-from src.backend.auth.case_acl_service import CaseACLService
 from src.backend.api.v1.deps import get_cancer_case_repo
-from src.backend.domain.cancer_case import CancerCaseCreate, CancerCaseUpdate, CancerCaseResponse, CancerCaseListResponse
+from src.backend.auth.case_acl_service import CaseACLService
+from src.backend.auth.dependencies import require_auth, require_case_access
+from src.backend.database.session import get_db
+from src.backend.domain.cancer_case import (
+    CancerCaseCreate,
+    CancerCaseListResponse,
+    CancerCaseResponse,
+    CancerCaseUpdate,
+)
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
 from src.backend.repositories.cancer_case_repo import CancerCaseRepository
-from src.backend.database.session import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cases", tags=["cases"])

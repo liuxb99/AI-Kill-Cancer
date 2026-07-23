@@ -6,13 +6,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 
 
 def _uuid() -> uuid.UUID:
@@ -44,12 +44,12 @@ class DrugCreate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     name: str = Field(..., max_length=256)
-    generic_name: Optional[str] = Field(None, max_length=256)
-    drugbank_id: Optional[str] = Field(None, max_length=64)
-    atc_codes: Optional[list[str]] = None
-    mechanism_of_action: Optional[str] = None
-    description: Optional[str] = None
-    approval_status: Optional[str] = Field(None, max_length=64)
+    generic_name: str | None = Field(None, max_length=256)
+    drugbank_id: str | None = Field(None, max_length=64)
+    atc_codes: list[str] | None = None
+    mechanism_of_action: str | None = None
+    description: str | None = None
+    approval_status: str | None = Field(None, max_length=64)
 
 
 class DrugResponse(BaseModel):
@@ -57,12 +57,12 @@ class DrugResponse(BaseModel):
 
     id: str
     name: str
-    generic_name: Optional[str] = None
-    drugbank_id: Optional[str] = None
+    generic_name: str | None = None
+    drugbank_id: str | None = None
     atc_codes: list = []
-    mechanism_of_action: Optional[str] = None
-    description: Optional[str] = None
-    approval_status: Optional[str] = None
+    mechanism_of_action: str | None = None
+    description: str | None = None
+    approval_status: str | None = None
     created_at: datetime
     updated_at: datetime
 

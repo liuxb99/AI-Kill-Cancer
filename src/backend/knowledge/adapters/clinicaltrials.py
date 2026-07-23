@@ -11,8 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import httpx
 
@@ -26,7 +25,7 @@ RATE_LIMIT = 0.2
 class ClinicalTrialsAdapter:
     """ClinicalTrials.gov API v2 adapter."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         self.config = config or {}
         self._name = "clinicaltrials"
         self._version = "v2"
@@ -99,7 +98,7 @@ class ClinicalTrialsAdapter:
                 "conditions": conditions_module.get("conditions", []),
                 "sponsor": id_module.get("organization", {}).get("fullName", ""),
                 "url": f"https://clinicaltrials.gov/study/{nct_id}" if nct_id else "",
-                "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                "retrieved_at": datetime.now(UTC).isoformat(),
             })
 
         return records

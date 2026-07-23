@@ -12,8 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import httpx
 
@@ -27,7 +26,7 @@ RATE_LIMIT = 0.35  # seconds between requests (< 3/sec)
 class ClinVarAdapter:
     """ClinVar E-Utilities adapter for variant clinical assertions."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: dict | None = None):
         self.config = config or {}
         self._name = "clinvar"
         self._version = "1.0"
@@ -114,7 +113,7 @@ class ClinVarAdapter:
                 "disease": (item.get("trait_set", [{}])[0].get("trait_name", "") if item.get("trait_set") else ""),
                 "review_status": item.get("review_status", ""),
                 "url": f"https://www.ncbi.nlm.nih.gov/clinvar/variation/{uid}/",
-                "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                "retrieved_at": datetime.now(UTC).isoformat(),
             }
             records.append(record)
 

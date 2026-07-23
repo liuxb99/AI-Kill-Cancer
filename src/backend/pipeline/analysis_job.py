@@ -12,8 +12,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,11 +35,11 @@ class AnalysisJob:
         raw_variants: list[dict],
         db_session: AsyncSession,
         pipeline_version: str = "0.3.1",
-        git_commit: Optional[str] = None,
-        genome_build: Optional[str] = None,
-        upload_id: Optional[str] = None,
-        normalization_adapter: Optional[BcftoolsAdapter] = None,
-        vep_adapter: Optional[VEPAdapter] = None,
+        git_commit: str | None = None,
+        genome_build: str | None = None,
+        upload_id: str | None = None,
+        normalization_adapter: BcftoolsAdapter | None = None,
+        vep_adapter: VEPAdapter | None = None,
     ):
         self.job_id = job_id
         self.case_id = case_id
@@ -59,9 +58,9 @@ class AnalysisJob:
 
         # Status tracking
         self.status = AnalysisStatusEnum.PENDING
-        self.started_at: Optional[datetime] = None
-        self.finished_at: Optional[datetime] = None
-        self.duration_ms: Optional[int] = None
+        self.started_at: datetime | None = None
+        self.finished_at: datetime | None = None
+        self.duration_ms: int | None = None
         self.warnings: list[str] = []
         self.errors: list[str] = []
 
@@ -117,7 +116,7 @@ class AnalysisJob:
     async def run(self) -> None:
         """Execute the full analysis pipeline."""
         self.status = AnalysisStatusEnum.RUNNING
-        self.started_at = datetime.now(timezone.utc)
+        self.started_at = datetime.now(UTC)
         start_ms = int(time.time() * 1000)
 
         try:
@@ -140,7 +139,7 @@ class AnalysisJob:
             if not norm_result.success and not norm_result.records:
                 self.errors.extend(norm_result.errors)
                 self.status = AnalysisStatusEnum.FAILED
-                self.finished_at = datetime.now(timezone.utc)
+                self.finished_at = datetime.now(UTC)
                 self.duration_ms = int(time.time() * 1000) - start_ms
                 await self._save_status()
                 return
@@ -191,7 +190,7 @@ class AnalysisJob:
             self.status = AnalysisStatusEnum.FAILED
 
         finally:
-            self.finished_at = datetime.now(timezone.utc)
+            self.finished_at = datetime.now(UTC)
             self.duration_ms = int(time.time() * 1000) - start_ms
             await self._save_status()
             logger.info(f"[Job {self.job_id}] Finished status={self.status.value} "
@@ -238,9 +237,9 @@ async def create_and_run_job(
     raw_variants: list[dict],
     db_session: AsyncSession,
     pipeline_version: str = "0.3.1",
-    git_commit: Optional[str] = None,
-    genome_build: Optional[str] = None,
-    upload_id: Optional[str] = None,
+    git_commit: str | None = None,
+    genome_build: str | None = None,
+    upload_id: str | None = None,
 ) -> AnalysisJob:
     """Create an analysis run in DB, execute pipeline, return job."""
     job_id = str(uuid.uuid4())
@@ -280,7 +279,7 @@ async def create_and_run_job(
     return job
 
 
-async def load_job_from_db(job_id: str, db_session: AsyncSession) -> Optional[AnalysisJob]:
+async def load_job_from_db(job_id: str, db_session: AsyncSession) -> AnalysisJob | None:
     """Load a job's status from database (without re-executing)."""
     # Check cache first
     if job_id in _job_cache:
@@ -316,6 +315,6 @@ async def load_job_from_db(job_id: str, db_session: AsyncSession) -> Optional[An
     return job
 
 
-def get_cached_job(job_id: str) -> Optional[AnalysisJob]:
+def get_cached_job(job_id: str) -> AnalysisJob | None:
     """Get a job from runtime cache only."""
     return _job_cache.get(job_id)

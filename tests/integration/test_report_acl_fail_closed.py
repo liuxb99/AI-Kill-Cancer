@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import json
 import uuid
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text as sa_text
 
 from src.backend.config import settings
-from src.backend.main import create_app
 from src.backend.database import session as db_session
-from sqlalchemy import text as sa_text
+from src.backend.main import create_app
 
 
 @pytest.fixture(scope="module")

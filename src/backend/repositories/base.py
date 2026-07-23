@@ -5,9 +5,9 @@ Base repository with common CRUD operations.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -30,7 +30,7 @@ class BaseRepository(Generic[ModelT]):
         await self.db.refresh(instance)
         return instance
 
-    async def get(self, id: uuid.UUID) -> Optional[ModelT]:
+    async def get(self, id: uuid.UUID) -> ModelT | None:
         stmt = select(self.model_class).where(self.model_class.id == id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -40,8 +40,8 @@ class BaseRepository(Generic[ModelT]):
         *,
         skip: int = 0,
         limit: int = 100,
-        order_by: Optional[Any] = None,
-        filters: Optional[list] = None,
+        order_by: Any | None = None,
+        filters: list | None = None,
     ) -> list[ModelT]:
         stmt: Select = select(self.model_class)
         if filters:
@@ -55,7 +55,7 @@ class BaseRepository(Generic[ModelT]):
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def count(self, filters: Optional[list] = None) -> int:
+    async def count(self, filters: list | None = None) -> int:
         stmt: Select = select(func.count(self.model_class.id))
         if filters:
             for f in filters:
@@ -63,7 +63,7 @@ class BaseRepository(Generic[ModelT]):
         result = await self.db.execute(stmt)
         return result.scalar() or 0
 
-    async def update(self, id: uuid.UUID, **kwargs) -> Optional[ModelT]:
+    async def update(self, id: uuid.UUID, **kwargs) -> ModelT | None:
         instance = await self.get(id)
         if not instance:
             return None

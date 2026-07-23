@@ -8,8 +8,6 @@ confidence level, and optional references with provenance metadata.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -45,7 +43,7 @@ class AgentOpinion(BaseModel):
     """Supporting references. Each item is a dictionary with keys
     ``source`` (str), ``citation`` (str), and ``url`` (str, optional)."""
 
-    context_hash: Optional[str] = None
+    context_hash: str | None = None
     """SHA256 hash of the :class:`ClinicalContext` snapshot that this
     opinion is based on, for full traceability."""
 

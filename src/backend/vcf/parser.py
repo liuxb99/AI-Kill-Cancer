@@ -7,9 +7,8 @@ VCF.GZ files must be decompressed before parsing.
 
 from __future__ import annotations
 
-import re
 import gzip
-from typing import Optional
+import re
 from dataclasses import dataclass, field
 
 
@@ -21,12 +20,12 @@ class VCFRecord:
     id: str  # rs ID or "."
     reference: str
     alternate: str
-    quality: Optional[float] = None
-    filter_status: Optional[str] = None
+    quality: float | None = None
+    filter_status: str | None = None
     info: dict = field(default_factory=dict)
-    format_fields: Optional[list[str]] = None
-    sample_values: Optional[list[list[str]]] = None
-    raw_line: Optional[str] = None
+    format_fields: list[str] | None = None
+    sample_values: list[list[str]] | None = None
+    raw_line: str | None = None
 
 
 @dataclass
@@ -37,14 +36,14 @@ class VCFHeader:
     info_fields: dict = field(default_factory=dict)
     format_fields: dict = field(default_factory=dict)
     sample_ids: list[str] = field(default_factory=list)
-    genome_build: Optional[str] = None  # Detected from reference or assembly
-    reference: Optional[str] = None  # ##reference=
+    genome_build: str | None = None  # Detected from reference or assembly
+    reference: str | None = None  # ##reference=
 
 
 @dataclass
 class VCFParseResult:
     """Result of parsing a VCF file."""
-    header: Optional[VCFHeader] = None
+    header: VCFHeader | None = None
     records: list[VCFRecord] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
@@ -69,7 +68,7 @@ _REFERENCE_BUILD_MAP = {
 }
 
 
-def detect_genome_build(header: VCFHeader) -> Optional[str]:
+def detect_genome_build(header: VCFHeader) -> str | None:
     """Detect genome build from VCF header metadata."""
     # Check ##reference= for known patterns
     if header.reference:
@@ -143,7 +142,7 @@ def _parse_meta_entry(raw: str) -> dict:
     return result
 
 
-def _parse_data_line(line: str, sample_ids: list[str]) -> Optional[VCFRecord]:
+def _parse_data_line(line: str, sample_ids: list[str]) -> VCFRecord | None:
     """Parse a non-header VCF data line."""
     line = line.strip()
     if not line or line.startswith("#"):
@@ -234,6 +233,6 @@ def parse_vcf_file(filepath: str) -> VCFParseResult:
         with gzip.open(filepath, "rt") as f:
             content = f.read()
     else:
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             content = f.read()
     return parse_vcf(content)

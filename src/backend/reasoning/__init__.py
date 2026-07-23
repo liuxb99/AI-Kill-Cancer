@@ -6,20 +6,25 @@ LLM must NOT: create evidence, create PMIDs, create drugs, modify evidence,
               replace DrugRankingEngine, prescribe, generate dosages.
 """
 
-from src.backend.reasoning.service import ClinicalReasoningService
-from src.backend.reasoning.context import ReasoningContextBuilder
-from src.backend.reasoning.validator import EvidenceCitationValidator, HallucinationGuard
 from src.backend.reasoning.conflicts import ConflictAnalyzer
-from src.backend.reasoning.repository import ReasoningRunRepository, ReasoningRunModel
-from src.backend.reasoning.models import (
-    ClinicalReasoningResult, ReasoningRunResponse,
-    ReasoningEvidenceCitation, ReasoningDrugExplanation,
-    SafetyNotice,
-)
+from src.backend.reasoning.context import ReasoningContextBuilder
 from src.backend.reasoning.llm import (
-    LLMAdapter, OpenAILikeAdapter, LocalLLMAdapter, DisabledLLMAdapter,
+    DisabledLLMAdapter,
+    LLMAdapter,
+    LocalLLMAdapter,
+    OpenAILikeAdapter,
     get_llm_adapter,
 )
+from src.backend.reasoning.models import (
+    ClinicalReasoningResult,
+    ReasoningDrugExplanation,
+    ReasoningEvidenceCitation,
+    ReasoningRunResponse,
+    SafetyNotice,
+)
+from src.backend.reasoning.repository import ReasoningRunModel, ReasoningRunRepository
+from src.backend.reasoning.service import ClinicalReasoningService
+from src.backend.reasoning.validator import EvidenceCitationValidator, HallucinationGuard
 
 __all__ = [
     "ClinicalReasoningService",

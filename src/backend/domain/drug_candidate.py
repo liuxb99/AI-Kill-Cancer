@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Column, String, Float, Text, DateTime, Enum as SAEnum, ForeignKey, JSON
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import CandidateCategoryEnum, EvidenceLevelEnum
 
 
@@ -58,22 +59,22 @@ class DrugCandidateResponse(BaseModel):
     id: str
     analysis_run_id: str
     drug_id: str
-    variant_id: Optional[str] = None
+    variant_id: str | None = None
     cancer_type: str
     candidate_category: str
-    approval_status: Optional[str] = None
-    off_label: Optional[str] = None
-    clinical_trial_available: Optional[str] = None
-    mechanism: Optional[str] = None
-    molecular_rationale: Optional[str] = None
+    approval_status: str | None = None
+    off_label: str | None = None
+    clinical_trial_available: str | None = None
+    mechanism: str | None = None
+    molecular_rationale: str | None = None
     evidence_level: str
-    confidence: Optional[str] = None
-    score: Optional[float] = None
+    confidence: str | None = None
+    score: float | None = None
     supporting_evidence_ids: list = []
     conflicting_evidence_ids: list = []
-    limitations: Optional[str] = None
-    safety_notes: Optional[str] = None
-    explanation: Optional[str] = None
+    limitations: str | None = None
+    safety_notes: str | None = None
+    explanation: str | None = None
     created_at: datetime
 
 

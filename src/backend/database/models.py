@@ -1,9 +1,10 @@
+import enum
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Column, String, Text, Float, Integer, Date, DateTime, ForeignKey, Enum as SAEnum, JSON, TypeDecorator
+from sqlalchemy import JSON, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, TypeDecorator
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import declarative_base, relationship
-import enum
 
 
 class CompatUUID(TypeDecorator):

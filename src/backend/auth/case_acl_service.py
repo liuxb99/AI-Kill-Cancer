@@ -6,23 +6,22 @@ from various resource types (specimens, variants, reports, etc.).
 """
 from __future__ import annotations
 
-import uuid
 import logging
-from typing import Optional
+import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.auth.models import PermissionDeniedError
-from src.backend.domain.case_acl import CaseACLModel, CaseRole, CASE_ROLE_HIERARCHY
+from src.backend.domain.case_acl import CASE_ROLE_HIERARCHY, CaseACLModel, CaseRole
 from src.backend.domain.user import UserModel
+from src.backend.repositories.analysis_run_repo import AnalysisRunRepository
 from src.backend.repositories.case_acl_repo import CaseACLRepository
+from src.backend.repositories.evidence_repo import EvidenceRepository
+from src.backend.repositories.report_repo import ReportRepository
+from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.repositories.specimen_repo import SpecimenRepository
 from src.backend.repositories.variant_repo import VariantRepository
-from src.backend.repositories.report_repo import ReportRepository
-from src.backend.repositories.evidence_repo import EvidenceRepository
-from src.backend.repositories.analysis_run_repo import AnalysisRunRepository
-from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,7 @@ class CaseACLService:
         self.db = db
         self.acl_repo = CaseACLRepository(db)
 
-    async def get_user_role(self, case_id: uuid.UUID, user_id: uuid.UUID) -> Optional[CaseRole]:
+    async def get_user_role(self, case_id: uuid.UUID, user_id: uuid.UUID) -> CaseRole | None:
         """Get the user's role on a specific case."""
         acl = await self.acl_repo.get_user_case_role(case_id, user_id)
         if acl is None:
@@ -77,7 +76,7 @@ class CaseACLService:
         self,
         resource_type: str,
         resource_id: uuid.UUID,
-    ) -> Optional[uuid.UUID]:
+    ) -> uuid.UUID | None:
         """Resolve a case_id from a related resource (specimen, variant, report, etc.)."""
         if resource_type == "specimen":
             repo = SpecimenRepository(self.db)
@@ -140,7 +139,7 @@ class CaseACLService:
             obj = await repo.get(resource_id)
             return obj.case_id if obj else None
 
-    async def grant_owner(self, case_id: uuid.UUID, user_id: uuid.UUID, granted_by: Optional[uuid.UUID] = None) -> CaseACLModel:
+    async def grant_owner(self, case_id: uuid.UUID, user_id: uuid.UUID, granted_by: uuid.UUID | None = None) -> CaseACLModel:
         """Grant owner role to a user on a case. Used when creating a case."""
         return await self.acl_repo.grant_permission(
             case_id=case_id,

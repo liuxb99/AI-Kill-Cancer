@@ -1,7 +1,8 @@
 """Variant repository."""
 from sqlalchemy import select
-from src.backend.repositories.base import BaseRepository
+
 from src.backend.domain.variant import VariantModel
+from src.backend.repositories.base import BaseRepository
 
 
 class VariantRepository(BaseRepository[VariantModel]):

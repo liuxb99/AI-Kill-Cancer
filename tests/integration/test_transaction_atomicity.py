@@ -14,13 +14,12 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sqlalchemy import String, select, event
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import String, event, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.backend.database.models import Base
 from src.backend.domain.audit_log import AuditLogModel
-from src.backend.workbench.repository import WorkbenchNoteModel, TumorBoardRepository, TumorBoardReviewModel
-
+from src.backend.workbench.repository import TumorBoardRepository, TumorBoardReviewModel, WorkbenchNoteModel
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 

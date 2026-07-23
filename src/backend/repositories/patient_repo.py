@@ -1,6 +1,6 @@
 """Patient repository."""
-from src.backend.repositories.base import BaseRepository
 from src.backend.domain.patient import PatientModel
+from src.backend.repositories.base import BaseRepository
 
 
 class PatientRepository(BaseRepository[PatientModel]):

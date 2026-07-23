@@ -6,13 +6,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 
 
 def _uuid() -> uuid.UUID:
@@ -47,13 +47,13 @@ class GeneCreate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     symbol: str = Field(..., max_length=32)
-    full_name: Optional[str] = Field(None, max_length=512)
-    aliases: Optional[list[str]] = None
-    chromosome: Optional[str] = Field(None, max_length=16)
-    gene_type: Optional[str] = Field(None, max_length=64)
-    description: Optional[str] = None
-    ncbi_gene_id: Optional[str] = Field(None, max_length=32)
-    ensembl_gene_id: Optional[str] = Field(None, max_length=64)
+    full_name: str | None = Field(None, max_length=512)
+    aliases: list[str] | None = None
+    chromosome: str | None = Field(None, max_length=16)
+    gene_type: str | None = Field(None, max_length=64)
+    description: str | None = None
+    ncbi_gene_id: str | None = Field(None, max_length=32)
+    ensembl_gene_id: str | None = Field(None, max_length=64)
 
 
 class GeneResponse(BaseModel):
@@ -61,13 +61,13 @@ class GeneResponse(BaseModel):
 
     id: str
     symbol: str
-    full_name: Optional[str] = None
+    full_name: str | None = None
     aliases: list = []
-    chromosome: Optional[str] = None
-    gene_type: Optional[str] = None
-    description: Optional[str] = None
-    ncbi_gene_id: Optional[str] = None
-    ensembl_gene_id: Optional[str] = None
+    chromosome: str | None = None
+    gene_type: str | None = None
+    description: str | None = None
+    ncbi_gene_id: str | None = None
+    ensembl_gene_id: str | None = None
     created_at: datetime
     updated_at: datetime
 

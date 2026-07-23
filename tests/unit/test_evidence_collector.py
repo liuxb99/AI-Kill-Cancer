@@ -7,11 +7,12 @@ evidence from multiple knowledge sources with graceful degradation.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.backend.clinical.collector import EvidenceCollector
 from src.backend.clinical.evidence_models import (
     EvidenceBundle,
     EvidenceItem,
@@ -19,9 +20,7 @@ from src.backend.clinical.evidence_models import (
     SourceStatusType,
     evidence_level_rank,
 )
-from src.backend.clinical.collector import EvidenceCollector
 from src.backend.clinical.models import ClinicalContext
-
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -116,7 +115,7 @@ def sample_bundle(sample_evidence_item):
                 evidence_level="C",
             ),
         ],
-        retrieved_at=datetime.now(timezone.utc).isoformat(),
+        retrieved_at=datetime.now(UTC).isoformat(),
         context_hash="abc123",
     )
 

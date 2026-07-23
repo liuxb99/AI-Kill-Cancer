@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import Column, String, DateTime, BigInteger, Enum as SAEnum, ForeignKey, JSON
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import JSON, BigInteger, Column, DateTime, ForeignKey, String
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from src.backend.database.models import CompatUUID, Base as DBBase
+from src.backend.database.models import Base as DBBase
+from src.backend.database.models import CompatUUID
 from src.backend.domain.enums import AnalysisStatusEnum
 
 
@@ -53,13 +54,13 @@ class AnalysisRunCreate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     case_id: str
-    sequencing_test_id: Optional[str] = None
-    pipeline_version: Optional[str] = Field(None, max_length=64)
-    dataset_version: Optional[str] = Field(None, max_length=64)
-    annotation_version: Optional[str] = Field(None, max_length=64)
-    evidence_version: Optional[str] = Field(None, max_length=64)
-    schema_version: Optional[str] = Field(None, max_length=64)
-    git_commit: Optional[str] = Field(None, max_length=64)
+    sequencing_test_id: str | None = None
+    pipeline_version: str | None = Field(None, max_length=64)
+    dataset_version: str | None = Field(None, max_length=64)
+    annotation_version: str | None = Field(None, max_length=64)
+    evidence_version: str | None = Field(None, max_length=64)
+    schema_version: str | None = Field(None, max_length=64)
+    git_commit: str | None = Field(None, max_length=64)
 
 
 class AnalysisRunResponse(BaseModel):
@@ -67,17 +68,17 @@ class AnalysisRunResponse(BaseModel):
 
     id: str
     case_id: str
-    sequencing_test_id: Optional[str] = None
+    sequencing_test_id: str | None = None
     status: str
-    pipeline_version: Optional[str] = None
-    dataset_version: Optional[str] = None
-    annotation_version: Optional[str] = None
-    evidence_version: Optional[str] = None
-    schema_version: Optional[str] = None
-    git_commit: Optional[str] = None
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
-    duration_ms: Optional[int] = None
+    pipeline_version: str | None = None
+    dataset_version: str | None = None
+    annotation_version: str | None = None
+    evidence_version: str | None = None
+    schema_version: str | None = None
+    git_commit: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    duration_ms: int | None = None
     warnings: list = []
     errors: list = []
     input_manifest: dict = {}
