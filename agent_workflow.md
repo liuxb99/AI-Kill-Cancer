@@ -4,13 +4,13 @@
 Vercel 部署調查與修復
 
 ## 當前任務ID
-Phase D：驗證與監看（D1–D4）
+全部完成
 
 ## 循環/返工次數
-1
+2
 
 ## 評分
-進行中
+✅ Vercel 部署成功
 
 ## Current Step
 [v] 初始化 workflow
@@ -20,8 +20,11 @@ Phase D：驗證與監看（D1–D4）
 [v] Phase A：現狀調查（A1–A4）✅
 [v] Phase B：根因分析（B1–B2）✅
 [v] Phase C：修復部署流程（C1–C5）✅
-[v] 返工第 1 次 — 修復 ruff + 前端測試 ✅
-[ ] Phase D：驗證與監看（D1–D4）
+[v] 返工第 1 次 — ruff + 前端測試 ✅
+[v] 返工第 2 次 — frontend build ✅
+[v] Phase D：驗證與監看（D1–D4）✅
+[v] CI Run #34 ✅
+[v] Deploy Run #57 ✅
 
 ## Next Step
-git push、觸發 workflow、監看結果
+全部完成 ✅
