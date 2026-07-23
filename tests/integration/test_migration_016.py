@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from alembic.config import Config
 from alembic import command
-from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import create_engine, inspect as sa_inspect
 
 # ── 条件跳过 ──────────────────────────────────────────────────────────────────
 _SKIP = os.environ.get("CI_SKIP_MIGRATION", "").lower() in ("1", "true", "yes")
@@ -82,51 +82,26 @@ class TestMigration016Upgrade:
     @pytest.mark.skipif(_SKIP, reason=_REASON)
     def test_upgrade_head_creates_phase2_tables(self, alembic_cfg):
         """执行 ``alembic upgrade head`` 后验证 Phase 2 表存在。"""
-        # 执行全部 migration 到最新版本
         command.upgrade(alembic_cfg, "head")
-
-        # 获取数据库连接并检查表
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        engine = create_async_engine(alembic_cfg.get_main_option("sqlalchemy.url"))
-
-        async def _check():
-            async with engine.connect() as conn:
-                inspector = await conn.run_sync(sa_inspect)
-                for table in PHASE2_TABLES:
-                    assert _table_exists(
-                        inspector, table
-                    ), f"表 {table} 应在 upgrade head 后存在"
-
-        import asyncio
-
-        asyncio.run(_check())
+        sync_url = alembic_cfg.get_main_option("sqlalchemy.url").replace("+aiosqlite", "")
+        engine = create_engine(sync_url)
+        inspector = sa_inspect(engine)
+        for table in PHASE2_TABLES:
+            assert _table_exists(inspector, table), f"表 {table} 应在 upgrade head 后存在"
 
     @pytest.mark.skipif(_SKIP, reason=_REASON)
     def test_upgrade_head_creates_indexes(self, alembic_cfg):
         """验证关键索引已创建。"""
         command.upgrade(alembic_cfg, "head")
-
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        engine = create_async_engine(alembic_cfg.get_main_option("sqlalchemy.url"))
-
-        async def _check():
-            async with engine.connect() as conn:
-                inspector = await conn.run_sync(sa_inspect)
-                # clinical_decision_nodes 索引
-                idx_cdn = {i["name"] for i in inspector.get_indexes("clinical_decision_nodes")}
-                assert any("case_id" in n for n in idx_cdn), "clinical_decision_nodes 应有 case_id 索引"
-                assert any("context_hash" in n for n in idx_cdn), "clinical_decision_nodes 应有 context_hash 索引"
-
-                # clinical_agent_opinions 索引
-                idx_cao = {i["name"] for i in inspector.get_indexes("clinical_agent_opinions")}
-                assert any("case_id" in n for n in idx_cao), "clinical_agent_opinions 应有 case_id 索引"
-                assert any("run_id" in n for n in idx_cao), "clinical_agent_opinions 应有 run_id 索引"
-
-        import asyncio
-
-        asyncio.run(_check())
+        sync_url = alembic_cfg.get_main_option("sqlalchemy.url").replace("+aiosqlite", "")
+        engine = create_engine(sync_url)
+        inspector = sa_inspect(engine)
+        idx_cdn = {i["name"] for i in inspector.get_indexes("clinical_decision_nodes")}
+        assert any("case_id" in n for n in idx_cdn), "clinical_decision_nodes 应有 case_id 索引"
+        assert any("context_hash" in n for n in idx_cdn), "clinical_decision_nodes 应有 context_hash 索引"
+        idx_cao = {i["name"] for i in inspector.get_indexes("clinical_agent_opinions")}
+        assert any("case_id" in n for n in idx_cao), "clinical_agent_opinions 应有 case_id 索引"
+        assert any("run_id" in n for n in idx_cao), "clinical_agent_opinions 应有 run_id 索引"
 
 
 class TestMigration016Downgrade:
@@ -137,22 +112,11 @@ class TestMigration016Downgrade:
         """执行 upgrade head 后 downgrade -1，验证 Phase 2 表已删除。"""
         command.upgrade(alembic_cfg, "head")
         command.downgrade(alembic_cfg, "-1")
-
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        engine = create_async_engine(alembic_cfg.get_main_option("sqlalchemy.url"))
-
-        async def _check():
-            async with engine.connect() as conn:
-                inspector = await conn.run_sync(sa_inspect)
-                for table in PHASE2_TABLES:
-                    assert not _table_exists(
-                        inspector, table
-                    ), f"表 {table} 应在 downgrade -1 后删除"
-
-        import asyncio
-
-        asyncio.run(_check())
+        sync_url = alembic_cfg.get_main_option("sqlalchemy.url").replace("+aiosqlite", "")
+        engine = create_engine(sync_url)
+        inspector = sa_inspect(engine)
+        for table in PHASE2_TABLES:
+            assert not _table_exists(inspector, table), f"表 {table} 应在 downgrade -1 后删除"
 
 
 class TestMigration016Cycle:
@@ -161,48 +125,30 @@ class TestMigration016Cycle:
     @pytest.mark.skipif(_SKIP, reason=_REASON)
     def test_upgrade_downgrade_upgrade_cycle(self, alembic_cfg):
         """执行 upgrade head → downgrade -1 → upgrade head，验证表状态。"""
+        sync_url = alembic_cfg.get_main_option("sqlalchemy.url").replace("+aiosqlite", "")
+
         # ── 第 1 步：upgrade head ──
         command.upgrade(alembic_cfg, "head")
-
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        engine = create_async_engine(alembic_cfg.get_main_option("sqlalchemy.url"))
-
-        async def _step1():
-            async with engine.connect() as conn:
-                inspector = await conn.run_sync(sa_inspect)
-                for table in PHASE2_TABLES:
-                    assert _table_exists(inspector, table), f"Step 1: {table} 应存在"
-
-        import asyncio
-
-        asyncio.run(_step1())
+        engine = create_engine(sync_url)
+        inspector = sa_inspect(engine)
+        for table in PHASE2_TABLES:
+            assert _table_exists(inspector, table), f"Step 1: {table} 应存在"
+        engine.dispose()
 
         # ── 第 2 步：downgrade -1 ──
         command.downgrade(alembic_cfg, "-1")
-
-        async def _step2():
-            async with engine.connect() as conn:
-                inspector = await conn.run_sync(sa_inspect)
-                for table in PHASE2_TABLES:
-                    assert not _table_exists(
-                        inspector, table
-                    ), f"Step 2: {table} 应已被删除"
-
-        asyncio.run(_step2())
+        engine = create_engine(sync_url)
+        inspector = sa_inspect(engine)
+        for table in PHASE2_TABLES:
+            assert not _table_exists(inspector, table), f"Step 2: {table} 应已被删除"
+        engine.dispose()
 
         # ── 第 3 步：再次 upgrade head ──
         command.upgrade(alembic_cfg, "head")
-
-        async def _step3():
-            async with engine.connect() as conn:
-                inspector = await conn.run_sync(sa_inspect)
-                for table in PHASE2_TABLES:
-                    assert _table_exists(
-                        inspector, table
-                    ), f"Step 3: {table} 应重新创建"
-
-        asyncio.run(_step3())
+        engine = create_engine(sync_url)
+        inspector = sa_inspect(engine)
+        for table in PHASE2_TABLES:
+            assert _table_exists(inspector, table), f"Step 3: {table} 应重新创建"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
