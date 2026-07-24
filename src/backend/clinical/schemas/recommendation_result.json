@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-kill-cancer.example/schemas/recommendation_result/1.0.0",
+  "version": "1.0.0",
+  "title": "RecommendationResult",
+  "description": "Top-level result of the clinical recommendation pipeline for a single patient. Contains the patient identifier, ranked list of drug recommendations, trace identifier for auditability, engine version that produced the result, and creation timestamp.\n\nThis is the primary output contract returned by the RecommendationEngine to callers (API, UI, downstream systems).",
+  "type": "object",
+  "properties": {
+    "patient_id": {
+      "type": "string",
+      "description": "Unique identifier for the patient this recommendation was generated for. Aligns with the patient_id in ClinicalContext and CalculationTrace.",
+      "examples": ["P-001", "PAT-42a7f1", "CASE-2024-00123"]
+    },
+    "recommendations": {
+      "type": "array",
+      "description": "Ordered list of drug scoring results, sorted by overall_score descending (rank 1 first). Each entry contains the full scoring breakdown for one drug candidate.",
+      "items": {
+        "$ref": "https://ai-kill-cancer.example/schemas/drug_score/1.0.0"
+      },
+      "minItems": 0
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "Unique identifier linking this result to its CalculationTrace in the trace store. Enables full step-by-step audit of how the recommendation was produced. Null when tracing was not enabled for this run.",
+      "examples": ["a1b2c3d4e5f67890abcdef1234567890", null]
+    },
+    "engine_version": {
+      "type": "string",
+      "description": "Semantic version of the RecommendationEngine that produced this result. Follows the MAJOR.MINOR.PATCH format. Helps downstream consumers determine which business rules and scoring logic were applied.",
+      "examples": ["1.0.0", "1.2.0", "2.0.0-beta"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp of when this recommendation result was generated (e.g. '2025-06-18T14:30:00Z').",
+      "examples": ["2025-06-18T14:30:00Z", "2025-06-18T14:30:00.123456Z"]
+    }
+  },
+  "required": ["patient_id", "recommendations", "engine_version", "created_at"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "patient_id": "P-001",
+      "recommendations": [
+        {
+          "drug_name": "Osimertinib",
+          "overall_score": 0.7834,
+          "evidence_score": {
+            "total_weighted_score": 8.25,
+            "source_diversity": 0.75,
+            "highest_tier": "Tier_0",
+            "confidence_score": 0.82
+          },
+          "sensitivity": 0.85,
+          "resistance": 0.12,
+          "conflict_score": 0.05,
+          "rank": 1,
+          "details": {
+            "item_count": 12,
+            "source_count": 4,
+            "highest_weight": 3.5,
+            "sources": ["COSMIC", "CIViC", "OncoKB", "ClinicalTrials.gov"]
+          }
+        },
+        {
+          "drug_name": "Pembrolizumab",
+          "overall_score": 0.521,
+          "evidence_score": {
+            "total_weighted_score": 4.5,
+            "source_diversity": 0.5,
+            "highest_tier": "Tier_1",
+            "confidence_score": 0.55
+          },
+          "sensitivity": 0.6,
+          "resistance": 0.3,
+          "conflict_score": 0.15,
+          "rank": 2,
+          "details": {
+            "item_count": 6,
+            "source_count": 3,
+            "highest_weight": 2.0,
+            "sources": ["CIViC", "OncoKB", "PubMed"]
+          }
+        }
+      ],
+      "trace_id": "a1b2c3d4e5f67890abcdef1234567890",
+      "engine_version": "1.0.0",
+      "created_at": "2025-06-18T14:30:00Z"
+    }
+  ]
+}

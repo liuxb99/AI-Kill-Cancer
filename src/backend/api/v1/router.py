@@ -12,6 +12,7 @@ from src.backend.api.v1.knowledge import router as knowledge_router
 from src.backend.api.v1.patients import router as patients_router
 from src.backend.api.v1.ranking import router as ranking_router
 from src.backend.api.v1.reasoning import router as reasoning_router
+from src.backend.api.v1.recommendation import router as recommendation_router
 from src.backend.api.v1.reports import router as reports_router
 from src.backend.api.v1.sequencing import router as sequencing_router
 from src.backend.api.v1.specimens import router as specimens_router
@@ -34,6 +35,7 @@ router.include_router(evidence_router)
 router.include_router(ranking_router)
 router.include_router(knowledge_router)
 router.include_router(reasoning_router)
+router.include_router(recommendation_router)
 router.include_router(reports_router)
 router.include_router(workbench_router)
 router.include_router(clinical_router)

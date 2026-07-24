@@ -1,30 +1,27 @@
 # Agent Workflow
 
 ## 場景
-Vercel 部署調查與修復
+Phase 3A：Drug Recommendation Engine V1 — 臨床智能功能開發
 
 ## 當前任務ID
-全部完成
+Phase-3A
 
 ## 循環/返工次數
-2
+0
 
 ## 評分
-✅ Vercel 部署成功
+98/100 合格 ✅（循環 0）
 
 ## Current Step
-[v] 初始化 workflow
-[v] 記錄需求
-[v] 場景識別
-[v] PLANNER 制定計劃 — tasks/plan-vercel-deploy.md
-[v] Phase A：現狀調查（A1–A4）✅
-[v] Phase B：根因分析（B1–B2）✅
-[v] Phase C：修復部署流程（C1–C5）✅
-[v] 返工第 1 次 — ruff + 前端測試 ✅
-[v] 返工第 2 次 — frontend build ✅
-[v] Phase D：驗證與監看（D1–D4）✅
-[v] CI Run #34 ✅
-[v] Deploy Run #57 ✅
+[v] Step 0B：接收需求（tasks/requirements.md）
+[v] Step 1：場景識別（task-status.md）
+[v] Step 2：PLANNER 制定計劃（tasks/plan-phase3A.md）
+[v] Step 3：更新 Workflow
+[v] Step 4：執行開發（Batch 1~7 全部完成）
+[v] Step 4b：需求回歸檢查（12/12 PASS）
+[v] Step 5：REVIEWER 評分（98 分 ✅）
+[v] Step 6：總結報告
+[v] ✅ **Phase 3A 全部完成！**
 
 ## Next Step
-全部完成 ✅
+等待使用者指示下一階段任務

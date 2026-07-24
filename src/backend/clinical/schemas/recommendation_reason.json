@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-kill-cancer.example/schemas/recommendation_reason/1.0.0",
+  "version": "1.0.0",
+  "title": "RecommendationReason",
+  "description": "Complete human-readable and traceable explanation for a single drug's ranking. Decomposes the ranking decision into atomic ReasonItem fragments covering evidence support, sensitivity, resistance, conflict, and rule triggers.\n\nProduced by ExplainableEngine to enable full auditability of the ranking decision.",
+  "type": "object",
+  "properties": {
+    "drug_name": {
+      "type": "string",
+      "description": "Name of the drug this explanation refers to.",
+      "examples": ["Osimertinib", "Pembrolizumab"]
+    },
+    "rank": {
+      "type": "integer",
+      "description": "1-based rank position of the drug. Aligns with the rank in the corresponding DrugScore.",
+      "minimum": 0,
+      "examples": [1, 2, 3]
+    },
+    "overall_score": {
+      "type": "number",
+      "description": "Composite overall score (raw_score) of the drug. The same value appears in DrugScore.overall_score.",
+      "examples": [0.7834, 0.521]
+    },
+    "reasons": {
+      "type": "array",
+      "description": "Ordered list of atomic explanation fragments that together justify the rank. Items are sorted by absolute score_impact descending — the most impactful reasons appear first.",
+      "items": {
+        "$ref": "#/$defs/ReasonItem"
+      },
+      "minItems": 0
+    }
+  },
+  "required": ["drug_name", "rank", "overall_score", "reasons"],
+  "additionalProperties": false,
+  "$defs": {
+    "ReasonItem": {
+      "title": "ReasonItem",
+      "description": "A single atomic explanation fragment for one drug's ranking. Each reason covers one facet of the scoring: evidence support, sensitivity, resistance, conflict, or a rule-based trigger.",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "description": "The facet this reason belongs to. One of: evidence_support (evidence source contributions), sensitivity (drug sensitivity analysis), resistance (resistance evidence), conflict (contradictory evidence), or rule (business rule / rank context).",
+          "enum": ["evidence_support", "sensitivity", "resistance", "conflict", "rule"]
+        },
+        "detail": {
+          "type": "string",
+          "description": "Human-readable description of this reason in English. Provides context, numeric values, and interpretation for the end user.",
+          "examples": [
+            "Evidence confidence score is 0.8200 (weighted score 8.25, source diversity 0.75).",
+            "Sensitivity score 0.8500 — 8/12 evidence items indicate sensitivity.",
+            "Ranked #1 — leads DrugX (#2) by 0.1234 points in overall score."
+          ]
+        },
+        "source": {
+          "type": "string",
+          "description": "The evidence source name or rule identifier that produced this reason. Helps users trace back to the originating system component.",
+          "examples": ["EvidenceAggregator", "DrugRankingEngine", "DrugRanker", "COSMIC", "CIViC"]
+        },
+        "score_impact": {
+          "type": "number",
+          "description": "The numeric contribution (positive or negative) of this reason to the overall score. Positive values indicate a favourable contribution; negative values indicate a penalty. A zero value means this reason is informational only.",
+          "examples": [0.328, -0.18, 0.0]
+        },
+        "trace_id": {
+          "type": "string",
+          "description": "Optional UUID or reference that can be followed back to the originating evidence item or rule evaluation. Null when the reason is aggregated or derived rather than directly traceable.",
+          "examples": ["a1b2c3d4-e5f6-7890-abcd-ef1234567890", null]
+        }
+      },
+      "required": ["category", "detail", "source", "score_impact"],
+      "additionalProperties": false
+    }
+  },
+  "examples": [
+    {
+      "drug_name": "Osimertinib",
+      "rank": 1,
+      "overall_score": 0.7834,
+      "reasons": [
+        {
+          "category": "evidence_support",
+          "detail": "Evidence confidence score is 0.8200 (weighted score 8.25, source diversity 0.75).",
+          "source": "EvidenceAggregator",
+          "score_impact": 0.328
+        },
+        {
+          "category": "sensitivity",
+          "detail": "Sensitivity score 0.8500 — 8/12 evidence items indicate sensitivity.",
+          "source": "DrugRankingEngine",
+          "score_impact": 0.2975
+        },
+        {
+          "category": "rule",
+          "detail": "Ranked #1 — leads DrugX (#2) by 0.1234 points in overall score.",
+          "source": "DrugRanker",
+          "score_impact": 0.1234
+        }
+      ]
+    }
+  ]
+}

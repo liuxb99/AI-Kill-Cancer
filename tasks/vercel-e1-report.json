@@ -1,0 +1,42 @@
+{
+  "phase": "E1",
+  "timestamp": "2026-07-24T10:07:17.103578",
+  "vercel_token_status": "INVALID (403 Forbidden)",
+  "projects": {
+    "frontend": {
+      "name": "frontend",
+      "team": "liuxb99-9860s-projects",
+      "production_domain": "frontend-liuxb99-9860s-projects.vercel.app",
+      "http_status": "302 Redirect",
+      "details": "由 GitHub Actions 自動建立，配置源自 vercel.json",
+      "created_by": "GitHub Actions deploy",
+      "last_deployment_status": "success (Run #30029948264)"
+    },
+    "ai-kill-cancer-zqpi": {
+      "name": "ai-kill-cancer-zqpi",
+      "team": "liuxb99-9860s-projects (推測)",
+      "production_domain": "ai-kill-cancer-zqpi.vercel.app",
+      "http_status": "500 FUNCTION_INVOCATION_FAILED",
+      "details": "由 Vercel Git Integration 自動建立，配置可能不正確（root directory 未設定為 src/frontend）",
+      "created_by": "Vercel Git Integration",
+      "last_deployment_status": "failure"
+    }
+  },
+  "analysis": {
+    "root_cause": "VERCEL_TOKEN 已失效 (403 Forbidden)，無法透過 CLI/API 修改 Project 設定或查詢詳細資訊",
+    "github_actions_config": {
+      "deploy.yml": "使用 VERCEL_ORG_ID 和 VERCEL_PROJECT_ID 來自 GitHub Secrets",
+      "current_target": "frontend (推測，因 VERCT_PROJECT_ID 指向 frontend project)",
+      "vercel_pull_dir": "src/frontend",
+      "prebuilt_deploy": true
+    },
+    "vercel_json": "已正確設定 rootDirectory: src/frontend, framework: Vite, nodeVersion: 22"
+  },
+  "blocked_items": [
+    "E2: 無法修改 ai-kill-cancer-zqpi Project 設定 — 需要有效 VERCEL_TOKEN",
+    "E3: 無法查詢或更新 GitHub Secrets 中的 VERCEL_PROJECT_ID — 需要 GitHub API Token 或手動操作",
+    "E4: 無法執行部署驗證 — 需要有效 VERCEL_TOKEN",
+    "E5: 無法停用 Git Integration — 需要有效 VERCEL_TOKEN 或 Dashboard 存取權",
+    "E6: 無法刪除 frontend project — 需要有效 VERCEL_TOKEN 或 Dashboard 存取權"
+  ]
+}

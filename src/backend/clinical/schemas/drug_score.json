@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-kill-cancer.example/schemas/drug_score/1.0.0",
+  "version": "1.0.0",
+  "title": "DrugScore",
+  "description": "Aggregated scoring result for a single drug candidate. Combines evidence strength, sensitivity, resistance, and conflict metrics into a composite overall score for ranking purposes.\n\nThis schema represents the per-drug output of the DrugRankingEngine pipeline.",
+  "type": "object",
+  "properties": {
+    "drug_name": {
+      "type": "string",
+      "description": "Name of the drug (generic or brand name as used in the evidence base).",
+      "examples": ["Osimertinib", "Pembrolizumab", "Imatinib"]
+    },
+    "overall_score": {
+      "type": "number",
+      "description": "Composite overall score for ranking. Higher values indicate stronger recommendation priority. Computed as a weighted combination of evidence_score, sensitivity, inverse resistance, and inverse conflict_score.",
+      "examples": [0.7834, 0.5210, 0.0]
+    },
+    "evidence_score": {
+      "description": "Evidence-derived sub-score containing total weighted score, source diversity, highest evidence tier, confidence score, and optional per-source breakdown.",
+      "$ref": "https://ai-kill-cancer.example/schemas/evidence_score/1.0.0"
+    },
+    "sensitivity": {
+      "type": "number",
+      "description": "Sensitivity score in [0.0, 1.0] reflecting the proportion and strength of evidence indicating the tumour is likely to respond to this drug. Higher values = more sensitive.",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.85, 0.33, 0.0]
+    },
+    "resistance": {
+      "type": "number",
+      "description": "Resistance score in [0.0, 1.0] reflecting the proportion and strength of evidence indicating the tumour is resistant to this drug. Higher values = more resistant (penalises overall score).",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.12, 0.67, 0.0]
+    },
+    "conflict_score": {
+      "type": "number",
+      "description": "Conflict score in [0.0, 1.0] reflecting the degree of contradictory evidence among sources. Higher values indicate more conflicting evidence (penalises overall score).",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.05, 0.43, 0.0]
+    },
+    "rank": {
+      "type": "integer",
+      "description": "1-based overall rank position among all scored drugs. Rank 1 is the highest-priority recommendation.",
+      "minimum": 0,
+      "examples": [1, 2, 5]
+    },
+    "details": {
+      "type": "object",
+      "description": "Additional detail fields for traceability and debugging. Typically includes item_count, source_count, highest_weight, and source list from the aggregation step.",
+      "properties": {
+        "item_count": {
+          "type": "integer",
+          "description": "Total number of evidence items considered for this drug.",
+          "minimum": 0
+        },
+        "source_count": {
+          "type": "integer",
+          "description": "Number of distinct evidence sources contributing to this drug's score.",
+          "minimum": 0
+        },
+        "highest_weight": {
+          "type": "number",
+          "description": "Maximum individual weight among all evidence items for this drug.",
+          "minimum": 0.0
+        },
+        "sources": {
+          "type": "array",
+          "description": "Sorted list of evidence source names that contributed to this drug's scoring.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "required": ["drug_name", "overall_score", "evidence_score", "sensitivity", "resistance", "conflict_score", "rank"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "drug_name": "Osimertinib",
+      "overall_score": 0.7834,
+      "evidence_score": {
+        "total_weighted_score": 8.25,
+        "source_diversity": 0.75,
+        "highest_tier": "Tier_0",
+        "confidence_score": 0.82
+      },
+      "sensitivity": 0.85,
+      "resistance": 0.12,
+      "conflict_score": 0.05,
+      "rank": 1,
+      "details": {
+        "item_count": 12,
+        "source_count": 4,
+        "highest_weight": 3.5,
+        "sources": ["COSMIC", "CIViC", "OncoKB", "ClinicalTrials.gov"]
+      }
+    }
+  ]
+}

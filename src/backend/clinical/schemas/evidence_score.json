@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-kill-cancer.example/schemas/evidence_score/1.0.0",
+  "version": "1.0.0",
+  "title": "EvidenceScore",
+  "description": "Evidence-derived score for a single drug, computed from the aggregated evidence data produced by EvidenceAggregator.\n\nEncapsulates total weighted score, source diversity, highest tier observed, composite confidence score, and per-source breakdown for full auditability.",
+  "type": "object",
+  "properties": {
+    "total_weighted_score": {
+      "type": "number",
+      "description": "Sum of all weighted evidence scores for this drug. Higher values indicate stronger aggregate evidence volume.",
+      "minimum": 0.0,
+      "examples": [7.5, 12.3, 0.0]
+    },
+    "source_diversity": {
+      "type": "number",
+      "description": "Ratio of distinct evidence sources to total items, in [0.0, 1.0]. Higher values indicate evidence from multiple independent sources, which increases confidence.",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.667, 1.0, 0.25]
+    },
+    "highest_tier": {
+      "type": "string",
+      "description": "The best (highest) evidence tier observed across all evidence items for this drug. Typical values range from Tier_0 (strongest) to Tier_4 (weakest).",
+      "examples": ["Tier_0", "Tier_1", "Tier_4"]
+    },
+    "confidence_score": {
+      "type": "number",
+      "description": "Composite confidence score in [0.0, 1.0] derived from a weighted combination of the normalised total weight and source diversity. Higher values reflect greater evidence reliability.",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.85, 0.42, 0.0]
+    },
+    "source_breakdown": {
+      "type": "object",
+      "description": "Optional per-source breakdown of evidence contributions. Each key is a source name, and its value contains weight, tier, item count, and direction summary for that source.",
+      "properties": {
+        "sources": {
+          "type": "object",
+          "description": "Mapping of source name → per-source summary.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "total_weight": {
+                "type": "number",
+                "description": "Sum of evidence weights from this source.",
+                "minimum": 0.0
+              },
+              "item_count": {
+                "type": "integer",
+                "description": "Number of evidence items from this source.",
+                "minimum": 0
+              },
+              "highest_tier": {
+                "type": "string",
+                "description": "Highest evidence tier observed from this source."
+              },
+              "directions": {
+                "type": "array",
+                "description": "Distinct evidence directions observed from this source (supporting, resistance, conflicting, neutral, unknown).",
+                "items": {
+                  "type": "string",
+                  "enum": ["supporting", "resistance", "conflicting", "neutral", "unknown"]
+                },
+                "uniqueItems": true
+              }
+            },
+            "required": ["total_weight", "item_count"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["total_weighted_score", "source_diversity", "highest_tier", "confidence_score"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "total_weighted_score": 8.25,
+      "source_diversity": 0.75,
+      "highest_tier": "Tier_0",
+      "confidence_score": 0.82
+    }
+  ]
+}

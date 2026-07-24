@@ -1,27 +1,22 @@
 # 任務狀態
 
 ## 場景
-Vercel 部署調查與修復
+Phase 3A：Drug Recommendation Engine V1 — 臨床智能功能開發
+
+## 場景分類
+feature-dev（功能開發）
 
 ## 任務清單
 
-| ID | 任務 | 狀態 | 負責 | 備註 |
-|----|------|------|------|------|
-| A1 | 審查所有 workflow 檔案 | ✅ 完成 | devops | |
-| A2 | 審查前端建置相關檔案 | ✅ 完成 | devops | |
-| A3 | 確認 gh CLI 可用性 | ✅ 完成 | devops | gh 不可用，改用 curl |
-| A4 | 查詢最近 failed GitHub Actions run | ✅ 完成 | devops | run ID: 30018075089 |
-| B1 | 定位第一個失敗 step 與錯誤訊息 | ✅ 完成 | devops | ruff 無配置、npm ci 暫態失敗 |
-| B2 | 分析根因並撰寫結構化錯誤報告 | ✅ 完成 | devops | |
-| C1 | 比對 Vercel 官方部署流程 | ✅ 完成 | devops | 採用 Vercel CLI 方案 |
-| C2 | 修正 vercel.json 配置 | ✅ 完成 | devops | nodeVersion: 18→22 |
-| C3 | 重寫 deploy.yml 為 Vercel CLI 部署 | ✅ 完成 | devops | SSH/Docker → Vercel CLI |
-| C4 | 確認 GitHub Secrets 名稱一致性 | ✅ 完成 | devops | VERCEL_TOKEN/ORG_ID/PROJECT_ID |
-| C5 | git commit/push | ✅ 完成 | devops | cd71333 |
-| D1 | 觸發並監看 CI 結果 | ✅ 完成 | devops | Run #34 ✅ success |
-| D2 | 監看 deploy workflow 結果 | ✅ 完成 | devops | Run #57 ✅ success |
-| D3 | 回報三種狀態 | ✅ 完成 | devops | CI ✅ / Vercel ✅ / Commit ✅ |
-| D4 | 彙整 18 項完成證據 | ✅ 完成 | devops | 報告在 tasks/vercel-deploy-report.md |
-
-## 最終結果
-🎉 Vercel 部署修復成功
+| ID | 任務 | 狀態 | 負責角色 | 備註 |
+|----|------|------|----------|------|
+| P3A-01 | Recommendation Engine 核心（Engine/Rule/Aggregator/Ranker） | [ ] 待辦 | backend-logic | 全部規則化，不可寫死 |
+| P3A-02 | Evidence Weight / Tier / Confidence / Evidence Level 模型 | [ ] 待辦 | db-modeler | 支援 FDA/NCCN/OncoKB/CIViC/DGIdb/OpenCRAVAT |
+| P3A-03 | Drug Ranking 系統（Overall/Evidence/Sensitivity/Resistance/Conflict Score） | [ ] 待辦 | backend-logic | 排序輸出 Top N |
+| P3A-04 | Explainable AI（Reason/Evidence/Source/Score Detail） | [ ] 待辦 | backend-logic | 全部可追溯 |
+| P3A-05 | Calculation Trace（Input→Evidence→Score→Recommendation→Output） | [ ] 待辦 | backend-logic | 整合既有 DecisionThread |
+| P3A-06 | JSON Schema（RecommendationResult/DrugScore/EvidenceScore/RecommendationReason） | [ ] 待辦 | backend-logic | Versioned |
+| P3A-07 | API 端點（POST /recommendation + GET /recommendation/{id}） | [ ] 待辦 | api-designer | |
+| P3A-08 | HTML Drug Recommendation Report | [ ] 待辦 | backend-logic | Patient/Variants/Evidence/Top Drugs/Reason/Warnings/Trace |
+| P3A-09 | Frontend Recommendation Page | [ ] 待辦 | frontend-logic | 只補頁面，不重新設計 |
+| P3A-10 | 測試（Unit/Integration/API/Golden Tests） | [ ] 待辦 | unit-tester + integration-tester | 全部通過 |

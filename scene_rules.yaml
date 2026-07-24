@@ -1,0 +1,43 @@
+# 場景規則
+scenes:
+  - id: feature-dev
+    name: 功能開發
+    description: 新功能模組的完整開發流程
+    roles:
+      - planner: 制定執行計劃
+      - backend-logic: 後端業務邏輯
+      - api-designer: API 設計
+      - db-modeler: 資料庫建模
+      - frontend-logic: 前端業務邏輯
+      - unit-tester: 單元測試
+      - integration-tester: 整合測試
+      - doc-writer: 文件撰寫
+      - reviewer: 評分代理
+    workflow:
+      - Step 0B: 接收需求
+      - Step 1: 場景識別
+      - Step 2: PLANNER 制定計劃
+      - Step 3: 更新 Workflow
+      - Step 4: 執行開發
+      - Step 4b: 需求回歸檢查
+      - Step 5: REVIEWER 評分
+      - Step 5b: 返工循環（必要時）
+      - Step 6: 總結報告
+
+  - id: bug-fix
+    name: 錯誤修復
+    description: 修復既有功能的錯誤
+    roles:
+      - planner: 制定修復計劃
+      - backend-logic: 後端修復（如適用）
+      - frontend-logic: 前端修復（如適用）
+      - unit-tester: 測試驗證
+      - reviewer: 評分代理
+
+  - id: devops
+    name: DevOps / 部署
+    description: CI/CD、部署、基礎設施
+    roles:
+      - planner: 規劃部署步驟
+      - devops: 部署執行
+      - reviewer: 驗證確認

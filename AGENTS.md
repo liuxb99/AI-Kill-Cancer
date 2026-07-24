@@ -32,11 +32,14 @@ Level 2：這是不是業務檔案？
 
 ## 子代理示範啟動（首次強制）
 
-预案核准后，接第一個真實任務前，先用 task() 啟動 doc-writer 做一個最小任務（如建立 tasks/demo/start.md），讓系統實際體驗子代理的運作模式。示範完成後記錄到 `agent_workflow_History.md`（append 末尾）。一次經驗比十條規則有效。
+接第一個真實任務前，先用 task() 啟動 doc-writer 做一個最小任務（如建立 tasks/demo/start.md），讓系統實際體驗子代理的運作模式。示範完成後記錄到 `agent_workflow_History.md`（append 末尾）。一次經驗比十條規則有效。
 
 ## 工作流程
 
-### Step 0：接收需求
+### Step 0A：启动子代理向用户保证听话
+主代理必須先用 task() 啟動子代理，由子代理直接向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」，完成後方可進入 Step 0B。
+
+### Step 0B：接收需求：接收需求
 記錄到 tasks/requirements.md。
 
 ### Step 1：場景識別
@@ -76,8 +79,11 @@ TIME_PENDING | [v] 初始化 workflow
 用 task() 啟動開發子代理。後置檢查：確認檔案存在。
 記錄 append 到 `agent_workflow_History.md` 末尾：`2026-06-05 16:35 | [v] task(<角色>) -> <任務ID> 完成`
 
-### Step 5：REVIEWER 評分
+### Step 4b：需求回歸檢查
+執行子代理完成後、進入 REVIEWER 前，必須用 task() 啟動獨立子代理重新讀取 tasks/requirements.md，逐條核對原始需求與實際交付成果。需求來源只能是 tasks/requirements.md，不得依 plan、review、目前成果或既有作法重新定義、縮小或反推需求。發現任何缺漏、部分完成或無可查驗證據時，直接進入 Step 5b 返工；全部符合後才可進入 Step 5。
 
+### Step 5：REVIEWER 評分
+REVIEWER 必須先重新讀取 tasks/requirements.md，並以原始需求逐條審查，不得只依目前成果、計劃、摘要或測試結果判定完成。
 REVIEWER prompt 帶入以下完整規則，產出報告到 tasks/reviews/review_<任務ID>_<循環次數>.md。
 記錄（檢查清單 + 細項 + 總分，缺一不可），append 到 `agent_workflow_History.md` 末尾：
 ```
@@ -99,7 +105,7 @@ REVIEWER prompt 帶入以下完整規則，產出報告到 tasks/reviews/review_
 - 可維護性：無強制約束，低於12需說明
 - 測試與驗證：有測試NO→0分
 
-總分 = 四項加總。>= 90 合格，< 90 不合格。
+總分 = 四項加總。>=90 合格，<90 不合格。若任一需求、正式驗收或最終報告存在 FAIL、PARTIAL、Pending、未完成、互相矛盾或「尚未完成項目」非空，則「滿足需求=NO」，總分最高89分，不得標記完成，任務狀態必須為 PARTIAL 或不合格。
 ```
 
 ### Step 5b：返工循環（重要）
@@ -130,7 +136,7 @@ do {
 
 結果判定：
 - 循環次數 < 5 且 >= 90 分 → 任務完成 ✅
-- 循環次數 >= 5 且仍 < 90 分 → 標記「阻塞⚠️ 需人工介入」
+- 循環次數 >= 5 且仍 < 90 分 → 標記「阻塞⚠️ → 先啟動 DeepSeek MCP 顧問，DeepSeek 介入後最多再修 2 輪，若仍 <90 分，才標記需真人人工決策」
 ```
 
 返工循環中每次調用子代理都必須獨立記錄，且每條都 append 到 `agent_workflow_History.md` 末尾，不可合併成一條：
@@ -165,3 +171,5 @@ do {
 | 自動連續模式 | config/auto-mode.md |
 | 角色查詢 | config/role-library.md |
 | 寫入大檔 | config/write-spec.md |
+| DeepSeek MCP 顧問 | config/ask-deepseek-blocked.md |
+
