@@ -83,6 +83,7 @@ TIME_PENDING | [v] 初始化 workflow
 執行子代理完成後、進入 REVIEWER 前，必須用 task() 啟動獨立子代理重新讀取 tasks/requirements.md，逐條核對原始需求與實際交付成果。需求來源只能是 tasks/requirements.md，不得依 plan、review、目前成果或既有作法重新定義、縮小或反推需求。發現任何缺漏、部分完成或無可查驗證據時，直接進入 Step 5b 返工；全部符合後才可進入 Step 5。
 
 ### Step 5：REVIEWER 評分
+未完成=核心缺失/崩溃，正式執行路徑使用 Mock、Stub、Fake 或 Placeholder 視同核心缺失；核心功能未接入正式執行路徑或正式流程，視為未完成；错误=运行报错/核心不符；测试=核心正向通过——lint/TODO/覆盖率不否决基本判定。
 REVIEWER 必須先重新讀取 tasks/requirements.md，並以原始需求逐條審查，不得只依目前成果、計劃、摘要或測試結果判定完成。
 REVIEWER prompt 帶入以下完整規則，產出報告到 tasks/reviews/review_<任務ID>_<循環次數>.md。
 記錄（檢查清單 + 細項 + 總分，缺一不可），append 到 `agent_workflow_History.md` 末尾：
@@ -105,6 +106,7 @@ REVIEWER prompt 帶入以下完整規則，產出報告到 tasks/reviews/review_
 - 可維護性：無強制約束，低於12需說明
 - 測試與驗證：有測試NO→0分
 
+逐條對比原始需求進行評分；任一需求未完成，總分最高 89 分。
 總分 = 四項加總。>=90 合格，<90 不合格。若任一需求、正式驗收或最終報告存在 FAIL、PARTIAL、Pending、未完成、互相矛盾或「尚未完成項目」非空，則「滿足需求=NO」，總分最高89分，不得標記完成，任務狀態必須為 PARTIAL 或不合格。
 ```
 
