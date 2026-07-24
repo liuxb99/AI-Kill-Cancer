@@ -32,7 +32,6 @@ jobs:
 
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: src/frontend
 
       - name: Install dependencies
         run: npm ci
@@ -40,4 +39,3 @@ jobs:
 
       - name: Build and Deploy to Vercel
         run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: src/frontend
