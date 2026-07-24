@@ -244,3 +244,98 @@ class TestGetRecommendation:
             assert "trace_id" in get_data
             assert "engine_version" in get_data
         # else: skip GET test when creation fails (expected in some envs)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Database Persistence & Error Handling Tests (Batch E4)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestDatabasePersistence:
+    """Verify that API calls actually persist/read from the database."""
+
+    def test_get_reads_from_database(self, client, auth_headers):
+        """GET should retrieve from the database, returning the same data that was stored."""
+        # First create a recommendation
+        create_resp = client.post(
+            "/api/v1/recommendation",
+            json={
+                "patient_id": "P-DB-READ",
+                "variants": ["BRAF V600E"],
+            },
+            headers=auth_headers,
+        )
+
+        if create_resp.status_code != 200:
+            pytest.skip("POST did not return 200 — cannot test GET from DB")
+
+        rec_id = create_resp.json()["recommendation_id"]
+        created_data = create_resp.json()
+
+        # Now GET the same resource
+        get_resp = client.get(
+            f"/api/v1/recommendation/{rec_id}",
+            headers=auth_headers,
+        )
+        assert get_resp.status_code == 200
+        get_data = get_resp.json()
+
+        # Verify consistency
+        assert get_data["recommendation_id"] == rec_id
+        assert get_data["patient_id"] == created_data["patient_id"]
+        assert get_data["engine_version"] == created_data["engine_version"]
+        assert len(get_data["recommendations"]) == len(created_data["recommendations"])
+        for i, rec in enumerate(get_data["recommendations"]):
+            assert rec["drug_name"] == created_data["recommendations"][i]["drug_name"]
+            assert rec["rank"] == created_data["recommendations"][i]["rank"]
+
+
+class TestErrorHandling:
+    """Verify that error responses are safe and do not leak internals."""
+
+    def test_500_does_not_leak_exception(self, client, auth_headers):
+        """Internal errors should return a generic 500 without exception details."""
+        from unittest.mock import patch
+
+        # Mock the service to raise an unexpected exception
+        with patch(
+            "src.backend.services.recommendation_service.RecommendationService.create_recommendation",
+            side_effect=RuntimeError("Sensitive internal details — should not be exposed"),
+        ):
+            resp = client.post(
+                "/api/v1/recommendation",
+                json={
+                    "patient_id": "P-500-TEST",
+                    "variants": ["EGFR L858R"],
+                },
+                headers=auth_headers,
+            )
+
+        assert resp.status_code == 500
+        data = resp.json()
+        detail = data.get("detail", {})
+        error_msg = str(detail)
+        # The error detail should NOT contain the original exception message
+        assert "Sensitive internal details" not in error_msg
+        # Should contain a generic message
+        assert "INTERNAL_ERROR" in error_msg or "error" in error_msg
+
+    def test_500_on_get_does_not_leak_exception(self, client, auth_headers):
+        """Internal errors on GET should also return a generic 500."""
+        from unittest.mock import patch
+
+        with patch(
+            "src.backend.services.recommendation_service.RecommendationService.get_recommendation",
+            side_effect=RuntimeError("DB connection pool exhausted — secret details"),
+        ):
+            resp = client.get(
+                "/api/v1/recommendation/some-id",
+                headers=auth_headers,
+            )
+
+        assert resp.status_code == 500
+        data = resp.json()
+        error_msg = str(data.get("detail", {}))
+        assert "secret details" not in error_msg
+        assert "INTERNAL_ERROR" in error_msg or "error" in error_msg
+        assert "DB connection" not in error_msg

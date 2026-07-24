@@ -8,6 +8,12 @@ const features = [
     icon: '📚',
   },
   {
+    title: '用藥推薦',
+    desc: '輸入基因變異（Variants），AI 智慧分析並推薦最適合的標靶藥物與治療方案。',
+    path: '/recommendation',
+    icon: '💊',
+  },
+  {
     title: 'AI 工具',
     desc: '智慧分析症狀、風險評估、治療建議，讓 AI 成為您的健康助手。',
     path: '/tools',
@@ -31,6 +37,7 @@ export default function Home() {
           <h1 className="text-xl font-bold text-primary-700">AI Kill Cancer</h1>
           <nav className="flex gap-6 text-sm font-medium text-gray-600">
             <span className="text-primary-600 cursor-pointer">首頁</span>
+            <span className="cursor-pointer hover:text-primary-600" onClick={() => navigate('/recommendation')}>藥物推薦</span>
             <span className="cursor-pointer hover:text-primary-600" onClick={() => navigate('/knowledge')}>知識庫</span>
             <span className="cursor-pointer hover:text-primary-600" onClick={() => navigate('/tools')}>工具</span>
             <span className="cursor-pointer hover:text-primary-600" onClick={() => navigate('/research')}>論文</span>
@@ -57,7 +64,7 @@ export default function Home() {
       </section>
 
       <section className="max-w-6xl mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-4 gap-8">
           {features.map((f) => (
             <div
               key={f.path}

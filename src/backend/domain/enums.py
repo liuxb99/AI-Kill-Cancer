@@ -274,6 +274,25 @@ class AuditActionEnum(str, enum.Enum):
     CREATE = "create"
 
 
+# ── Recommendation enums ────────────────────────────────────────────────
+
+class RecommendationStatusEnum(str, enum.Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class TraceStepStatusEnum(str, enum.Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
 # ── Auth enums (imported by domain/user.py and auth/models.py) ──────────
 
 class Role(str, enum.Enum):

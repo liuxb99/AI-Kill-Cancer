@@ -8,6 +8,10 @@ from src.backend.repositories.evidence_item_repo import EvidenceItemRepository
 from src.backend.repositories.evidence_repo import EvidenceRepository
 from src.backend.repositories.knowledge_source_repo import KnowledgeSourceRepository
 from src.backend.repositories.patient_repo import PatientRepository
+from src.backend.repositories.recommendation_repo import (
+    RecommendationRepository,
+    TraceRepository,
+)
 from src.backend.repositories.report_repo import ReportRepository
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.repositories.specimen_repo import SpecimenRepository
@@ -25,6 +29,8 @@ __all__ = [
     "KnowledgeSourceRepository",
     "EvidenceItemRepository",
     "DrugInteractionRepository",
+    "RecommendationRepository",
+    "TraceRepository",
     "UserRepository",
     "CaseACLRepository",
 ]

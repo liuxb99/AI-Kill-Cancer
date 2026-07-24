@@ -70,9 +70,11 @@ from src.backend.domain.enums import (
     NormalizationStatusEnum,
     OncogenicityEnum,
     Permission,
+    RecommendationStatusEnum,
     Role,
     SexEnum,
     SpecimenTypeEnum,
+    TraceStepStatusEnum,
     UploadStatusEnum,
     ValidationStatusEnum,
     VariantOriginEnum,
@@ -100,6 +102,11 @@ from src.backend.domain.patient import (
     PatientUpdate,
 )
 from src.backend.domain.publication import PublicationModel
+from src.backend.domain.recommendation import (
+    RecommendationModel,
+    RecommendationTraceModel,
+    RecommendationTraceStepModel,
+)
 from src.backend.domain.report import ReportModel
 from src.backend.domain.sequencing import (
     SequencingTestCreate,
@@ -189,6 +196,12 @@ __all__ = [
     "ReportModel",
     "ConsentModel",
     "AuditLogModel",
+    # Recommendation
+    "RecommendationModel",
+    "RecommendationTraceModel",
+    "RecommendationTraceStepModel",
+    "RecommendationStatusEnum",
+    "TraceStepStatusEnum",
     # Pydantic
     "PatientCreate",
     "PatientUpdate",

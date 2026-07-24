@@ -64,6 +64,7 @@ export default function Dashboard() {
             <h1 className="text-xl font-bold text-primary-700">數據儀表板</h1>
           </div>
           <nav className="flex gap-6 text-sm font-medium text-gray-600">
+            <span className="cursor-pointer hover:text-primary-600" onClick={() => navigate('/recommendation')}>藥物推薦</span>
             <span className="cursor-pointer hover:text-primary-600" onClick={() => navigate('/knowledge')}>知識庫</span>
             <span className="cursor-pointer hover:text-primary-600" onClick={() => navigate('/tools')}>工具</span>
             <span className="cursor-pointer hover:text-primary-600" onClick={() => navigate('/research')}>論文</span>

@@ -146,3 +146,295 @@ class TestAnalysisRunRepository:
         assert run.id is not None
         assert run.status == AnalysisStatusEnum.PENDING
         assert run.pipeline_version == "0.2.0"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Recommendation Repository Tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestRecommendationRepository:
+    """Tests for RecommendationRepository — CRUD for RecommendationModel."""
+
+    async def test_create_recommendation(self, db_session):
+        from src.backend.domain.patient import PatientModel
+        from src.backend.domain.recommendation import RecommendationModel
+        from src.backend.repositories.recommendation_repo import RecommendationRepository
+
+        patient = PatientModel(display_name="REC-CREATE")
+        db_session.add(patient)
+        await db_session.flush()
+
+        repo = RecommendationRepository(db_session)
+        rec = RecommendationModel(
+            recommendation_id="repo-create-001",
+            patient_id=patient.id,
+            engine_version="1.0.0",
+            status="pending",
+            request_payload={"variants": ["EGFR L858R"]},
+        )
+        result = await repo.create(rec)
+        await db_session.flush()  # Ensure ID is assigned before reading
+
+        assert result is rec  # same instance returned
+        assert result.id is not None
+        assert result.recommendation_id == "repo-create-001"
+
+        # Confirm it's actually in the DB
+        await db_session.commit()
+        await db_session.refresh(result)
+        assert result.request_payload == {"variants": ["EGFR L858R"]}
+
+    async def test_get_by_id_found(self, db_session):
+        from src.backend.domain.patient import PatientModel
+        from src.backend.domain.recommendation import RecommendationModel
+        from src.backend.repositories.recommendation_repo import RecommendationRepository
+
+        patient = PatientModel(display_name="REC-GET-ID")
+        db_session.add(patient)
+        await db_session.flush()
+
+        repo = RecommendationRepository(db_session)
+        rec = RecommendationModel(recommendation_id="get-by-id-found", patient_id=patient.id)
+        await repo.create(rec)
+        await db_session.commit()
+
+        fetched = await repo.get_by_id("get-by-id-found")
+        assert fetched is not None
+        assert fetched.recommendation_id == "get-by-id-found"
+        assert str(fetched.id) == str(rec.id)
+
+    async def test_get_by_id_not_found(self, db_session):
+        from src.backend.repositories.recommendation_repo import RecommendationRepository
+
+        repo = RecommendationRepository(db_session)
+        result = await repo.get_by_id("non-existent-id")
+        assert result is None
+
+    async def test_get_by_trace_id(self, db_session):
+        from src.backend.domain.patient import PatientModel
+        from src.backend.domain.recommendation import RecommendationModel
+        from src.backend.repositories.recommendation_repo import RecommendationRepository
+
+        patient = PatientModel(display_name="REC-TRACE-ID")
+        db_session.add(patient)
+        await db_session.flush()
+
+        repo = RecommendationRepository(db_session)
+        rec = RecommendationModel(
+            recommendation_id="get-by-trace",
+            patient_id=patient.id,
+            trace_id="trace-abc-123",
+        )
+        await repo.create(rec)
+        await db_session.commit()
+
+        fetched = await repo.get_by_trace_id("trace-abc-123")
+        assert fetched is not None
+        assert fetched.recommendation_id == "get-by-trace"
+
+    async def test_get_by_trace_id_not_found(self, db_session):
+        from src.backend.repositories.recommendation_repo import RecommendationRepository
+
+        repo = RecommendationRepository(db_session)
+        result = await repo.get_by_trace_id("non-existent-trace")
+        assert result is None
+
+    async def test_list_by_patient_id(self, db_session):
+        from src.backend.domain.patient import PatientModel
+        from src.backend.domain.recommendation import RecommendationModel
+        from src.backend.repositories.recommendation_repo import RecommendationRepository
+
+        # Create a patient to satisfy FK
+        patient = PatientModel(display_name="REC-LIST-PAT")
+        db_session.add(patient)
+        await db_session.flush()
+
+        repo = RecommendationRepository(db_session)
+        for i in range(3):
+            rec = RecommendationModel(
+                recommendation_id=f"list-pat-{i:02d}",
+                patient_id=patient.id,
+            )
+            await repo.create(rec)
+        await db_session.commit()
+
+        results = await repo.list_by_patient_id(str(patient.id))
+        assert len(results) == 3
+        # Should be ordered by created_at desc (newest first)
+        assert all(r.patient_id == patient.id for r in results)
+
+    async def test_list_by_patient_id_empty(self, db_session):
+        from src.backend.repositories.recommendation_repo import RecommendationRepository
+
+        repo = RecommendationRepository(db_session)
+        results = await repo.list_by_patient_id("non-existent-patient")
+        assert results == []
+
+    async def test_list_by_patient_id_limits(self, db_session):
+        from src.backend.domain.patient import PatientModel
+        from src.backend.domain.recommendation import RecommendationModel
+        from src.backend.repositories.recommendation_repo import RecommendationRepository
+
+        patient = PatientModel(display_name="REC-LIMIT-PAT")
+        db_session.add(patient)
+        await db_session.flush()
+
+        repo = RecommendationRepository(db_session)
+        for i in range(5):
+            rec = RecommendationModel(
+                recommendation_id=f"limit-pat-{i:02d}",
+                patient_id=patient.id,
+            )
+            await repo.create(rec)
+        await db_session.commit()
+
+        results = await repo.list_by_patient_id(str(patient.id), limit=3)
+        assert len(results) == 3
+
+    async def test_transaction_rollback(self, db_session):
+        """If commit fails, no data should persist."""
+        from src.backend.domain.patient import PatientModel
+        from src.backend.domain.recommendation import RecommendationModel
+        from src.backend.repositories.recommendation_repo import RecommendationRepository
+
+        patient = PatientModel(display_name="REC-ROLLBACK")
+        db_session.add(patient)
+        await db_session.flush()
+
+        repo = RecommendationRepository(db_session)
+        rec = RecommendationModel(recommendation_id="rollback-test", patient_id=patient.id)
+        await repo.create(rec)
+
+        # Rollback explicitly
+        await db_session.rollback()
+
+        # Verify it's not in DB
+        fetched = await repo.get_by_id("rollback-test")
+        assert fetched is None
+
+
+class TestTraceRepository:
+    """Tests for TraceRepository — CRUD for RecommendationTraceModel and steps."""
+
+    async def _setup_recommendation(self, db_session):
+        """Helper: create a recommendation and return its ID."""
+        from src.backend.domain.patient import PatientModel
+        from src.backend.domain.recommendation import RecommendationModel
+
+        patient = PatientModel(display_name="TRACE-HELPER")
+        db_session.add(patient)
+        await db_session.flush()
+
+        rec = RecommendationModel(recommendation_id="trace-repo-test", patient_id=patient.id)
+        db_session.add(rec)
+        await db_session.flush()
+        return rec
+
+    async def test_create_trace(self, db_session):
+        from src.backend.domain.recommendation import (
+            RecommendationModel,
+            RecommendationTraceModel,
+        )
+        from src.backend.repositories.recommendation_repo import TraceRepository
+
+        rec = await self._setup_recommendation(db_session)
+        repo = TraceRepository(db_session)
+
+        trace = RecommendationTraceModel(
+            trace_id="trace-create-001",
+            recommendation_id=rec.id,
+        )
+        result = await repo.create_trace(trace)
+        await db_session.flush()  # Ensure trace.id is assigned before assertion
+        assert result is trace
+        assert result.id is not None
+        await db_session.commit()
+
+    async def test_get_trace_by_recommendation_id(self, db_session):
+        from src.backend.domain.recommendation import RecommendationTraceModel
+        from src.backend.repositories.recommendation_repo import TraceRepository
+
+        rec = await self._setup_recommendation(db_session)
+        repo = TraceRepository(db_session)
+
+        trace = RecommendationTraceModel(
+            trace_id="get-by-rec-id",
+            recommendation_id=rec.id,
+        )
+        await repo.create_trace(trace)
+        await db_session.commit()
+
+        fetched = await repo.get_trace_by_recommendation_id(str(rec.id))
+        assert fetched is not None
+        assert fetched.trace_id == "get-by-rec-id"
+
+    async def test_get_trace_by_trace_id(self, db_session):
+        from src.backend.domain.recommendation import RecommendationTraceModel
+        from src.backend.repositories.recommendation_repo import TraceRepository
+
+        rec = await self._setup_recommendation(db_session)
+        repo = TraceRepository(db_session)
+
+        trace = RecommendationTraceModel(
+            trace_id="trace-lookup-001",
+            recommendation_id=rec.id,
+        )
+        await repo.create_trace(trace)
+        await db_session.commit()
+
+        fetched = await repo.get_trace_by_trace_id("trace-lookup-001")
+        assert fetched is not None
+        assert fetched.trace_id == "trace-lookup-001"
+
+    async def test_get_trace_not_found(self, db_session):
+        from src.backend.repositories.recommendation_repo import TraceRepository
+
+        repo = TraceRepository(db_session)
+        assert await repo.get_trace_by_trace_id("nonexistent") is None
+        assert await repo.get_trace_by_recommendation_id("nonexistent") is None
+
+    async def test_create_and_get_steps(self, db_session):
+        from src.backend.domain.recommendation import (
+            RecommendationTraceModel,
+            RecommendationTraceStepModel,
+        )
+        from src.backend.repositories.recommendation_repo import TraceRepository
+
+        rec = await self._setup_recommendation(db_session)
+        repo = TraceRepository(db_session)
+
+        trace = RecommendationTraceModel(
+            trace_id="step-test-trace",
+            recommendation_id=rec.id,
+        )
+        await repo.create_trace(trace)
+        await db_session.flush()
+
+        step1 = RecommendationTraceStepModel(
+            trace_id=trace.id,
+            step_order=1,
+            step_type="collect",
+            status="completed",
+        )
+        step2 = RecommendationTraceStepModel(
+            trace_id=trace.id,
+            step_order=2,
+            step_type="rank",
+            status="completed",
+        )
+        await repo.create_step(step1)
+        await repo.create_step(step2)
+        await db_session.commit()
+
+        steps = await repo.get_steps_by_trace_id(str(trace.id))
+        assert len(steps) == 2
+        assert steps[0].step_order == 1
+        assert steps[1].step_order == 2
+
+    async def test_steps_empty_for_no_trace(self, db_session):
+        from src.backend.repositories.recommendation_repo import TraceRepository
+
+        repo = TraceRepository(db_session)
+        steps = await repo.get_steps_by_trace_id("no-such-trace")
+        assert steps == []
