@@ -16,13 +16,27 @@ jobs:
       - name: Delete frontend project
         run: |
           echo "Deleting frontend project..."
-          curl -s -X DELETE "https://api.vercel.com/v9/projects/frontend" \
-            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin))"
+          response=$(curl -s -o /tmp/response.json -w "%{http_code}" -X DELETE "https://api.vercel.com/v9/projects/frontend" \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}")
+          echo "HTTP Status: $response"
+          if [ -s /tmp/response.json ]; then
+            cat /tmp/response.json | python3 -m json.tool
+          fi
+          if [ "$response" = "204" ] || [ "$response" = "200" ]; then
+            echo "✅ frontend project deleted successfully"
+          else
+            echo "❌ Delete returned unexpected status"
+            exit 1
+          fi
 
       - name: Verify deletion
         run: |
           echo "=== Verifying frontend project deleted ==="
-          curl -s "https://api.vercel.com/v9/projects/frontend" \
-            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Status: {d.get(\"error\",{}).get(\"code\",\"?\")} — {d.get(\"error\",{}).get(\"message\",\"?\")}')"
+          response=$(curl -s -o /tmp/verify.json -w "%{http_code}" "https://api.vercel.com/v9/projects/frontend" \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}")
+          echo "HTTP Status: $response"
+          if [ "$response" = "404" ]; then
+            echo "✅ frontend project confirmed deleted (404)"
+          elif [ -s /tmp/verify.json ]; then
+            cat /tmp/verify.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Error: {d.get(\"error\",{}).get(\"code\",\"?\")}')"
+          fi
