@@ -23,8 +23,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, Optional
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.clinical.calculation_trace import TraceManager
 from src.backend.clinical.collector import EvidenceCollector
