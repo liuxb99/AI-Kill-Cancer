@@ -173,8 +173,7 @@ async def create_recommendation(
                 "message": str(exc),
             },
         )
-    except Exception as exc:
-        print(f"API_ERROR: type={type(exc).__name__} msg={exc}", flush=True)
+    except Exception:
         logger.exception("Recommendation processing failed")
         raise HTTPException(
             status_code=500,
@@ -186,9 +185,15 @@ async def create_recommendation(
 
     try:
         validated = RecommendationResponse(**result)
-    except Exception as exc:
-        print(f"VALIDATION_ERROR: type={type(exc).__name__} msg={exc}", flush=True)
-        raise
+    except Exception as e:
+        logger.exception("Response validation failed")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "INTERNAL_ERROR",
+                "message": f"Response validation failed: {e}",
+            },
+        )
     return validated
 
 
