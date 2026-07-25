@@ -186,3 +186,7 @@ Commit: a64f7a1 | 796 tests passed | Pushed to origin/master ✅
 2026-07-25 16:31 | [v] 診斷：嘗試 API 獲取日誌失敗（403/401）、代碼分析所有 Postgres 測試（40 passed on SQLite）
 2026-07-25 16:32 | [v] 修復：EvidenceAggregator set→list、close_db 重置 engine、mock set 修正
 2026-07-25 16:32 | [v] 推送 commit 95f32b5 → CI Run #60 進行中
+2026-07-25 17:00 | [v] 診斷循環 #62-#81：發現根因為 created_by FK 違規 + close_db 重置 engine
+2026-07-25 17:02 | [v] 修復：created_by=None + close_db 恢復原始行為
+2026-07-25 17:03 | [v] CI Run #82 ✅ 全部通過（backend + frontend success）
+2026-07-25 17:04 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性24 正確性24 可維護性22 測試23 | 總分93 合格 ✅
