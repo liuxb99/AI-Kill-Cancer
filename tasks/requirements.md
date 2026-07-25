@@ -197,3 +197,10 @@ dict 代替 DB、mock restart、monkeypatch、只新增 Model 不接 API、只�
 ### 提交範圍
 - 只允許修改：recommendation_service.py、recommendation.py (API)、必要的 domain/repository、必要的 migration、新測試檔案、tasks/ 文檔
 - 不得修改無關檔案
+
+## 2026-07-25 — Phase 3A Final Acceptance Gate
+
+- GitHub Actions PostgreSQL integration gate
+- PostgreSQL migration upgrade/downgrade/re-upgrade
+- Full API restart recovery on PostgreSQL
+- Real pipeline trace persistence without mocked TraceManager

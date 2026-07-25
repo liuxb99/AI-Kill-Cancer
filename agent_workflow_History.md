@@ -167,3 +167,17 @@ Commit: a64f7a1 | 796 tests passed | Pushed to origin/master ✅
 2026-07-25 00:00 | [v] task(test-writer) -> Batch F 完成：Trace Persistence Tests 6/6 passed
 2026-07-25 00:02 | [v] task(exec-dev) -> Batch H 完成：完整驗證（1071 tests passed, frontend build ✅, git diff --check ✅）
 2026-07-25 00:05 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性23 正確性24 可維護性22 測試23 | 總分92 合格 ✅
+2026-07-25 00:10 | [v] Git Commit & Push → f2fa9af → origin/master ✅
+2026-07-25 14:36 | [v] task(doc-writer) -> Step 0A 完成：子代理已向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」
+2026-07-25 14:38 | [v] task(doc-writer) -> Step 0B 完成：需求已追加到 tasks/requirements.md（+7 行）
+2026-07-25 14:38 | [v] task(doc-writer) -> Step 1 完成：tasks/task-status.md 已更新（GATE-1~GATE-6）
+2026-07-25 14:38 | [v] task(PLANNER) -> Step 2 完成：產出 tasks/plan-phase3a-acceptance-gate.md（6 Gate 完整方案）
+2026-07-25 14:38 | [v] Step 3 完成：agent_workflow.md + History 已更新
+2026-07-25 15:00 | [v] task(backend-logic) -> GATE-5 完成：Engine output_data 補強 + Service 層 _extract 方法
+2026-07-25 15:00 | [v] task(devops) -> GATE-1 完成：ci.yml 新增 Postgres Integration Gate（4 steps）
+2026-07-25 15:00 | [v] task(backend-logic) -> GATE-2 完成：test_restart_recovery.py 支援 Postgres/Ci 偵測
+2026-07-25 15:00 | [v] task(test-writer) -> GATE-3 完成：test_trace_persistence.py 重寫為真實 Pipeline（無 Mock TraceManager）
+2026-07-25 15:00 | [v] task(test-writer) -> GATE-4 完成：新增 test_acceptance_real_trace.py（4 Acceptance Tests）
+2026-07-25 15:00 | [v] 修復 Service 層 trace_id bug（Engine 內部重複 start_trace 導致 steps 遺失）
+2026-07-25 15:00 | [v] 修復 db_url fixture Postgres 偵測邏輯（CI env check）
+2026-07-25 15:02 | [v] GATE-6 完整驗證：50 passed 1 skipped ✅ | lint 全過 ✅ | YAML valid ✅

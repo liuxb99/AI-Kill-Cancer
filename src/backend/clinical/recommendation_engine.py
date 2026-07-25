@@ -17,23 +17,18 @@ placeholder values are used.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
+from src.backend.clinical.calculation_trace import (
+    TraceManager,
+    TraceStep,
+)
 from src.backend.clinical.evidence_models import (
     EvidenceBundle,
     EvidenceItem,
 )
 from src.backend.clinical.evidence_weight import WeightRegistry
-from src.backend.clinical.calculation_trace import (
-    TraceManager,
-    TraceStep,
-)
-from src.backend.clinical.explainable_recommendation import (
-    ExplainableEngine,
-    ExplanationFormatter,
-    RecommendationReason,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -567,6 +562,21 @@ class RecommendationEngine:
                         drug: data["total_weight"]
                         for drug, data in aggregated.items()
                     },
+                    "evidence_references": [
+                        {
+                            "drug": drug,
+                            "source": score["source"],
+                            "weight": score["weight"],
+                            "tier": score["tier"],
+                            "direction": score.get("direction", "unknown"),
+                        }
+                        for drug, data in aggregated.items()
+                        for score in data.get("evidence_scores", [])
+                    ],
+                    "weight": max(
+                        (data["total_weight"] for data in aggregated.values()),
+                        default=0,
+                    ),
                 },
             )
         except Exception:
@@ -606,6 +616,9 @@ class RecommendationEngine:
                         }
                         for r in ranked
                     ],
+                    "score": ranked[0]["total_weight"] if ranked else 0,
+                    "rank": 1,
+                    "drug_count": len(ranked),
                 },
             )
         except Exception:
@@ -691,6 +704,8 @@ class RecommendationEngine:
             },
             output_data={
                 "pipeline_status": "completed",
+                "drugs_ranked_count": len(ranked),
+                "evidence_count": len(evidence_bundle.items),
             },
         )
 

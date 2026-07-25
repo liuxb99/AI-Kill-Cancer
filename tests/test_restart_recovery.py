@@ -27,7 +27,6 @@ from src.backend.auth.dependencies import require_auth
 from src.backend.domain.enums import Role
 from src.backend.domain.user import UserModel
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 def _make_fake_user() -> UserModel:
@@ -51,10 +50,19 @@ def _make_fake_user() -> UserModel:
 
 @pytest.fixture
 def db_url() -> str:
-    """Set DATABASE_URL to a temp file-based SQLite DB and clean up after.
+    """Detect DATABASE_URL env var; if CI + Postgres use it directly, else use temp SQLite.
 
-    Yields the file path so the test can refer to it if needed.
+    Yields the database URL string.
     """
+    env_url = os.environ.get("DATABASE_URL", "")
+    is_ci = os.environ.get("CI", "").lower() in ("true", "1") or os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
+
+    if env_url.startswith("postgresql") and is_ci:
+        # CI environment with Postgres available — use it directly
+        yield env_url
+        return
+
+    # Fallback: file-based SQLite
     import src.backend.config as _config
 
     original_url = _config.settings.DATABASE_URL
@@ -62,8 +70,9 @@ def db_url() -> str:
         os.path.dirname(__file__),
         f"test_restart_{uuid.uuid4().hex}.db",
     )
-    _config.settings.DATABASE_URL = f"sqlite+aiosqlite:///{file_path}"
-    yield file_path
+    url = f"sqlite+aiosqlite:///{file_path}"
+    _config.settings.DATABASE_URL = url
+    yield url
     # Restore original URL
     _config.settings.DATABASE_URL = original_url
     # Clean up the temp DB file
@@ -114,10 +123,8 @@ class TestRestartRecovery:
 
             # ── Create a recommendation with mocked pipeline ────────────────
             # pylint: disable=import-outside-toplevel
-            from unittest.mock import patch, AsyncMock
-            from src.backend.clinical.recommendation_engine import (
-                RecommendationEngine,
-            )
+            from unittest.mock import AsyncMock, patch
+
             from src.backend.clinical.drug_ranking import (
                 ConflictScore,
                 DrugRankingEngine,
@@ -131,6 +138,9 @@ class TestRestartRecovery:
                 ExplainableEngine,
                 ReasonItem,
                 RecommendationReason,
+            )
+            from src.backend.clinical.recommendation_engine import (
+                RecommendationEngine,
             )
 
             # Build mock aggregated data (simulating EvidenceAggregator output)
@@ -253,11 +263,11 @@ class TestRestartRecovery:
                 DrugRankingEngine,
                 "rank",
                 return_value=[ranking_result],
-            ) as mock_rank, patch.object(
+            ), patch.object(
                 ExplainableEngine,
                 "generate_explanations",
                 return_value=[explanation],
-            ) as mock_explain:
+            ):
 
                 mock_run.return_value = {
                     "pipeline_status": "completed",
@@ -317,6 +327,13 @@ class TestRestartRecovery:
 
         # ── App 1 context exited → lifespan shutdown → engine disposed ─────
 
+        # ── Capture engine & sessionmaker references for Postgres check ────
+        # pylint: disable=import-outside-toplevel
+        from src.backend.database import session as _db_session
+
+        engine1 = _db_session.engine
+        sessionmaker1 = _db_session.async_session_factory
+
         # ═══════════════════════════════════════════════════════════════
         # Phase 2: App 2 — read back the same data from the DB file
         # ═══════════════════════════════════════════════════════════════
@@ -371,6 +388,17 @@ class TestRestartRecovery:
 
         # ── App 2 context exited → lifespan shutdown → cleanup ─────────────
 
+        # ── Postgres-specific check: engine & sessionmaker must differ ─────
+        if db_url.startswith("postgresql"):
+            engine2 = _db_session.engine
+            sessionmaker2 = _db_session.async_session_factory
+            assert engine1 is not engine2, (
+                "Engine must be a new instance after restart (Postgres)"
+            )
+            assert sessionmaker1 is not sessionmaker2, (
+                "Sessionmaker must be a new instance after restart (Postgres)"
+            )
+
     def test_restart_recovery_nonexistent_returns_404(self, db_url: str) -> None:
         """After restart, a non-existent recommendation returns 404."""
         from src.backend.main import create_app
@@ -386,3 +414,45 @@ class TestRestartRecovery:
                 f"Expected 404 for non-existent recommendation, "
                 f"got {resp.status_code}: {resp.text}"
             )
+
+
+class TestPostgresRestart:
+    """Optional Postgres-specific restart checks (only active with real Postgres)."""
+
+    def test_restart_recovery_postgres_engine_check(self, db_url: str) -> None:
+        """Verify engine/sessionmaker instances differ across restarts.
+
+        Only performs assertions when DATABASE_URL points to a real Postgres;
+        otherwise passes silently (SQLite fallback).
+        """
+        if not db_url.startswith("postgresql"):
+            return  # Not a Postgres environment — nothing to check
+
+        # pylint: disable=import-outside-toplevel
+        from src.backend.database import session as _db_session
+        from src.backend.main import create_app
+
+        app1 = create_app()
+        app1.dependency_overrides[require_auth] = lambda: _make_fake_user()
+
+        with TestClient(app1):
+            pass  # trigger lifespan (init_db)
+
+        engine1 = _db_session.engine
+        sessionmaker1 = _db_session.async_session_factory
+
+        app2 = create_app()
+        app2.dependency_overrides[require_auth] = lambda: _make_fake_user()
+
+        with TestClient(app2):
+            pass  # trigger lifespan (init_db again)
+
+        engine2 = _db_session.engine
+        sessionmaker2 = _db_session.async_session_factory
+
+        assert engine1 is not engine2, (
+            "Engine must be a new instance after restart (Postgres)"
+        )
+        assert sessionmaker1 is not sessionmaker2, (
+            "Sessionmaker must be a new instance after restart (Postgres)"
+        )

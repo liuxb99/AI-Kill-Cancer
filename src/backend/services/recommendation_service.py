@@ -31,12 +31,12 @@ from src.backend.clinical.drug_ranking import DrugRankingEngine
 from src.backend.clinical.evidence_weight import WeightRegistry
 from src.backend.clinical.explainable_recommendation import ExplainableEngine
 from src.backend.clinical.models import ClinicalContext
-from src.backend.clinical.report_generator import ReportGenerator
 from src.backend.clinical.recommendation_engine import (
     DrugRanker,
     EvidenceAggregator,
     RecommendationEngine,
 )
+from src.backend.clinical.report_generator import ReportGenerator
 from src.backend.domain.enums import RecommendationStatusEnum
 from src.backend.domain.recommendation import (
     RecommendationModel,
@@ -143,10 +143,9 @@ class RecommendationService:
         ranker = DrugRanker()
         ranking_engine = DrugRankingEngine()
 
-        # In-memory TraceManager for step-level tracing during pipeline run
+        # In-memory TraceManager for step-level tracing during pipeline run.
+        # The RecommendationEngine handles trace creation and completion internally.
         trace_manager = TraceManager()
-        trace = trace_manager.start_trace(patient_id=patient_id)
-        trace_id = trace.trace_id
 
         engine = RecommendationEngine(
             collector=collector,
@@ -160,19 +159,22 @@ class RecommendationService:
             pipeline_result = await engine.run(patient_context=context)
         except Exception as exc:
             logger.exception("Recommendation pipeline raised an unhandled exception.")
-            trace_manager.complete_trace(trace_id, status="failed")
             raise RuntimeError("Recommendation pipeline encountered an internal error") from exc
+
+        # Retrieve trace_id from the engine's result (engine owns trace lifecycle)
+        trace_id: str | None = pipeline_result.get("trace_id")
+        if not trace_id:
+            logger.warning("Engine did not produce a trace_id — proceeding without tracing.")
+            trace_id = uuid.uuid4().hex  # fallback for persistence
 
         pipeline_status: str = pipeline_result.get("pipeline_status", "")
         if pipeline_status.startswith("error"):
-            trace_manager.complete_trace(trace_id, status="failed")
             raise RuntimeError(
                 "Recommendation pipeline did not complete successfully",
             )
 
         aggregated_data: dict[str, dict] = pipeline_result.get("aggregated", {})
         if not aggregated_data:
-            trace_manager.complete_trace(trace_id, status="failed")
             raise ValueError(
                 "No clinical evidence found for the provided variants",
             )
@@ -180,7 +182,6 @@ class RecommendationService:
         # ── DrugRankingEngine detailed scoring ──────────────────────────────
         ranking_results = ranking_engine.rank(aggregated_data, top_n=top_n)
         if not ranking_results:
-            trace_manager.complete_trace(trace_id, status="failed")
             raise ValueError("No drugs could be ranked based on available evidence.")
 
         # ── ExplainableEngine ───────────────────────────────────────────────
@@ -205,8 +206,6 @@ class RecommendationService:
                     "explanations": [r.model_dump() for r in explanation.reasons],
                 },
             )
-
-        trace_manager.complete_trace(trace_id, status="completed")
 
         # ── Retrieve trace steps for report ─────────────────────────────────
         trace_steps: list[dict] = []
@@ -322,6 +321,47 @@ class RecommendationService:
         protein_change = parts[1] if len(parts) > 1 else ""
         return gene, protein_change
 
+    @staticmethod
+    def _extract_evidence_references(output_data: dict) -> list | None:
+        """從 trace step output_data 穩定提取 evidence_references."""
+        refs = output_data.get("evidence_references")
+        if refs is not None:
+            return refs
+        ranking = output_data.get("ranking")
+        if ranking and isinstance(ranking, list):
+            return [
+                {"drug": r["drug_name"], "rank": r.get("rank"), "weight": r.get("total_weight")}
+                for r in ranking
+            ]
+        return None
+
+    @staticmethod
+    def _extract_weight(output_data: dict) -> float | None:
+        """從 trace step output_data 穩定提取 weight."""
+        weight = output_data.get("weight")
+        if weight is not None:
+            return weight
+        twbd = output_data.get("total_weight_by_drug")
+        if twbd and isinstance(twbd, dict):
+            return max(twbd.values(), default=None)
+        return None
+
+    @staticmethod
+    def _extract_score(output_data: dict) -> float | None:
+        """從 trace step output_data 穩定提取 score."""
+        return output_data.get("score")
+
+    @staticmethod
+    def _extract_rank(output_data: dict) -> int | None:
+        """從 trace step output_data 穩定提取 rank."""
+        rank = output_data.get("rank")
+        if rank is not None:
+            return rank
+        ranking = output_data.get("ranking")
+        if ranking and isinstance(ranking, list) and len(ranking) > 0:
+            return ranking[0].get("rank")
+        return None
+
     async def _persist_recommendation(
         self,
         *,
@@ -370,7 +410,6 @@ class RecommendationService:
             # Persist individual steps
             for idx, step in enumerate(calc_trace.steps):
                 output_data = step.output_data if isinstance(step.output_data, dict) else {}
-                input_data = step.input_data if isinstance(step.input_data, dict) else {}
 
                 step_model = RecommendationTraceStepModel(
                     trace_id=trace_model.id,
@@ -378,10 +417,10 @@ class RecommendationService:
                     step_type=step.step_type or "",
                     input_summary=step.input_data,
                     output_summary=step.output_data,
-                    evidence_references=output_data.get("evidence_references"),
-                    weight=input_data.get("weight") or output_data.get("weight"),
-                    score=output_data.get("score"),
-                    rank=output_data.get("rank"),
+                    evidence_references=self._extract_evidence_references(output_data),
+                    weight=self._extract_weight(output_data),
+                    score=self._extract_score(output_data),
+                    rank=self._extract_rank(output_data),
                     status="completed",
                 )
                 await self._trace_repo.create_step(step_model)

@@ -1,21 +1,22 @@
 # Task Status
 
 ## 場景
-Phase 3A Hardening Final Fix — 根因修復
+Phase 3A Final Acceptance Gate — PostgreSQL CI Gate + Real Pipeline Trace
 
 ## 任務
 | ID | 描述 | 優先級 | 狀態 |
 |----|------|--------|------|
-| P0-1 | Persistence Failure 不得回傳成功（Atomic Persistence） | P0 | [ ] |
-| P0-2 | 建立真正 End-to-End Restart Recovery Integration Test | P0 | [ ] |
-| P0-3 | 完整 Trace Persistence（Evidence/Weight/Score/Rank/Explanation） | P0 | [ ] |
-| T1 | Transaction Tests（5 Case） | P0 | [ ] |
-| T2 | Migration / Postgres 驗證 | P0 | [ ] |
-| T3 | 完整驗證（backend/frontend build + test suite） | P0 | [ ] |
-| T4 | Git Commit & Push | P0 | [ ] |
+| GATE-1 | GitHub Actions Postgres Integration Gate（修改 ci.yml） | P0 | [ ] |
+| GATE-2 | Postgres Restart Recovery（修改 test_restart_recovery.py） | P0 | [ ] |
+| GATE-3 | Real Pipeline Trace（修改 test_trace_persistence.py + source） | P0 | [ ] |
+| GATE-4 | Real Trace Acceptance Test（新增 test_real_pipeline_trace_persistence.py） | P0 | [ ] |
+| GATE-5 | Trace 欄位映射 Helper（修改 trace 寫入邏輯） | P0 | [ ] |
+| GATE-6 | 完整驗證 + Git Commit & Push | P0 | [ ] |
 
 ## 禁止修改
 - AGENTS.md
-- 無關格式化
-- 無關 dependency upgrade
-- 新 Agent / 新功能
+- Phase 3B 功能
+- Vercel 部署
+- 前端 UI
+- 認證系統
+- 無關格式化 / dependency upgrade

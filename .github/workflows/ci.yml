@@ -51,6 +51,32 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
         run: pytest -v --tb=short --cov=src/backend tests/unit/ tests/integration/
 
+      # Phase 2: Postgres Integration Gate
+      - name: Postgres Integration Gate - Alembic upgrade on Postgres
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
+          PYTHONPATH: .
+        run: alembic -c migrations/alembic.ini upgrade head
+
+      - name: Postgres Integration Gate - Run Postgres Integration Tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
+        run: pytest -v --tb=short tests/test_restart_recovery.py tests/test_trace_persistence.py tests/test_acceptance_real_trace.py tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py
+
+      - name: Postgres Integration Gate - Alembic downgrade & re-upgrade
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
+          PYTHONPATH: .
+        run: |
+          alembic -c migrations/alembic.ini downgrade 016
+          alembic -c migrations/alembic.ini upgrade head
+
+      - name: Postgres Integration Gate - Migration verification
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///test_migration_ci.db
+          PYTHONPATH: .
+        run: pytest -v --tb=short tests/test_migration.py
+
       # Phase 2: Test migration (database schema)
       - name: Test migration
         env:
