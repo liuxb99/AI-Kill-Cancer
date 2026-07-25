@@ -80,6 +80,9 @@ jobs:
                 *ERROR*)
                   echo "::error title=TEST ERROR::$line"
                   ;;
+                "E "*)
+                  echo "::error title=ASSERT FAIL::$line"
+                  ;;
                 *assert*)
                   echo "::error title=ASSERTION::$line"
                   ;;
