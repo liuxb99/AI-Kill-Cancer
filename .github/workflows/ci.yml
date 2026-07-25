@@ -70,25 +70,23 @@ jobs:
           echo "=== Other Backend Tests ==="
           pytest -v --tb=long tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py 2>&1 | tee /tmp/pg-test-other.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
           # Emit annotations for any failures found in logs
-          for log in /tmp/pg-test-*.log; do
-            [ -f "$log" ] || continue
-            while IFS= read -r line; do
-              case "$line" in
-                *FAILED*)
-                  echo "::error title=FAILED TEST::$line"
-                  ;;
-                *ERROR*)
-                  echo "::error title=TEST ERROR::$line"
-                  ;;
-                "E "*)
-                  echo "::error title=ASSERT FAIL::$line"
-                  ;;
-                *assert*)
-                  echo "::error title=ASSERTION::$line"
-                  ;;
-              esac
-            done < "$log"
-          done
+          python3 -c "
+import os, glob, sys
+for f in sorted(glob.glob('/tmp/pg-test-*.log')):
+    if not os.path.isfile(f):
+        continue
+    with open(f) as fh:
+        for line in fh:
+            line = line.rstrip('\n')
+            if 'FAILED' in line:
+                print(f'::error title=FAILED TEST::{line}')
+            elif 'ERROR' in line:
+                print(f'::error title=TEST ERROR::{line}')
+            elif line.startswith('E '):
+                print(f'::error title=ASSERT FAIL::{line}')
+            elif 'assert' in line:
+                print(f'::error title=ASSERTION::{line}')
+" 2>&1
           exit $EXIT
 
       - name: Postgres Integration Gate - Alembic downgrade & re-upgrade
