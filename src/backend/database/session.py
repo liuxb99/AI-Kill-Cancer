@@ -11,10 +11,10 @@ _DIAG_PATH = "/tmp/db_diag.log"
 
 
 def _diag(msg: str) -> None:
-    """Write diagnostic message to a file (visible to annotation parser)."""
+    """Write diagnostic message using shell echo (most robust across environments)."""
+    import os
     try:
-        with open(_DIAG_PATH, "a") as f:
-            f.write(msg + "\n")
+        os.system(f"echo 'DIAG:{msg}' >> /tmp/pg-diag.log 2>/dev/null")
     except Exception:
         pass
 
