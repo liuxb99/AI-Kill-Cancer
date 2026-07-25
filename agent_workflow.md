@@ -1,7 +1,10 @@
 # Agent Workflow
 
 ## 當前任務ID
-Phase-3B
+Phase-3B-Hardening
+
+## 場景
+hardening（架構強化）
 
 ## 循環/返工次數
 0
@@ -16,10 +19,10 @@ Phase-3B
 [v] Step 2：PLANNER 制定計劃
 [v] Step 3：更新 Workflow
 [v] Step 4：執行開發
-[v] Step 4b：需求回歸檢查
-[v] Step 5：REVIEWER 評分（94/100 ✅）
-[v] Step 5b：返工循環（必要時）— 跳過（94 ≥ 90）
-[v] Step 6：總結報告 + Git Commit & Push
+[ ] Step 4b：需求回歸檢查
+[ ] Step 5：REVIEWER 評分
+[ ] Step 5b：返工循環（必要時）
+[ ] Step 6：總結報告 + Git Commit & Push
 
 ## Next Step
-Phase 3C（待啟動）
+Step 4b：需求回歸檢查

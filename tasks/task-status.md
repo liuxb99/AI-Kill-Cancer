@@ -45,3 +45,38 @@ Phase 3A Final Acceptance Gate — PostgreSQL CI Gate + Real Pipeline Trace
 
 **任務清單（待 planner 產出）**：
 待 Step 2 PLANNER 完成後更新
+
+---
+
+## Phase 3B Hardening — 架構問題修正
+
+**場景**：hardening（架構強化）
+
+**啟動時間**：2026-07-26
+
+**狀態**：待啟動
+
+**角色分派**：
+| 角色 | 職責 |
+|------|------|
+| planner | 制定強化計劃與優先級排序 |
+| backend-logic | 後端邏輯修正（validation、audit trail、DTO） |
+| frontend-logic | 前端邏輯修正（navigation、sample data 移除） |
+| test-writer | 撰寫回歸測試驗證修正 |
+| reviewer | 評分代理 |
+
+**修正項目**：
+| 優先級 | ID | 描述 | 狀態 |
+|--------|----|------|------|
+| P0 | HARDEN-1 | Recommendation 必須屬於同一位 Patient（加 validation） | [ ] |
+| P0 | HARDEN-2 | created_by 必須完整傳遞（Audit Trail） | [ ] |
+| P0 | HARDEN-3 | context.patient 不得覆蓋 Database Patient | [ ] |
+| P0 | HARDEN-4 | Frontend Navigation 移除假資料 sample | [ ] |
+| P1 | HARDEN-5 | Clinical Decision Trace 拆成 4~5 個 Step | [ ] |
+| P1 | HARDEN-6 | DTO Mutable Default 修正 | [ ] |
+
+**禁止修改**：
+- AGENTS.md
+- Phase 3A 已完成功能
+- Vercel 部署
+- 認證系統

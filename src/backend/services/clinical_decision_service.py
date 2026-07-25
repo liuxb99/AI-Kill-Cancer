@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.clinical.clinical_decision_engine import (
@@ -66,7 +66,7 @@ class ClinicalDecisionRequest(BaseModel):
 
     patient_id: str
     recommendation_id: str
-    variants: list[dict] = []
+    variants: list[dict] = Field(default_factory=list)
     context: dict | None = None
 
 
@@ -107,8 +107,8 @@ class ClinicalDecisionResponse(BaseModel):
     reason: str
     evidence_summary: dict | None = None
     confidence: str
-    alternatives: list[dict] = []
-    contraindications: list[dict] = []
+    alternatives: list[dict] = Field(default_factory=list)
+    contraindications: list[dict] = Field(default_factory=list)
     created_at: str
     trace_id: str | None = None
 
@@ -161,6 +161,7 @@ class ClinicalDecisionService:
         recommendation_id: str | UUID,
         variants: list[dict],
         context: dict | None = None,
+        created_by: str | UUID | None = None,
     ) -> ClinicalDecisionResponse:
         """Create a clinical decision based on a recommendation.
 
@@ -211,14 +212,31 @@ class ClinicalDecisionService:
         decision_id = _uuid.uuid4().hex
 
         # ── Step 1: Retrieve patient & recommendation data ────────────────
-        patient_data: dict[str, Any] | None = ctx.get("patient")
-        if patient_data is None:
-            patient_data = await self._load_patient_data(patient_uuid)
+        # Always load patient from Database — the single source of truth
+        patient_data = await self._load_patient_data(patient_uuid)
+
+        # context.patient is supplemental only — merge non-overlapping fields
+        ctx_patient = ctx.get("patient")
+        if ctx_patient and isinstance(ctx_patient, dict):
+            for key, value in ctx_patient.items():
+                # Do NOT override core identity fields from DB
+                if key not in ("id", "patient_id", "external_id", "display_name",
+                               "birth_year", "age_range", "sex", "consent_status",
+                               "created_at"):
+                    patient_data[key] = value
 
         recommendation = await self._load_recommendation_data(rec_id_str)
         if recommendation is None:
             raise ValueError(
                 f"Recommendation with id '{rec_id_str}' not found",
+            )
+
+        # P0-1: Validate recommendation belongs to the same patient
+        rec_patient_id = recommendation.get("patient_id")
+        if rec_patient_id and str(rec_patient_id) != str(patient_uuid):
+            raise ValueError(
+                f"Recommendation '{rec_id_str}' belongs to patient "
+                f"'{rec_patient_id}', not patient '{patient_uuid}'"
             )
 
         # Extract evidence from context or from the recommendation payload
@@ -250,10 +268,12 @@ class ClinicalDecisionService:
         trace_id = _uuid.uuid4().hex
         created_at = datetime.now(UTC)
 
+        rec_uuid = recommendation.get("_uuid") or recommendation.get("id")
+
         decision_model = ClinicalDecisionModel(
             decision_id=decision_id,
             patient_id=patient_uuid,
-            recommendation_id=recommendation.get("_uuid") or recommendation.get("id"),
+            recommendation_id=rec_uuid,
             decision_type=result.decision_type,
             reason=result.reason,
             evidence_summary=result.evidence_summary,
@@ -261,34 +281,86 @@ class ClinicalDecisionService:
             alternatives=result.alternatives,
             contraindications=result.contraindications,
             status="active",
+            created_by=created_by if isinstance(created_by, UUID) else UUID(created_by) if created_by else None,
             created_at=created_at,
             updated_at=created_at,
         )
 
-        # Trace step recording the engine evaluation
-        trace_model = ClinicalDecisionTraceModel(
-            trace_id=trace_id,
-            recommendation_id=recommendation.get("_uuid") or recommendation.get("id"),
-            step_order=0,
-            step_type="clinical_decision_evaluate",
-            input_summary={
-                "patient_id": str(patient_uuid),
-                "recommendation_id": rec_id_str,
-                "variants": list(variants),
-                "evidence_count": len(evidence),
-            },
-            output_summary=result.to_dict(),
-            created_at=created_at,
-        )
-
-        # ── Step 4: Persist (transaction managed here) ────────────────────
+        # ── Step 4: Persist — flush first to get decision_model.id ────────
         try:
             await self._decision_repo.create(decision_model)
             await self._db.flush()
 
-            # Link trace to decision after decision_model.id is assigned
-            trace_model.clinical_decision_id = decision_model.id
-            await self._trace_repo.create(trace_model)
+            # Build 5 trace steps now that we have decision_model.id
+            trace_steps = [
+                ClinicalDecisionTraceModel(
+                    trace_id=trace_id,
+                    clinical_decision_id=decision_model.id,
+                    recommendation_id=rec_uuid,
+                    step_order=0,
+                    step_type="load_recommendation",
+                    input_summary={"recommendation_id": rec_id_str},
+                    output_summary={"status": "loaded", "has_patient": rec_patient_id is not None},
+                    created_at=created_at,
+                ),
+                ClinicalDecisionTraceModel(
+                    trace_id=trace_id,
+                    clinical_decision_id=decision_model.id,
+                    recommendation_id=rec_uuid,
+                    step_order=1,
+                    step_type="validate_patient",
+                    input_summary={
+                        "patient_id": str(patient_uuid),
+                        "recommendation_patient_id": rec_patient_id,
+                    },
+                    output_summary={"valid": True},
+                    created_at=created_at,
+                ),
+                ClinicalDecisionTraceModel(
+                    trace_id=trace_id,
+                    clinical_decision_id=decision_model.id,
+                    recommendation_id=rec_uuid,
+                    step_order=2,
+                    step_type="evaluate",
+                    input_summary={
+                        "patient_id": str(patient_uuid),
+                        "recommendation_id": rec_id_str,
+                        "variants": list(variants),
+                        "evidence_count": len(evidence),
+                    },
+                    output_summary=result.to_dict(),
+                    created_at=created_at,
+                ),
+                ClinicalDecisionTraceModel(
+                    trace_id=trace_id,
+                    clinical_decision_id=decision_model.id,
+                    recommendation_id=rec_uuid,
+                    step_order=3,
+                    step_type="decision",
+                    input_summary={
+                        "decision_type": result.decision_type,
+                        "confidence": result.confidence,
+                    },
+                    output_summary={
+                        "decision_id": decision_id,
+                        "reason": result.reason,
+                    },
+                    created_at=created_at,
+                ),
+                ClinicalDecisionTraceModel(
+                    trace_id=trace_id,
+                    clinical_decision_id=decision_model.id,
+                    recommendation_id=rec_uuid,
+                    step_order=4,
+                    step_type="persist",
+                    input_summary={"decision_id": decision_id},
+                    output_summary={"status": "persisted"},
+                    created_at=created_at,
+                ),
+            ]
+
+            for step in trace_steps:
+                await self._trace_repo.create(step)
 
             await self._db.commit()
         except Exception as exc:

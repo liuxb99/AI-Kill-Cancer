@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from src.backend.database.models import Base as DBBase
@@ -47,9 +47,12 @@ class ClinicalDecisionModel(DBBase):
 
 class ClinicalDecisionTraceModel(DBBase):
     __tablename__ = "domain_clinical_decision_traces"
+    __table_args__ = (
+        UniqueConstraint("trace_id", "step_order", name="uq_trace_step"),
+    )
 
     id = Column(CompatUUID, primary_key=True, default=_uuid)
-    trace_id = Column(String(64), unique=True, nullable=False, index=True)
+    trace_id = Column(String(64), unique=False, nullable=False, index=True)
     clinical_decision_id = Column(CompatUUID, ForeignKey("domain_clinical_decisions.id", ondelete="CASCADE"), nullable=True, index=True)
     recommendation_id = Column(CompatUUID, ForeignKey("domain_recommendations.id", ondelete="SET NULL"), nullable=True, index=True)
     step_order = Column(Integer, nullable=False)

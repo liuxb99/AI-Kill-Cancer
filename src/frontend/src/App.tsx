@@ -8,6 +8,7 @@ import ResearchPortal from './pages/ResearchPortal'
 import Workbench from './pages/Workbench'
 import RecommendationPage from './pages/RecommendationPage'
 import ClinicalDecisionPage from './pages/ClinicalDecisionPage'
+import ClinicalDecisionListPage from './pages/ClinicalDecisionListPage'
 import StatusBanner from './components/StatusBanner'
 
 function AppNavbar() {
@@ -19,7 +20,7 @@ function AppNavbar() {
 
   const links = [
     { label: '藥物推薦', path: '/recommendation' },
-    { label: '臨床決策', path: '/clinical-decision/sample' },
+    { label: '臨床決策', path: '/clinical-decision' },
     { label: '知識庫', path: '/knowledge' },
     { label: '工具', path: '/tools' },
     { label: '論文', path: '/research' },
@@ -64,6 +65,7 @@ function App() {
         <Route path="/research-portal" element={<ResearchPortal />} />
         <Route path="/workbench" element={<Workbench />} />
         <Route path="/recommendation" element={<RecommendationPage />} />
+        <Route path="/clinical-decision" element={<ClinicalDecisionListPage />} />
         <Route path="/clinical-decision/:id" element={<ClinicalDecisionPage />} />
       </Routes>
     </div>

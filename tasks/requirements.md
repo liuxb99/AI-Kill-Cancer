@@ -343,3 +343,71 @@ Phase 3B：PASS / PARTIAL
 Ready for ChatGPT GitHub Review：YES / NO
 
 推送完成後停止，不要自行開始 Phase 3C。
+
+---
+
+## 2026-07-25 — Phase 3B Hardening
+
+**狀態**：PARTIAL（ChatGPT GitHub Review：84/100，不可進入 Phase 3C）
+
+## 本輪目標
+
+不是新增功能，而是修正 ChatGPT Review 找出的架構問題（Phase 3B Hardening）。
+
+## 工作方式
+
+完全依 AGENTS.md：Step 0B → Scene → Planner → Workflow → Batch → Step4b → Reviewer → Git Commit → Git Push。一次完成，不要中途回報。
+
+## P0-1：Recommendation 必須屬於同一位 Patient
+
+Service 中 patient_id 與 recommendation_id 分開查詢但沒有驗證 recommendation.patient_id == patient.id。必須在 Engine 執行前加入驗證，若不匹配則 raise ValidationError，不得建立 Clinical Decision 或 Trace，Transaction 全部 rollback。
+
+新增測試：Patient A + Recommendation B → 422 → Database 無資料 → Trace 無資料。
+
+## P0-2：created_by 必須完整傳遞
+
+目前 ClinicalDecisionModel.created_by = NULL。API 已有 Current User，必須一路傳到 Service 再到 Model，確保 Audit Trail 完整。
+
+新增測試：POST → created_by == 登入 User。
+
+## P0-3：context.patient 不得覆蓋 Database Patient
+
+Patient 的唯一來源必須是 Database，context 只能作為 Supplemental Context，不得修改 Age/Sex/Diagnosis。若 context.patient 與 Database 不同，仍採用 Database。
+
+新增測試：context.patient 與 Database 不同 → 仍採用 Database。
+
+## P0-4：Frontend Navigation 移除假資料
+
+Navbar 中 /clinical-decision/sample 是假資料，必須改成正式流程。至少完成方案 A（Clinical Decision List → Decision Detail）或方案 B（Recommendation → Create Decision → redirect → /clinical-decision/{id}）。不得保留 sample，不得有 Fake Route。
+
+新增 Frontend Route Test + Browser Test。
+
+## P1-1：Clinical Decision Trace 至少拆成 4~5 個 Step
+
+目前只有 Step0，必須至少拆成：Load Recommendation → Validate Patient → Evaluate → Decision → Persist。不得全部塞成 output_summary。
+
+## P1-2：DTO Mutable Default 修正
+
+所有 =[] 改成 Field(default_factory=list)，避免 Mutable Default。
+
+## 禁止事項
+
+不得修改已驗收 Phase3A、Migration、CI、Recommendation Engine、AGENTS、Vercel。不得加入 Phase3C/Tumor Board/Consensus Engine。
+
+## Reviewer
+
+低於 95 分必須返工。>= 95 分才可停止。
+
+## Commit Scope
+
+只能包含：Clinical Decision Hardening / Audit Trail / Validation / Frontend Navigation / Trace / Tests。不得混入其他功能。
+
+## 完成後只回報
+
+Commit SHA / Files Changed / Validation Added / Audit Trail / Trace Steps / Frontend Route / Tests Added / Backend PASS / Frontend PASS / Coverage / Push / Reviewer Score
+
+最後輸出：
+Phase 3B：PASS / PARTIAL
+Ready for ChatGPT GitHub Review：YES / NO
+
+推送後停止，不要開始 Phase 3C。

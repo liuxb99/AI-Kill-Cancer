@@ -45,6 +45,7 @@ async def create_clinical_decision(
             recommendation_id=request.recommendation_id,
             variants=request.variants,
             context=request.context,
+            created_by=str(user.id),
         )
         return result
     except ValueError as e:

@@ -295,15 +295,16 @@ class TestCreateDecision:
         assert dec is not None
         assert dec.decision_type == "approved"
 
-        # Verify trace exists in DB
+        # Verify traces exist in DB
         trace_stmt = select(ClinicalDecisionTraceModel).where(
             ClinicalDecisionTraceModel.trace_id == trace_id,
-        )
+        ).order_by(ClinicalDecisionTraceModel.step_order)
         trace_result = await db_session.execute(trace_stmt)
-        trace = trace_result.scalar_one_or_none()
-        assert trace is not None
-        assert trace.step_type == "clinical_decision_evaluate"
-        assert trace.clinical_decision_id == dec.id
+        traces = trace_result.scalars().all()
+        assert len(traces) == 5
+        assert traces[0].step_type == "load_recommendation"
+        assert traces[0].clinical_decision_id == dec.id
+        assert traces[4].step_type == "persist"
 
     async def test_create_decision_patient_not_found(
         self,
@@ -410,6 +411,239 @@ class TestCreateDecision:
                     "patient": {"id": str(patient_in_db.id)},
                     "evidence": [],
                 },
+            )
+
+    # ── H1.2 ───────────────────────────────────────────────────────────────
+
+    async def test_create_decision_patient_recommendation_mismatch(
+        self,
+        db_session,
+        patient_in_db,
+        recommendation_in_db,
+        mock_engine,
+    ):
+        """H1.2: Using a recommendation that belongs to another patient should raise ValueError."""
+        from src.backend.domain.patient import PatientModel
+        from src.backend.domain.recommendation import RecommendationModel
+        from src.backend.services.clinical_decision_service import (
+            ClinicalDecisionService,
+        )
+        from src.backend.domain.clinical_decision import (
+            ClinicalDecisionModel,
+            ClinicalDecisionTraceModel,
+        )
+        from sqlalchemy import select
+
+        # Create Patient B (a different patient than patient_in_db)
+        patient_b_id = uuid.UUID("660e8400-e29b-41d4-a716-446655440001")
+        patient_b = PatientModel(id=patient_b_id, display_name="PATIENT-B")
+        db_session.add(patient_b)
+        await db_session.commit()
+        await db_session.refresh(patient_b)
+
+        # Create Recommendation B belonging to Patient B
+        rec_b = RecommendationModel(
+            recommendation_id="rec-cds-mismatch-001",
+            patient_id=patient_b.id,
+            engine_version="1.0.0",
+            status="completed",
+            request_payload={"variants": ["EGFR L858R"]},
+            result_payload={
+                "recommendations": [
+                    {
+                        "drug_name": "Osimertinib",
+                        "rank": 1,
+                        "overall_score": 0.95,
+                    },
+                ],
+                "evidence": [],
+            },
+        )
+        db_session.add(rec_b)
+        await db_session.commit()
+        await db_session.refresh(rec_b)
+
+        # Try to create a decision for patient_in_db using the recommendation
+        # that belongs to Patient B → should raise ValueError
+        service = ClinicalDecisionService(db=db_session, engine=mock_engine)
+        with pytest.raises(ValueError, match="belongs to patient"):
+            await service.create_decision(
+                patient_id=patient_in_db.id,
+                recommendation_id=rec_b.recommendation_id,
+                variants=[{"gene_symbol": "EGFR", "protein_change": "L858R"}],
+                context={
+                    "patient": {"id": str(patient_in_db.id)},
+                },
+            )
+
+        # Verify no ClinicalDecision was persisted
+        dec_stmt = select(ClinicalDecisionModel)
+        dec_result = await db_session.execute(dec_stmt)
+        assert dec_result.scalars().all() == []
+
+        # Verify no ClinicalDecisionTrace was persisted
+        trace_stmt = select(ClinicalDecisionTraceModel)
+        trace_result = await db_session.execute(trace_stmt)
+        assert trace_result.scalars().all() == []
+
+    # ── H2.2 ───────────────────────────────────────────────────────────────
+
+    async def test_create_decision_created_by_set(
+        self,
+        db_session,
+        patient_in_db,
+        recommendation_in_db,
+        mock_engine,
+    ):
+        """H2.2: created_by should be persisted and stored in the DB."""
+        from src.backend.services.clinical_decision_service import (
+            ClinicalDecisionService,
+        )
+        from src.backend.domain.clinical_decision import ClinicalDecisionModel
+        from sqlalchemy import select
+
+        created_by_uuid = uuid.UUID("770e8400-e29b-41d4-a716-446655440002")
+
+        service = ClinicalDecisionService(db=db_session, engine=mock_engine)
+        result = await service.create_decision(
+            patient_id=patient_in_db.id,
+            recommendation_id=recommendation_in_db.recommendation_id,
+            variants=[{"gene_symbol": "EGFR", "protein_change": "L858R"}],
+            context={
+                "patient": {"id": str(patient_in_db.id)},
+            },
+            created_by=created_by_uuid,
+        )
+
+        # Query DB to verify created_by was stored
+        stmt = select(ClinicalDecisionModel).where(
+            ClinicalDecisionModel.decision_id == result.decision_id,
+        )
+        model_result = await db_session.execute(stmt)
+        model = model_result.scalar_one()
+        assert model.created_by == created_by_uuid
+
+    # ── H3.2 ───────────────────────────────────────────────────────────────
+
+    async def test_context_patient_does_not_override_db(
+        self,
+        db_session,
+        recommendation_in_db,
+        mock_engine,
+    ):
+        """H3.2: context.patient should NOT override core DB patient fields (sex, birth_year, etc.)."""
+        from src.backend.domain.patient import PatientModel
+        from src.backend.domain.enums import SexEnum
+        from src.backend.domain.recommendation import RecommendationModel
+        from src.backend.services.clinical_decision_service import (
+            ClinicalDecisionService,
+        )
+
+        # Create a patient with specific sex and birth_year
+        patient_id = uuid.UUID("880e8400-e29b-41d4-a716-446655440003")
+        patient = PatientModel(
+            id=patient_id,
+            display_name="H3.2-TEST-PATIENT",
+            sex=SexEnum.M,
+            birth_year=1990,
+        )
+        db_session.add(patient)
+        await db_session.commit()
+        await db_session.refresh(patient)
+
+        # Create a recommendation for this patient
+        rec = RecommendationModel(
+            recommendation_id="rec-h32-test-001",
+            patient_id=patient.id,
+            engine_version="1.0.0",
+            status="completed",
+            request_payload={"variants": ["EGFR L858R"]},
+            result_payload={
+                "recommendations": [
+                    {
+                        "drug_name": "Osimertinib",
+                        "rank": 1,
+                        "overall_score": 0.95,
+                    },
+                ],
+                "evidence": [],
+            },
+        )
+        db_session.add(rec)
+        await db_session.commit()
+        await db_session.refresh(rec)
+
+        # Call with context.patient that has conflicting + supplemental fields
+        service = ClinicalDecisionService(db=db_session, engine=mock_engine)
+        await service.create_decision(
+            patient_id=patient.id,
+            recommendation_id=rec.recommendation_id,
+            variants=[{"gene_symbol": "EGFR"}],
+            context={
+                "patient": {
+                    "sex": "female",  # should NOT override DB "male"
+                    "age_range": "20-30",  # supplemental — should be merged
+                    "allergies": ["penicillin"],  # supplemental — should be merged
+                },
+            },
+        )
+
+        # Inspect the engine call args to verify patient_data contents
+        patient_arg = mock_engine.evaluate.call_args[1]["patient"]
+        assert patient_arg["sex"] == "M"  # DB value preserved, context did NOT override
+        assert patient_arg["allergies"] == ["penicillin"]  # supplemental field merged
+
+    # ── H5.2 ───────────────────────────────────────────────────────────────
+
+    async def test_trace_has_all_steps(
+        self,
+        db_session,
+        patient_in_db,
+        recommendation_in_db,
+        mock_engine,
+    ):
+        """H5.2: Verify all 5 trace steps are created with correct step_type and order."""
+        from src.backend.services.clinical_decision_service import (
+            ClinicalDecisionService,
+        )
+        from src.backend.domain.clinical_decision import (
+            ClinicalDecisionTraceModel,
+        )
+        from sqlalchemy import select
+
+        service = ClinicalDecisionService(db=db_session, engine=mock_engine)
+        result = await service.create_decision(
+            patient_id=patient_in_db.id,
+            recommendation_id=recommendation_in_db.recommendation_id,
+            variants=[{"gene_symbol": "EGFR", "protein_change": "L858R"}],
+            context={
+                "patient": {"id": str(patient_in_db.id)},
+            },
+        )
+
+        # Query all trace steps for this trace_id ordered by step_order
+        stmt = (
+            select(ClinicalDecisionTraceModel)
+            .where(ClinicalDecisionTraceModel.trace_id == result.trace_id)
+            .order_by(ClinicalDecisionTraceModel.step_order)
+        )
+        traces = await db_session.execute(stmt)
+        steps = traces.scalars().all()
+
+        assert len(steps) == 5
+
+        expected_types = [
+            "load_recommendation",
+            "validate_patient",
+            "evaluate",
+            "decision",
+            "persist",
+        ]
+        for i, step in enumerate(steps):
+            assert step.step_order == i, f"step_order mismatch at index {i}"
+            assert step.step_type == expected_types[i], (
+                f"step_type mismatch at order {i}: "
+                f"expected {expected_types[i]!r}, got {step.step_type!r}"
             )
 
 

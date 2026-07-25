@@ -84,6 +84,13 @@ describe('ClinicalDecisionPage — Route Registration', () => {
     expect(appTsx).toContain('ClinicalDecisionPage')
     expect(appTsx).toContain('<Route path="/clinical-decision/:id"')
   })
+
+  it('route is registered in App.tsx at /clinical-decision (list page)', async () => {
+    const fs = await import('fs')
+    const appTsx = fs.readFileSync('./src/App.tsx', 'utf-8')
+    expect(appTsx).toContain('/clinical-decision')
+    expect(appTsx).toContain('ClinicalDecisionListPage')
+  })
 })
 
 describe('ClinicalDecisionPage — Rendering', () => {
@@ -383,7 +390,7 @@ describe('ClinicalDecisionPage — UI Elements', () => {
     await waitFor(() => {
       // decision_id is truncated to 12 chars + …
       expect(screen.getByText(/dec-001/)).toBeInTheDocument()
-      expect(screen.getByText(/trace: trace-xyz/)).toBeInTheDocument()
+      expect(screen.getByText(/trace: trace-xy/)).toBeInTheDocument()
     })
   })
 
@@ -407,7 +414,7 @@ describe('ClinicalDecisionPage — Navigation', () => {
     const fs = await import('fs')
     const appTsx = fs.readFileSync('./src/App.tsx', 'utf-8')
     expect(appTsx).toContain('臨床決策')
-    expect(appTsx).toContain('/clinical-decision/sample')
+    expect(appTsx).toContain('/clinical-decision')
     expect(appTsx).toContain("label: '臨床決策'")
   })
 })

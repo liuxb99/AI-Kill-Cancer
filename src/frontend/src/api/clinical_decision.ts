@@ -60,3 +60,12 @@ export function fetchClinicalDecisionById(id: string): Promise<ClinicalDecisionR
 export function createClinicalDecision(data: ClinicalDecisionRequest): Promise<ClinicalDecisionResponse> {
   return request('/clinical-decision', { method: 'POST', body: data })
 }
+
+export interface ClinicalDecisionListResponse {
+  decisions: ClinicalDecisionResponse[]
+  total: number
+}
+
+export function fetchClinicalDecisionsByPatientId(patientId: string): Promise<ClinicalDecisionListResponse> {
+  return request(`/clinical-decision?patient_id=${encodeURIComponent(patientId)}`)
+}

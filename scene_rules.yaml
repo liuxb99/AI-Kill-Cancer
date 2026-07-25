@@ -41,3 +41,13 @@ scenes:
       - planner: 規劃部署步驟
       - devops: 部署執行
       - reviewer: 驗證確認
+
+  - id: hardening
+    name: 架構強化
+    description: 修正既有功能的架構問題、邊界案例驗證、審計追蹤補全
+    roles:
+      - planner: 制定強化計劃與優先級排序
+      - backend-logic: 後端邏輯修正（validation、audit trail）
+      - frontend-logic: 前端邏輯修正（navigation、sample data 移除）
+      - test-writer: 撰寫回歸測試驗證修正
+      - reviewer: 評分代理

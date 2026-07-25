@@ -232,6 +232,37 @@ class TestCreateClinicalDecision:
         )
         assert resp.status_code == 401
 
+    # ── H7.1 ───────────────────────────────────────────────────────────────
+
+    def test_create_decision_patient_recommendation_mismatch_api(
+        self,
+        client,
+        auth_headers,
+    ):
+        """H7.1: POST with mismatched patient/recommendation should return 422."""
+        with patch(
+            "src.backend.api.v1.clinical_decision.ClinicalDecisionService.create_decision",
+            new_callable=AsyncMock,
+            side_effect=ValueError(
+                "Recommendation 'rec-b' belongs to patient "
+                "'patient-b-id', not patient 'patient-a-id'",
+            ),
+        ):
+            resp = client.post(
+                "/api/v1/clinical-decision",
+                json={
+                    "patient_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "recommendation_id": "rec-b-id",
+                    "variants": [{"gene_symbol": "EGFR"}],
+                },
+                headers=auth_headers,
+            )
+
+        assert resp.status_code == 422
+        data = resp.json()
+        detail = str(data.get("detail", ""))
+        assert "belongs to patient" in detail
+
     def test_create_decision_422_value_error(self, client, auth_headers):
         """When service raises ValueError (e.g. patient not found), API returns 422."""
         with patch(
