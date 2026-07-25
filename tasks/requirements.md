@@ -411,3 +411,97 @@ Phase 3B：PASS / PARTIAL
 Ready for ChatGPT GitHub Review：YES / NO
 
 推送後停止，不要開始 Phase 3C。
+
+---
+
+## 2026-07-26 — Phase 3B Final Acceptance Fix
+
+**狀態**：PARTIAL（ChatGPT GitHub Review：86/100，Accepted：NO，不可進入 Phase 3C）
+
+## 本輪目標
+
+不是新增功能，而是修正 ChatGPT Review 找出的兩個 P0 缺陷，使 Phase 3B 達到 Accepted。
+
+## P0-1：Migration 缺失
+
+目前 Migration 018 中 `domain_clinical_decision_traces.trace_id` 為 `unique=True`，但 ORM 模型已改為 `UniqueConstraint("trace_id", "step_order")` 且 `trace_id` 為 `unique=False`。
+
+必須新增 Migration 019（019_phase3b_trace_compound_unique.py）：
+
+Upgrade：
+1. Drop trace_id unique constraint
+2. Create normal index on trace_id
+3. Create UNIQUE(trace_id, step_order)
+
+Downgrade：
+1. Drop compound unique
+2. Drop normal index
+3. Restore trace_id unique
+
+不得修改 018。不得重建整張 Table。
+
+### Migration Tests
+
+新增 Migration Tests 驗證：
+- 018 → 019 → Insert 5 Trace Steps → PASS
+- 019 → 018 → PASS
+- 018 → 019 → PASS
+
+CI 必須真正跑 Migration。
+
+## P0-2：Clinical Decision List API 缺失
+
+前端 ClinicalDecisionListPage 呼叫 `GET /api/v1/clinical-decision?patient_id=...`，但後端只有 POST 和 GET /{id}，沒有 Collection API。
+
+必須新增：
+
+### Repository
+- `count_by_patient_id(patient_id: UUID) -> int`
+
+### Service
+- `list_decisions_by_patient()`（已存在於 service 中，需確保完整）
+- 新增 `count_decisions_by_patient(patient_id) -> int`
+
+### Router
+新增 `GET /api/v1/clinical-decision`（注意：Collection Route 必須放在 `/{decision_id}` 之前避免 Route Conflict）
+
+支援：patient_id（必填）、skip（預設 0）、limit（預設 50）
+
+回傳：
+```json
+{
+  "decisions": [],
+  "total": 0
+}
+```
+
+Response Schema 必須完全符合 Frontend 的 `ClinicalDecisionListResponse`。
+
+### API Tests
+
+至少：
+- List Empty
+- List One
+- Pagination
+- Wrong Patient
+- Unauthorized
+
+### Frontend Integration Test
+
+真正呼叫 List API。不得 Mock 不存在的 Endpoint。
+
+## 禁止事項
+
+不得修改 Recommendation、Phase 3A、AGENTS、CI、Vercel。不得開始 Phase 3C。不得混入其他功能。
+
+## Commit
+```
+fix(phase3b): add migration019 and clinical decision collection api
+```
+
+## 驗收條件
+- Migration 019 PASS
+- CI Migration 018 → 019 → PASS
+- Collection API 正常回應
+- Frontend ClinicalDecisionListPage 正常顯示
+- Reviewer >= 95

@@ -137,6 +137,32 @@ class ClinicalDecisionRepository(BaseRepository[ClinicalDecisionModel]):
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
+    async def count_by_patient_id(
+        self,
+        patient_id: uuid.UUID,
+    ) -> int:
+        """Count clinical decisions for a patient.
+
+        Parameters
+        ----------
+        patient_id : uuid.UUID
+            The patient's UUID.
+
+        Returns
+        -------
+        int
+            Number of clinical decisions for the patient.
+        """
+        from sqlalchemy import func
+
+        stmt = (
+            select(func.count())
+            .select_from(ClinicalDecisionModel)
+            .where(ClinicalDecisionModel.patient_id == patient_id)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or 0
+
     async def list_by_recommendation_id(
         self,
         recommendation_id: uuid.UUID,

@@ -304,8 +304,8 @@ class TestClinicalDecisionTraceModel:
         assert trace.output_summary == {"rank": 1, "score": 0.92}
         assert trace.created_at is not None
 
-    async def test_trace_id_unique(self, db_session, patient):
-        """trace_id must be unique."""
+    async def test_trace_id_step_order_unique(self, db_session, patient):
+        """(trace_id, step_order) must be unique — same pair raises IntegrityError."""
         from sqlalchemy.exc import IntegrityError
 
         from src.backend.domain.clinical_decision import (
@@ -314,27 +314,66 @@ class TestClinicalDecisionTraceModel:
         )
 
         decision = ClinicalDecisionModel(
-            decision_id="trace-unique",
+            decision_id="trace-compound-unique",
             patient_id=patient.id,
             decision_type="test",
-            reason="Unique trace test",
+            reason="Compound unique trace test",
             confidence="high",
         )
         db_session.add(decision)
         await db_session.flush()
 
         t1 = ClinicalDecisionTraceModel(
-            trace_id="unique-trace", clinical_decision_id=decision.id, step_order=1, step_type="a"
+            trace_id="compound-trace", clinical_decision_id=decision.id, step_order=1, step_type="a"
         )
         db_session.add(t1)
         await db_session.commit()
 
+        # Same trace_id + same step_order → should raise IntegrityError
         t2 = ClinicalDecisionTraceModel(
-            trace_id="unique-trace", clinical_decision_id=decision.id, step_order=2, step_type="b"
+            trace_id="compound-trace", clinical_decision_id=decision.id, step_order=1, step_type="b"
         )
         db_session.add(t2)
         with pytest.raises(IntegrityError):
             await db_session.commit()
+
+    async def test_same_trace_id_different_step_order_allowed(self, db_session, patient):
+        """Same trace_id with different step_order is allowed after migration 019."""
+        from src.backend.domain.clinical_decision import (
+            ClinicalDecisionModel,
+            ClinicalDecisionTraceModel,
+        )
+
+        decision = ClinicalDecisionModel(
+            decision_id="trace-multi-step",
+            patient_id=patient.id,
+            decision_type="test",
+            reason="Multi-step trace test",
+            confidence="high",
+        )
+        db_session.add(decision)
+        await db_session.flush()
+
+        t1 = ClinicalDecisionTraceModel(
+            trace_id="multi-step-trace", clinical_decision_id=decision.id, step_order=1, step_type="load"
+        )
+        db_session.add(t1)
+
+        t2 = ClinicalDecisionTraceModel(
+            trace_id="multi-step-trace", clinical_decision_id=decision.id, step_order=2, step_type="validate"
+        )
+        db_session.add(t2)
+
+        t3 = ClinicalDecisionTraceModel(
+            trace_id="multi-step-trace", clinical_decision_id=decision.id, step_order=3, step_type="evaluate"
+        )
+        db_session.add(t3)
+
+        # All 3 steps with same trace_id but different step_order should commit
+        await db_session.commit()
+        assert t1.id is not None
+        assert t2.id is not None
+        assert t3.id is not None
 
     async def test_json_fields_round_trip(self, db_session, patient):
         """JSON fields (input_summary, output_summary) survive write-read."""

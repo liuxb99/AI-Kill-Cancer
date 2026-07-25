@@ -444,3 +444,263 @@ class TestMigration018:
         assert fks["clinical_decision_id"] == "domain_clinical_decisions", "clinical_decision_id FK target mismatch"
 
         conn.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 3B — Batch A: Migration 019 → Trace Compound Unique
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def alembic_config_019(tmp_path):
+    """Isolated Alembic config for 018→019 migration tests."""
+    db_path = tmp_path / "test_migration_019.db"
+    cfg = Config()
+    cfg.set_main_option("script_location", "migrations")
+    cfg.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{db_path}")
+    return cfg, db_path
+
+
+class TestMigration019:
+    """Tests for Phase 3B migration 019 (trace compound unique)."""
+
+    # ── helpers ──────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _get_indexes(db_path, table_name):
+        """Return a dict mapping index name → {"unique": bool, "columns": list}."""
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=?",
+            (table_name,),
+        )
+        index_names = [row[0] for row in cursor.fetchall()]
+
+        result = {}
+        for idx_name in index_names:
+            cursor = conn.execute(f"PRAGMA index_info('{idx_name}')")
+            columns = [row[2] for row in cursor.fetchall()]
+            cursor = conn.execute(f"PRAGMA index_list('{table_name}')")
+            unique = False
+            for row in cursor.fetchall():
+                # row[1] = name, row[2] = unique flag (0/1)
+                if row[1] == idx_name:
+                    unique = bool(row[2])
+                    break
+            result[idx_name] = {"unique": unique, "columns": columns}
+        conn.close()
+        return result
+
+    # ── file existence ───────────────────────────────────────────────────────
+
+    def test_migration_019_file_exists(self):
+        """Verify migration 019 file exists with correct metadata."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "migration_019",
+            "migrations/versions/019_phase3b_trace_compound_unique.py",
+        )
+        assert spec is not None, "Migration 019 file not found"
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert hasattr(module, "upgrade"), "Migration 019 missing upgrade()"
+        assert hasattr(module, "downgrade"), "Migration 019 missing downgrade()"
+        assert module.revision == "019"
+        assert module.down_revision == "018"
+
+    def test_migration_018_exists_as_prerequisite(self):
+        """Migration 018 must exist as the base for 019."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "migration_018",
+            "migrations/versions/018_phase3b_clinical_decision_tables.py",
+        )
+        assert spec is not None, "Migration 018 file not found"
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert module.revision == "018"
+
+    # ── upgrade 018→019 ──────────────────────────────────────────────────────
+
+    def test_upgrade_018_to_019_alters_indexes(self, alembic_config_019):
+        """Upgrade to 019 drops UNIQUE on trace_id and adds compound unique."""
+        cfg, db_path = alembic_config_019
+        command.upgrade(cfg, "018")
+
+        # Before upgrade: trace_id index should be UNIQUE
+        indexes_before = self._get_indexes(db_path, "domain_clinical_decision_traces")
+        assert "ix_domain_clinical_decision_traces_trace_id" in indexes_before
+        assert indexes_before["ix_domain_clinical_decision_traces_trace_id"]["unique"] is True
+
+        command.upgrade(cfg, "019")
+
+        # After upgrade:
+        indexes_after = self._get_indexes(db_path, "domain_clinical_decision_traces")
+
+        # 1) The single-column index should now be non-unique
+        idx = indexes_after.get("ix_domain_clinical_decision_traces_trace_id")
+        assert idx is not None, "Missing trace_id index after upgrade"
+        assert idx["unique"] is False, "trace_id index should no longer be UNIQUE"
+        assert idx["columns"] == ["trace_id"]
+
+        # 2) The compound unique constraint should exist
+        assert "uq_trace_step" in indexes_after, "Missing uq_trace_step compound unique"
+        assert indexes_after["uq_trace_step"]["unique"] is True
+        assert indexes_after["uq_trace_step"]["columns"] == ["trace_id", "step_order"]
+
+    # ── insert multiple trace steps with same trace_id ───────────────────────
+
+    def test_insert_multiple_trace_steps_same_trace_id(self, alembic_config_019):
+        """After 019 upgrade, inserting rows with same trace_id but different step_order succeeds."""
+        cfg, db_path = alembic_config_019
+        command.upgrade(cfg, "019")
+
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+
+        # Insert multiple steps sharing the same trace_id
+        trace_id = "trace-simulation-001"
+        for step_order in range(1, 6):
+            conn.execute(
+                """INSERT INTO domain_clinical_decision_traces
+                   (id, trace_id, step_order, step_type, input_summary, output_summary)
+                   VALUES (?, ?, ?, ?, '{}', '{}')""",
+                (f"id-{step_order}", trace_id, step_order, "reasoning"),
+            )
+        conn.commit()
+
+        # Verify all 5 rows exist
+        cursor = conn.execute(
+            "SELECT COUNT(*) FROM domain_clinical_decision_traces WHERE trace_id=?",
+            (trace_id,),
+        )
+        count = cursor.fetchone()[0]
+        assert count == 5, f"Expected 5 rows, got {count}"
+
+        # Verify unique violation on same trace_id + step_order
+        with pytest.raises(Exception):
+            conn.execute(
+                """INSERT INTO domain_clinical_decision_traces
+                   (id, trace_id, step_order, step_type)
+                   VALUES (?, ?, ?, ?)""",
+                ("id-duplicate", trace_id, 1, "duplicate"),
+            )
+        conn.close()
+
+    # ── downgrade 019→018 ────────────────────────────────────────────────────
+
+    def test_downgrade_019_to_018_restores_unique(self, alembic_config_019):
+        """Downgrade from 019 to 018 restores the UNIQUE index on trace_id."""
+        cfg, db_path = alembic_config_019
+        command.upgrade(cfg, "019")
+
+        # Upgrade to 019 first, then downgrade
+        command.downgrade(cfg, "018")
+
+        indexes = self._get_indexes(db_path, "domain_clinical_decision_traces")
+
+        # After downgrade: trace_id index should be UNIQUE again
+        idx = indexes.get("ix_domain_clinical_decision_traces_trace_id")
+        assert idx is not None, "Missing trace_id index after downgrade"
+        assert idx["unique"] is True, "trace_id index should be UNIQUE after downgrade"
+
+        # Compound constraint should be gone
+        assert "uq_trace_step" not in indexes, "uq_trace_step should not exist after downgrade"
+
+    def test_downgrade_019_to_018_enforces_unique(self, alembic_config_019):
+        """After downgrade to 018, inserting duplicate trace_id should fail."""
+        cfg, db_path = alembic_config_019
+        command.upgrade(cfg, "019")
+        command.downgrade(cfg, "018")
+
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+
+        trace_id = "trace-unique-test"
+        conn.execute(
+            """INSERT INTO domain_clinical_decision_traces
+               (id, trace_id, step_order, step_type)
+               VALUES (?, ?, ?, ?)""",
+            ("id-first", trace_id, 1, "first"),
+        )
+        conn.commit()
+
+        # Second insert with same trace_id should fail (UNIQUE constraint)
+        with pytest.raises(Exception):
+            conn.execute(
+                """INSERT INTO domain_clinical_decision_traces
+                   (id, trace_id, step_order, step_type)
+                   VALUES (?, ?, ?, ?)""",
+                ("id-second", trace_id, 2, "second"),
+            )
+        conn.close()
+
+    # ── re-upgrade cycle ─────────────────────────────────────────────────────
+
+    def test_reupgrade_019_cycle(self, alembic_config_019):
+        """018 → 019 → 018 → 019 cycle should succeed and leave correct indexes."""
+        cfg, db_path = alembic_config_019
+
+        # First pass
+        command.upgrade(cfg, "019")
+        command.downgrade(cfg, "018")
+
+        # Second pass
+        command.upgrade(cfg, "019")
+
+        indexes = self._get_indexes(db_path, "domain_clinical_decision_traces")
+
+        # Final state should match 019 expectations
+        idx = indexes.get("ix_domain_clinical_decision_traces_trace_id")
+        assert idx is not None, "Missing trace_id index after re-upgrade"
+        assert idx["unique"] is False, "trace_id index should be non-unique"
+        assert "uq_trace_step" in indexes, "Missing uq_trace_step after re-upgrade"
+        assert indexes["uq_trace_step"]["unique"] is True
+
+    # ── upgrade preserves existing tables ────────────────────────────────────
+
+    def test_upgrade_019_preserves_018_tables(self, alembic_config_019):
+        """Upgrading to 019 should not drop tables created by 018."""
+        cfg, db_path = alembic_config_019
+
+        command.upgrade(cfg, "018")
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables_before = {row[0] for row in cursor.fetchall()}
+        conn.close()
+
+        command.upgrade(cfg, "019")
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables_after = {row[0] for row in cursor.fetchall()}
+        conn.close()
+
+        missing = tables_before - tables_after
+        assert not missing, f"Tables from 018 missing after 019 upgrade: {missing}"
+
+    # ── columns unchanged ────────────────────────────────────────────────────
+
+    def test_upgrade_019_columns_unchanged(self, alembic_config_019):
+        """Column definitions must be identical after 019 upgrade."""
+        cfg, db_path = alembic_config_019
+        command.upgrade(cfg, "018")
+
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("PRAGMA table_info(domain_clinical_decision_traces)")
+        columns_018 = {(row[1], row[2]) for row in cursor.fetchall()}
+        conn.close()
+
+        command.upgrade(cfg, "019")
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("PRAGMA table_info(domain_clinical_decision_traces)")
+        columns_019 = {(row[1], row[2]) for row in cursor.fetchall()}
+        conn.close()
+
+        assert columns_018 == columns_019, "Columns changed after 019 upgrade"

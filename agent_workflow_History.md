@@ -225,3 +225,14 @@ Commit: a64f7a1 | 796 tests passed | Pushed to origin/master ✅
 2026-07-25 20:27 | [v] 更新 agent_workflow.md -> 當前狀態
 2026-07-25 20:32 | [v] task(子代理) -> Step 4b 需求回歸檢查：✅ PASS，全部 6 項需求符合，可進入 Step 5
 2026-07-25 20:50 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性25 正確性25 可維護性23 測試25 | 總分98 合格 ✅
+2026-07-25 21:00 | [v] Step 6 完成：總結報告產出 + Git Commit & Push（1e5b934 → origin/master）✅
+2026-07-26 13:50 | [v] task(doc-writer) -> Step 0A 完成：子代理已向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」
+2026-07-26 13:52 | [v] task(doc-writer) -> Step 0B 完成：Phase 3B Final Acceptance Fix 需求已追加到 tasks/requirements.md
+2026-07-26 13:53 | [v] task(doc-writer) -> Step 1 完成：場景 bug-fix，tasks/task-status.md 已更新（8 項任務）
+2026-07-26 13:55 | [v] task(PLANNER) -> Step 2 完成，產出 tasks/plan-phase3b-final-fix.md（4 Batch: A~D）
+2026-07-26 13:57 | [v] fleet(backend-logic + api-designer) -> Batch A + Batch B 核心完成：Migration 019 + Repository count_by_patient_id + Service count_decisions_by_patient + Router Collection API
+2026-07-26 14:00 | [v] fleet(test-writer + frontend-logic) -> Batch B Tests + Batch C 完成：Repository Test + Service Test + Frontend Integration Test（API 測試檔案待補）
+2026-07-26 14:02 | [v] task(test-writer) -> API Tests 追加完成：5 個 Collection API Tests（Empty/One/Pagination/Wrong Patient/Unauthorized）
+2026-07-26 14:03 | [v] task(子代理) -> Step 4b 需求回歸檢查：全部 PASS ✅（16/16 項通過）
+2026-07-26 14:05 | [v] 驗證測試通過：後端 113 ✅ | 前端 106 ✅
+2026-07-26 14:05 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性24 正確性25 可維護性23 測試25 | 總分97 合格 ✅

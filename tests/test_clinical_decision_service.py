@@ -920,3 +920,43 @@ class TestGetDecision:
         # Should be ordered newest first
         if len(decisions) >= 2:
             assert decisions[0].created_at >= decisions[1].created_at
+
+
+class TestCountDecisions:
+    """Tests for ClinicalDecisionService.count_decisions_by_patient()."""
+
+    async def test_count_decisions_by_patient(
+        self,
+        db_session,
+        patient_in_db,
+        recommendation_in_db,
+        mock_engine,
+    ):
+        """count_decisions_by_patient returns the correct count."""
+        from src.backend.services.clinical_decision_service import (
+            ClinicalDecisionService,
+        )
+
+        service = ClinicalDecisionService(db=db_session, engine=mock_engine)
+
+        # Count before creating any decisions
+        count0 = await service.count_decisions_by_patient(patient_in_db.id)
+        assert count0 == 0
+
+        # Create two decisions
+        for _ in range(2):
+            await service.create_decision(
+                patient_id=patient_in_db.id,
+                recommendation_id=recommendation_in_db.recommendation_id,
+                variants=[{"gene_symbol": "EGFR"}],
+                context={"patient": {"id": str(patient_in_db.id)}, "evidence": []},
+            )
+
+        count = await service.count_decisions_by_patient(patient_in_db.id)
+        assert count == 2
+
+        # Count for a non-existent patient should be 0
+        import uuid
+
+        count_wrong = await service.count_decisions_by_patient(uuid.uuid4())
+        assert count_wrong == 0

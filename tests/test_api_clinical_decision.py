@@ -519,6 +519,115 @@ class TestDecisionRoundTrip:
         assert get_data["confidence"] == created_data["confidence"]
         assert get_data["reason"] == created_data["reason"]
         assert len(get_data["alternatives"]) == len(created_data["alternatives"])
+
         assert len(get_data["contraindications"]) == len(
             created_data["contraindications"],
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/clinical-decision (Collection) Tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestListClinicalDecisions:
+    """Tests for GET /api/v1/clinical-decision (collection with pagination)."""
+
+    LIST_ENDPOINT = "/api/v1/clinical-decision"
+    PATIENT_ID = "550e8400-e29b-41d4-a716-446655440000"
+
+    def test_list_decisions_empty(self, client, auth_headers):
+        """GET with no decisions for a patient returns empty list and total=0."""
+        with patch.multiple(
+            "src.backend.api.v1.clinical_decision.ClinicalDecisionService",
+            list_decisions_by_patient=AsyncMock(return_value=[]),
+            count_decisions_by_patient=AsyncMock(return_value=0),
+        ):
+            resp = client.get(
+                f"{self.LIST_ENDPOINT}?patient_id={self.PATIENT_ID}",
+                headers=auth_headers,
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["decisions"] == []
+        assert data["total"] == 0
+
+    def test_list_decisions_one(self, client, auth_headers):
+        """GET returns a single decision when one exists."""
+        mock_dec = _make_mock_response(
+            decision_id="single-dec-001",
+            patient_id=self.PATIENT_ID,
+            recommendation_id="rec-list-test-001",
+        )
+
+        with patch.multiple(
+            "src.backend.api.v1.clinical_decision.ClinicalDecisionService",
+            list_decisions_by_patient=AsyncMock(return_value=[mock_dec]),
+            count_decisions_by_patient=AsyncMock(return_value=1),
+        ):
+            resp = client.get(
+                f"{self.LIST_ENDPOINT}?patient_id={self.PATIENT_ID}",
+                headers=auth_headers,
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["decisions"]) == 1
+        assert data["total"] == 1
+        assert data["decisions"][0]["decision_id"] == "single-dec-001"
+
+    def test_list_decisions_pagination(self, client, auth_headers):
+        """GET supports skip/limit pagination."""
+        all_decisions = [
+            _make_mock_response(
+                decision_id=f"page-dec-{i:02d}",
+                patient_id=self.PATIENT_ID,
+                recommendation_id=f"rec-page-{i:02d}",
+            )
+            for i in range(5)
+        ]
+
+        with patch.multiple(
+            "src.backend.api.v1.clinical_decision.ClinicalDecisionService",
+            list_decisions_by_patient=AsyncMock(return_value=all_decisions[:2]),
+            count_decisions_by_patient=AsyncMock(return_value=5),
+        ):
+            resp = client.get(
+                f"{self.LIST_ENDPOINT}?patient_id={self.PATIENT_ID}&skip=0&limit=2",
+                headers=auth_headers,
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["decisions"]) == 2
+        assert data["total"] == 5
+        assert data["decisions"][0]["decision_id"] == "page-dec-00"
+        assert data["decisions"][1]["decision_id"] == "page-dec-01"
+
+    def test_list_decisions_wrong_patient(self, client, auth_headers):
+        """GET with a patient_id that has no decisions returns empty list."""
+        wrong_patient_id = "99999999-9999-9999-9999-999999999999"
+
+        with patch.multiple(
+            "src.backend.api.v1.clinical_decision.ClinicalDecisionService",
+            list_decisions_by_patient=AsyncMock(return_value=[]),
+            count_decisions_by_patient=AsyncMock(return_value=0),
+        ):
+            resp = client.get(
+                f"{self.LIST_ENDPOINT}?patient_id={wrong_patient_id}",
+                headers=auth_headers,
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["decisions"] == []
+        assert data["total"] == 0
+
+    def test_list_decisions_unauthorized(self, client):
+        """GET without auth should return 401."""
+        resp = client.get(
+            f"{self.LIST_ENDPOINT}?patient_id={self.PATIENT_ID}",
+        )
+        assert resp.status_code == 401
+

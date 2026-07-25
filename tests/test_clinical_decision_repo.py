@@ -484,3 +484,66 @@ class TestClinicalDecisionTraceRepository:
 
         fetched = await repo.get_by_trace_id("trace-rollback")
         assert fetched is None
+
+
+class TestClinicalDecisionRepositoryCount:
+    """Tests for ClinicalDecisionRepository.count_by_patient_id()."""
+
+    async def test_count_by_patient_id_empty(self, db_session):
+        """count_by_patient_id returns 0 when no decisions exist for a patient."""
+        import uuid
+
+        from src.backend.repositories.clinical_decision_repo import (
+            ClinicalDecisionRepository,
+        )
+
+        repo = ClinicalDecisionRepository(db_session)
+        count = await repo.count_by_patient_id(uuid.uuid4())
+        assert count == 0
+
+    async def test_count_by_patient_id_with_records(self, db_session, patient):
+        """count_by_patient_id returns the correct count for a patient with decisions."""
+        from src.backend.domain.clinical_decision import ClinicalDecisionModel
+        from src.backend.repositories.clinical_decision_repo import (
+            ClinicalDecisionRepository,
+        )
+
+        repo = ClinicalDecisionRepository(db_session)
+        for i in range(5):
+            model = ClinicalDecisionModel(
+                decision_id=f"count-pat-{i:02d}",
+                patient_id=patient.id,
+                decision_type="test",
+                reason=f"Decision {i}",
+                confidence="high",
+            )
+            await repo.create(model)
+        await db_session.commit()
+
+        count = await repo.count_by_patient_id(patient.id)
+        assert count == 5
+
+    async def test_count_by_patient_id_wrong_patient(self, db_session, patient):
+        """count_by_patient_id returns 0 for a patient unrelated to existing records."""
+        import uuid
+
+        from src.backend.domain.clinical_decision import ClinicalDecisionModel
+        from src.backend.repositories.clinical_decision_repo import (
+            ClinicalDecisionRepository,
+        )
+
+        repo = ClinicalDecisionRepository(db_session)
+        model = ClinicalDecisionModel(
+            decision_id="wrong-patient-count",
+            patient_id=patient.id,
+            decision_type="test",
+            reason="Only this patient's decision",
+            confidence="medium",
+        )
+        await repo.create(model)
+        await db_session.commit()
+
+        other_patient_id = uuid.uuid4()
+        count = await repo.count_by_patient_id(other_patient_id)
+        assert count == 0
+

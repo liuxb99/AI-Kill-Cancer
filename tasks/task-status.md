@@ -80,3 +80,24 @@ Phase 3A Final Acceptance Gate — PostgreSQL CI Gate + Real Pipeline Trace
 - Phase 3A 已完成功能
 - Vercel 部署
 - 認證系統
+
+## 2026-07-26 — Phase 3B Final Acceptance Fix
+
+場景：bug-fix
+
+角色：
+- PLANNER: 制定修復計劃
+- backend-logic: Migration 019 + Repository count_by_patient 新增
+- api-designer: Clinical Decision Collection API 新增
+- test-writer: Migration Tests + API Tests + Frontend Integration Test
+- reviewer: 評分代理
+
+任務：
+- [ ] TASK-FIX-01: Migration 019 — 新增 migration 檔案（drop trace_id unique → compound unique）
+- [ ] TASK-FIX-02: Repository — 新增 count_by_patient_id 方法
+- [ ] TASK-FIX-03: Service — 確保 list_decisions_by_patient + 新增 count_decisions_by_patient
+- [ ] TASK-FIX-04: API Router — 新增 GET /api/v1/clinical-decision collection route（放在 /{decision_id} 之前）
+- [ ] TASK-FIX-05: API Tests — List Empty / List One / Pagination / Wrong Patient / Unauthorized
+- [ ] TASK-FIX-06: Migration Tests — 018→019→insert 5 steps→PASS / downgrade→PASS / re-upgrade→PASS
+- [ ] TASK-FIX-07: Frontend Integration Test — 真正呼叫 List API
+- [ ] TASK-FIX-08: 完整回歸測試 + Git Commit & Push

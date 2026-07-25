@@ -456,6 +456,26 @@ class ClinicalDecisionService:
         )
         return [await self._model_to_response(m) for m in models]
 
+    async def count_decisions_by_patient(
+        self,
+        patient_id: UUID,
+    ) -> int:
+        """Count clinical decisions for a patient.
+
+        Parameters
+        ----------
+        patient_id : UUID
+            The patient's UUID.
+
+        Returns
+        -------
+        int
+            Number of clinical decisions for the patient.
+        """
+        return await self._decision_repo.count_by_patient_id(
+            patient_id=patient_id,
+        )
+
     # ── Internal helpers ─────────────────────────────────────────────────
 
     async def _load_patient_data(

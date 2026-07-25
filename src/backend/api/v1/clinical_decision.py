@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import logging
 
+from typing import Optional
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.auth.dependencies import require_auth
@@ -54,6 +58,49 @@ async def create_clinical_decision(
         raise HTTPException(status_code=500, detail="Internal server error")
     except Exception:
         logger.exception("Unexpected error in create_clinical_decision")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ─── Response schema ──────────────────────────────────────────────────────────
+
+
+class ClinicalDecisionListResponse(BaseModel):
+    """Response schema for list of clinical decisions."""
+    decisions: list[ClinicalDecisionResponse]
+    total: int
+
+
+# ─── Collection route (must precede /{decision_id} to avoid route conflict) ───
+
+
+@router.get("", response_model=ClinicalDecisionListResponse)
+async def list_clinical_decisions(
+    patient_id: str,
+    skip: int = 0,
+    limit: int = 50,
+    user: UserModel = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+) -> ClinicalDecisionListResponse:
+    """依 patient_id 查詢 Clinical Decision 列表。"""
+    service = ClinicalDecisionService(db=db)
+    try:
+        patient_uuid = UUID(patient_id)
+        decisions = await service.list_decisions_by_patient(
+            patient_id=patient_uuid,
+            skip=skip,
+            limit=limit,
+        )
+        total = await service.count_decisions_by_patient(
+            patient_id=patient_uuid,
+        )
+        return ClinicalDecisionListResponse(
+            decisions=decisions,
+            total=total,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception:
+        logger.exception("Unexpected error in list_clinical_decisions")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
