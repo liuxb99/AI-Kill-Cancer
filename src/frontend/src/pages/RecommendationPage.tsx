@@ -311,13 +311,23 @@ export default function RecommendationPage() {
               <h2 className="text-base font-semibold text-gray-800">
                 推薦結果
               </h2>
-              <span className="text-xs text-gray-400">
-                {result.recommendation_id
-                  ? `ID: ${result.recommendation_id.slice(0, 12)}…`
-                  : ''}
-                {result.created_at &&
-                  ` · ${new Date(result.created_at).toLocaleString('zh-CN')}`}
-              </span>
+              <div className="flex items-center gap-3">
+                {result.recommendation_id && (
+                  <button
+                    onClick={() => navigate(`/clinical-decision/${result.recommendation_id}`)}
+                    className="inline-flex items-center gap-1 rounded-lg bg-primary-50 text-primary-700 px-3 py-1.5 text-xs font-medium hover:bg-primary-100 transition"
+                  >
+                    View Clinical Decision &rarr;
+                  </button>
+                )}
+                <span className="text-xs text-gray-400">
+                  {result.recommendation_id
+                    ? `ID: ${result.recommendation_id.slice(0, 12)}…`
+                    : ''}
+                  {result.created_at &&
+                    ` · ${new Date(result.created_at).toLocaleString('zh-CN')}`}
+                </span>
+              </div>
             </div>
 
             {/* Top Drugs Table */}

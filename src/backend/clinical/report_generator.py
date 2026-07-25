@@ -426,6 +426,115 @@ body {
   text-align: center;
 }
 
+/* ── Clinical Decision ────────────────────────────────────────────────── */
+
+.clinical-decision-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .clinical-decision-grid { grid-template-columns: 1fr; }
+}
+
+.clinical-decision-field {
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.clinical-decision-field .field-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.clinical-decision-field .field-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.clinical-decision-field .field-value.confidence-high {
+  color: var(--color-success);
+}
+
+.clinical-decision-field .field-value.confidence-medium {
+  color: var(--color-warning);
+}
+
+.clinical-decision-field .field-value.confidence-low {
+  color: var(--color-danger);
+}
+
+.clinical-decision-alternatives {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.clinical-decision-alternatives .alt-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.clinical-decision-alternatives .alt-item {
+  font-size: 13px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.clinical-decision-alternatives .alt-item:last-child {
+  border-bottom: none;
+}
+
+.clinical-decision-contraindications {
+  margin-top: 12px;
+}
+
+.clinical-decision-contraindications .contra-item {
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fef2f2;
+  border-left: 3px solid var(--color-danger);
+  color: #991b1b;
+}
+
+.clinical-decision-evidence {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #f0fdf4;
+  border-radius: 8px;
+  border: 1px solid #bbf7d0;
+}
+
+.clinical-decision-evidence .ev-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.clinical-decision-evidence .ev-text {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 /* ── Trace (collapsible) ───────────────────────────────────────────────── */
 
 details.trace-details {
@@ -535,6 +644,10 @@ details.trace-details[open] summary {
   .drug-breakdown-header { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   details.trace-details summary { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .variant-list li { background: #eff6ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .clinical-decision-field { background: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .clinical-decision-evidence { background: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .clinical-decision-alternatives { background: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .clinical-decision-contraindications .contra-item { background: #fef2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */
@@ -577,6 +690,7 @@ class ReportGenerator:
         rules_evaluated: int = 0,
         rules_fired: int = 0,
         trace_steps: list[dict[str, Any]] | None = None,
+        clinical_decision: dict | None = None,
     ) -> str:
         """Produce a complete HTML report page.
 
@@ -597,6 +711,14 @@ class ReportGenerator:
             Each dict should have keys ``step_name``, ``step_type``,
             ``input_data``, ``output_data``, and optionally ``timestamp``
             and ``duration_ms``.
+        clinical_decision : dict, optional
+            Optional clinical decision analysis data with keys
+            ``decision_type``, ``reason``, ``confidence`` (``"high"`` /
+            ``"medium"`` / ``"low"``), ``alternatives`` (list of dicts),
+            ``contraindications`` (list of strings), and
+            ``evidence_summary`` (free text).  When provided a dedicated
+            "Clinical Decision Analysis" card is rendered; when ``None``
+            the section is omitted entirely (backward-compatible).
 
         Returns
         -------
@@ -615,6 +737,7 @@ class ReportGenerator:
             self._render_header(recommendation),
             self._render_patient_section(recommendation, variants or []),
             self._render_evidence_summary(recommendation, evidence_count),
+            self._render_clinical_decision(clinical_decision) if clinical_decision else "",
             self._render_ranking_table(drugs),
             self._render_reason_breakdown(drugs),
             self._render_warnings(drugs) if has_conflicts_or_resistance else "",
@@ -1019,6 +1142,98 @@ class ReportGenerator:
     derived from aggregated public evidence sources and may not reflect all
     available clinical data.
   </div>
+</div>"""
+
+    # ── Section: Clinical Decision ─────────────────────────────────────────
+
+    def _render_clinical_decision(self, cd: dict) -> str:
+        """Render the clinical decision analysis card.
+
+        *cd* is expected to contain keys (all optional):
+
+        - ``decision_type`` — e.g. "Approved", "Conditional", "Rejected"
+        - ``reason`` — free-text rationale
+        - ``confidence`` — ``"high"``, ``"medium"``, or ``"low"``
+        - ``alternatives`` — list of dicts with ``name`` and ``reason`` keys
+        - ``contraindications`` — list of strings
+        - ``evidence_summary`` — multi-line evidence summary text
+        """
+        if not cd:
+            return ""
+
+        # ── Decision type & reason ─────────────────────────────────────────
+        decision_type = html_lib.escape(str(cd.get("decision_type", "N/A")))
+        reason = html_lib.escape(str(cd.get("reason", "")))
+
+        # ── Confidence ─────────────────────────────────────────────────────
+        confidence_raw = str(cd.get("confidence", "medium")).lower()
+        confidence_label = {
+            "high": "High",
+            "medium": "Medium",
+            "low": "Low",
+        }.get(confidence_raw, confidence_raw.capitalize())
+        confidence_cls = f"confidence-{confidence_raw}" if confidence_raw in ("high", "medium", "low") else ""
+
+        # ── Alternatives ───────────────────────────────────────────────────
+        alternatives_html = ""
+        alt_list: list[dict] = cd.get("alternatives", []) or []
+        if alt_list:
+            items = "".join(
+                f'<div class="alt-item">• <strong>{html_lib.escape(str(a.get("name", "")))}</strong>'
+                f' — {html_lib.escape(str(a.get("reason", "")))}</div>\n'
+                for a in alt_list
+            )
+            alternatives_html = f"""\
+<div class="clinical-decision-alternatives">
+  <div class="alt-title">🔄 Alternative Options</div>
+  {items}
+</div>"""
+
+        # ── Contraindications ──────────────────────────────────────────────
+        contraindications_html = ""
+        contra_list: list[str] = cd.get("contraindications", []) or []
+        if contra_list:
+            items = "".join(
+                f'<div class="contra-item">⛔ {html_lib.escape(str(c))}</div>\n'
+                for c in contra_list
+            )
+            contraindications_html = f"""\
+<div class="clinical-decision-contraindications">
+  {items}
+</div>"""
+
+        # ── Evidence summary ───────────────────────────────────────────────
+        evidence_html = ""
+        ev_text = str(cd.get("evidence_summary", "")).strip()
+        if ev_text:
+            # Convert newlines to <br> for multi-line display
+            ev_escaped = html_lib.escape(ev_text).replace("\n", "<br>")
+            evidence_html = f"""\
+<div class="clinical-decision-evidence">
+  <div class="ev-title">📋 Evidence Summary</div>
+  <div class="ev-text">{ev_escaped}</div>
+</div>"""
+
+        return f"""\
+<div class="card">
+  <div class="card-title">🏥 Clinical Decision Analysis</div>
+  <div class="clinical-decision-grid">
+    <div class="clinical-decision-field">
+      <div class="field-label">Decision Type</div>
+      <div class="field-value">{decision_type}</div>
+    </div>
+    <div class="clinical-decision-field">
+      <div class="field-label">Confidence</div>
+      <div class="field-value {confidence_cls}">{confidence_label}</div>
+    </div>
+    <div class="clinical-decision-field" style="grid-column:1/-1;">
+      <div class="field-label">Reason</div>
+      <div class="field-value">{reason}</div>
+    </div>
+  </div>
+  {alternatives_html}
+  {contraindications_html}
+  {evidence_html}
 </div>"""
 
     # ── Helpers ─────────────────────────────────────────────────────────────

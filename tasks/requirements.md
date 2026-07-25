@@ -204,3 +204,142 @@ dict 代替 DB、mock restart、monkeypatch、只新增 Model 不接 API、只�
 - PostgreSQL migration upgrade/downgrade/re-upgrade
 - Full API restart recovery on PostgreSQL
 - Real pipeline trace persistence without mocked TraceManager
+
+---
+
+## 2026-07-25 — Phase 3B Clinical Decision Layer
+
+Repository：https://github.com/liuxb99/AI-Kill-Cancer
+
+Branch：master
+
+基線 Commit：2896cb0
+
+Phase 3A：Accepted
+
+本輪開始：Phase 3B
+
+---
+
+# 一、工作方式
+
+嚴格依照 AGENTS.md：
+
+Step 0B → Scene → Planner → Workflow → Batch → Step 4b → Reviewer → Git Commit → Git Push
+
+不得跳步。不得中途回報。完成全部後一次回報。
+
+---
+
+# 二、本輪定位
+
+本輪不是：Bug Fix / Hardening / CI 修復
+
+本輪正式開始：Clinical Decision Layer
+
+建立 Recommendation 之上的臨床決策層。
+
+保持：Model / Repository / Service / API / Frontend / Tests / Migration / Digital Thread 完整架構。
+
+---
+
+# 三、目標
+
+建立 Clinical Decision Engine
+
+輸入：Patient / Variant / Evidence / Recommendation
+
+輸出：Clinical Decision
+
+至少包含：Decision Type / Reason / Evidence / Confidence / Alternatives / Contraindications
+
+---
+
+## Decision Repository
+
+建立 ClinicalDecisionModel / ClinicalDecisionRepository / ClinicalDecisionService
+
+正式寫入 Postgres。不得使用 dict / memory cache。
+
+---
+
+## Digital Thread
+
+形成 Patient → Evidence → Recommendation → Clinical Decision 完整可追溯。
+
+---
+
+## API
+
+新增：
+- POST /api/v1/clinical-decision
+- GET /api/v1/clinical-decision/{id}
+
+保持：Repository Pattern / Service Pattern / Transaction Pattern
+
+---
+
+## Frontend
+
+新增 Clinical Decision Page，並正式接入 Router / Navigation / Menu。
+
+---
+
+## HTML Report
+
+Recommendation Report 加入 Clinical Decision / Reason / Alternatives / Evidence Summary。
+
+---
+
+# 四、Migration
+
+新增 ClinicalDecision / ClinicalDecisionTrace
+
+不得修改既有 migration。
+
+---
+
+# 五、測試
+
+至少新增：
+
+## Repository
+CRUD / Rollback / Not Found
+
+## Service
+Decision Creation / Decision Update / Transaction / Failure Rollback
+
+## API
+POST / GET / 404 / 422 / 500
+
+## Integration
+Patient → Recommendation → Clinical Decision → Restart → GET
+
+## Digital Thread
+Evidence → Recommendation → Clinical Decision 全部可還原。
+
+---
+
+# 六、禁止事項
+
+不得：修改 Phase 3A / 修改已驗收功能 / 重新設計 Recommendation / 重新設計 Trace / 修改 AGENTS.md / 修改 CI / 修改 Vercel / 混入 Phase 4
+
+---
+
+# 七、Commit Scope
+
+只能包含：Clinical Decision / Migration / Repository / Service / API / Frontend / Tests / Workflow / Review / Summary
+
+不得混入其他功能。
+
+---
+
+# 八、完成後只回報
+
+Commit SHA / Files Changed / New Tables / New Models / New Repository / New Service / New API / Frontend Route / Migration / Backend Tests / Frontend Tests / Integration Tests / Coverage / Push Result / Reviewer Score
+
+最後輸出：
+Phase 3B：PASS / PARTIAL
+Ready for ChatGPT GitHub Review：YES / NO
+
+推送完成後停止，不要自行開始 Phase 3C。

@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from src.backend.api.v1.analyses import router as analyses_router
 from src.backend.api.v1.case_acl import router as case_acl_router
+from src.backend.api.v1.clinical_decision import router as clinical_decision_router
 from src.backend.api.v1.cases import router as cases_router
 from src.backend.api.v1.clinical import router as clinical_router
 from src.backend.api.v1.evidence import router as evidence_router
@@ -39,4 +40,5 @@ router.include_router(recommendation_router)
 router.include_router(reports_router)
 router.include_router(workbench_router)
 router.include_router(clinical_router)
+router.include_router(clinical_decision_router)
 router.include_router(case_acl_router)

@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-kill-cancer.example/schemas/clinical_decision/1.0.0",
+  "version": "1.0.0",
+  "title": "ClinicalDecisionResult",
+  "description": "Top-level result of the Clinical Decision Engine. Encapsulates the final clinical decision for a patient based on the recommendation pipeline output, evidence data, patient profile, and variant information.\n\nEach decision carries a decision type, human-readable reason, evidence summary, confidence level, alternative options, and contraindication information for full clinical auditability.",
+  "type": "object",
+  "properties": {
+    "decision_type": {
+      "type": "string",
+      "description": "Clinical decision classification. One of: approved (strong evidence supports use), off_label (evidence exists but drug not formally approved for this indication), clinical_trial (drug should be considered in a trial context), contraindicated (safety or resistance signals preclude use), experimental (only preclinical/early evidence), not_recommended (insufficient evidence to support use).",
+      "enum": ["approved", "off_label", "clinical_trial", "contraindicated", "experimental", "not_recommended"],
+      "examples": ["approved", "off_label", "contraindicated"]
+    },
+    "reason": {
+      "type": "string",
+      "description": "Human-readable, multi-sentence explanation of the clinical decision. Summarises the decision type, evidence strength, confidence, sources reviewed, and any notable resistance or contraindication signals.",
+      "examples": [
+        "Recommended: Osimertinib is supported by strong evidence. The strongest evidence tier observed is Tier_1 across 12 evidence item(s). Overall confidence in this decision is high. Evidence sources reviewed: CIViC, COSMIC, ClinicalTrials.gov, OncoKB."
+      ]
+    },
+    "evidence_summary": {
+      "type": "object",
+      "description": "Structured summary of the evidence that informed the decision. Contains counts, best tier, sources, and directional breakdown.",
+      "properties": {
+        "total_evidence_count": {
+          "type": "integer",
+          "description": "Total number of evidence items reviewed for the top recommended drug.",
+          "minimum": 0
+        },
+        "best_evidence_tier": {
+          "type": "string",
+          "description": "The highest (strongest) evidence tier observed across all evidence items.",
+          "examples": ["Tier_0", "Tier_1", "Tier_2"]
+        },
+        "sources": {
+          "type": "array",
+          "description": "Sorted list of distinct evidence sources that contributed.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "direction_breakdown": {
+          "type": "object",
+          "description": "Count of evidence items by direction.",
+          "properties": {
+            "supporting": {
+              "type": "integer",
+              "description": "Number of evidence items supporting the drug."
+            },
+            "resistance": {
+              "type": "integer",
+              "description": "Number of evidence items indicating resistance."
+            },
+            "conflicting": {
+              "type": "integer",
+              "description": "Number of evidence items with conflicting direction."
+            },
+            "neutral": {
+              "type": "integer",
+              "description": "Number of evidence items with neutral or unknown direction."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["total_evidence_count", "best_evidence_tier"],
+      "additionalProperties": false
+    },
+    "confidence": {
+      "type": "string",
+      "description": "Confidence level in the clinical decision. Derived from evidence tiers, source consensus, and conflict detection.",
+      "enum": ["high", "medium", "low", "insufficient"],
+      "examples": ["high", "medium", "low"]
+    },
+    "alternatives": {
+      "type": "array",
+      "description": "List of alternative drug options (ranked 2nd and below). Each alternative includes drug name, rank, score, and rationale. Empty when there is only one candidate drug or no ranked list.",
+      "items": {
+        "$ref": "#/$defs/DecisionOption"
+      },
+      "minItems": 0
+    },
+    "contraindications": {
+      "type": "array",
+      "description": "List of contraindication or safety signals detected for the top recommended drug. Each entry describes the type, detail, and severity of the contraindication. Empty when no contraindications are found.",
+      "items": {
+        "$ref": "#/$defs/ContraindicationInfo"
+      },
+      "minItems": 0
+    }
+  },
+  "required": ["decision_type", "reason", "evidence_summary", "confidence"],
+  "additionalProperties": false,
+  "$defs": {
+    "DecisionOption": {
+      "title": "DecisionOption",
+      "description": "An alternative drug option that could be considered instead of the primary recommendation. Carries ranking context and a brief rationale for why it is an alternative.",
+      "type": "object",
+      "properties": {
+        "drug_name": {
+          "type": "string",
+          "description": "Name of the alternative drug.",
+          "examples": ["Pembrolizumab", "Imatinib", "Crizotinib"]
+        },
+        "rank": {
+          "type": "integer",
+          "description": "1-based rank position of this alternative among all scored drugs.",
+          "minimum": 2,
+          "examples": [2, 3]
+        },
+        "overall_score": {
+          "type": "number",
+          "description": "Composite overall score for this alternative drug, as computed by the DrugRankingEngine.",
+          "minimum": 0.0,
+          "examples": [0.521, 0.312]
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Brief human-readable rationale explaining why this drug is listed as an alternative.",
+          "examples": [
+            "Alternative #2 — evidence score 0.5210",
+            "Alternative #3 — evidence score 0.3120"
+          ]
+        }
+      },
+      "required": ["drug_name", "rank", "overall_score", "rationale"],
+      "additionalProperties": false
+    },
+    "ContraindicationInfo": {
+      "title": "ContraindicationInfo",
+      "description": "A single contraindication or safety signal detected for a drug. Describes the nature, detail, and severity level to help clinicians assess risk.",
+      "type": "object",
+      "properties": {
+        "drug": {
+          "type": "string",
+          "description": "Name of the drug this contraindication applies to.",
+          "examples": ["Osimertinib", "Pembrolizumab"]
+        },
+        "type": {
+          "type": "string",
+          "description": "Category of contraindication. One of: variant_resistance (genetic variant indicates resistance), evidence_contraindication (evidence source explicitly contraindicates), allergy (patient allergy documented), drug_interaction (potential interaction with current medications).",
+          "enum": ["variant_resistance", "evidence_contraindication", "allergy", "drug_interaction"],
+          "examples": ["variant_resistance", "allergy"]
+        },
+        "detail": {
+          "type": "string",
+          "description": "Human-readable description of the contraindication, including specific genes, evidence sources, or patient conditions involved.",
+          "examples": [
+            "Variant in EGFR T790M has clinical significance 'resistance' indicating possible resistance to Osimertinib.",
+            "Patient has a documented allergy to 'Osimertinib'."
+          ]
+        },
+        "severity": {
+          "type": "string",
+          "description": "Clinical severity assessment of this contraindication. high (absolute contraindication, strongly avoid), medium (relative contraindication, use with caution), low (minor concern, monitor).",
+          "enum": ["high", "medium", "low"],
+          "examples": ["high", "medium"]
+        }
+      },
+      "required": ["drug", "type", "detail", "severity"],
+      "additionalProperties": false
+    }
+  },
+  "examples": [
+    {
+      "decision_type": "approved",
+      "reason": "Recommended: Osimertinib is supported by strong evidence. The strongest evidence tier observed is Tier_1 across 12 evidence item(s). Overall confidence in this decision is high. Evidence sources reviewed: CIViC, COSMIC, ClinicalTrials.gov, OncoKB.",
+      "evidence_summary": {
+        "total_evidence_count": 12,
+        "best_evidence_tier": "Tier_1",
+        "sources": ["CIViC", "COSMIC", "ClinicalTrials.gov", "OncoKB"],
+        "direction_breakdown": {
+          "supporting": 10,
+          "resistance": 1,
+          "conflicting": 1,
+          "neutral": 0
+        }
+      },
+      "confidence": "high",
+      "alternatives": [
+        {
+          "drug_name": "Pembrolizumab",
+          "rank": 2,
+          "overall_score": 0.521,
+          "rationale": "Alternative #2 — evidence score 0.5210"
+        }
+      ],
+      "contraindications": [
+        {
+          "drug": "Osimertinib",
+          "type": "variant_resistance",
+          "detail": "Variant in EGFR T790M has clinical significance 'resistance' indicating possible resistance to Osimertinib.",
+          "severity": "high"
+        }
+      ]
+    }
+  ]
+}

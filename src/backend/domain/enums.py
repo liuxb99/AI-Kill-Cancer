@@ -274,6 +274,31 @@ class AuditActionEnum(str, enum.Enum):
     CREATE = "create"
 
 
+# ── Clinical Decision enums ────────────────────────────────────────────
+
+class DecisionTypeEnum(str, enum.Enum):
+    APPROVED = "approved"
+    OFF_LABEL = "off_label"
+    CLINICAL_TRIAL = "clinical_trial"
+    CONTRAINDICATED = "contraindicated"
+    EXPERIMENTAL = "experimental"
+    NOT_RECOMMENDED = "not_recommended"
+
+
+class DecisionStatusEnum(str, enum.Enum):
+    ACTIVE = "active"
+    SUPERSEDED = "superseded"
+    WITHDRAWN = "withdrawn"
+    ARCHIVED = "archived"
+
+
+class ConfidenceLevelEnum(str, enum.Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INSUFFICIENT = "insufficient"
+
+
 # ── Recommendation enums ────────────────────────────────────────────────
 
 class RecommendationStatusEnum(str, enum.Enum):

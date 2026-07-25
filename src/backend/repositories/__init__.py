@@ -2,6 +2,10 @@ from src.backend.repositories.analysis_run_repo import AnalysisRunRepository
 from src.backend.repositories.base import BaseRepository, ModelT
 from src.backend.repositories.cancer_case_repo import CancerCaseRepository
 from src.backend.repositories.case_acl_repo import CaseACLRepository
+from src.backend.repositories.clinical_decision_repo import (
+    ClinicalDecisionRepository,
+    ClinicalDecisionTraceRepository,
+)
 from src.backend.repositories.drug_interaction_repo import DrugInteractionRepository
 from src.backend.repositories.drug_repo import DrugRepository
 from src.backend.repositories.evidence_item_repo import EvidenceItemRepository
@@ -29,6 +33,8 @@ __all__ = [
     "KnowledgeSourceRepository",
     "EvidenceItemRepository",
     "DrugInteractionRepository",
+    "ClinicalDecisionRepository",
+    "ClinicalDecisionTraceRepository",
     "RecommendationRepository",
     "TraceRepository",
     "UserRepository",

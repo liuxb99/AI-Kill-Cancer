@@ -37,6 +37,10 @@ from src.backend.domain.case_acl import (
     CaseRole,
 )
 from src.backend.domain.clinical_trial import ClinicalTrialModel
+from src.backend.domain.clinical_decision import (
+    ClinicalDecisionModel,
+    ClinicalDecisionTraceModel,
+)
 from src.backend.domain.consent import (
     ConsentCreate,
     ConsentModel,
@@ -80,6 +84,9 @@ from src.backend.domain.enums import (
     VariantOriginEnum,
     VariantTypeEnum,
     ZygosityEnum,
+    ConfidenceLevelEnum,
+    DecisionStatusEnum,
+    DecisionTypeEnum,
 )
 from src.backend.domain.evidence import (
     EvidenceCreate,
@@ -202,6 +209,11 @@ __all__ = [
     "RecommendationTraceStepModel",
     "RecommendationStatusEnum",
     "TraceStepStatusEnum",
+    "ClinicalDecisionModel",
+    "ClinicalDecisionTraceModel",
+    "ConfidenceLevelEnum",
+    "DecisionStatusEnum",
+    "DecisionTypeEnum",
     # Pydantic
     "PatientCreate",
     "PatientUpdate",

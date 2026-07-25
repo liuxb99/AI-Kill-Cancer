@@ -7,6 +7,15 @@ from src.backend.clinical.calculation_trace import (
     TraceStep,
 )
 
+# Clinical decision engine (P3B-C1)
+from src.backend.clinical.clinical_decision_engine import (
+    ClinicalDecisionEngine,
+    ClinicalDecisionResult,
+)
+
+# Decision rule set (P3B-C3)
+from src.backend.clinical.decision_rules import DecisionRuleSet
+
 # Drug ranking system (P3A-03)
 from src.backend.clinical.drug_ranking import (
     ConflictScore,
@@ -46,7 +55,11 @@ from src.backend.clinical.recommendation_engine import (
 
 __all__ = [
     "ClinicalContext",
+    "ClinicalDecisionEngine",
+    "ClinicalDecisionResult",
     "ConfidenceLevel",
+    # decision_rules
+    "DecisionRuleSet",
     "EvidenceLevel",
     "EvidenceTier",
     "EvidenceWeightConfig",

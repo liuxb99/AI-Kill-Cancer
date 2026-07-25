@@ -81,7 +81,13 @@ def get_recommendation_reason_schema() -> dict:
     return _load_schema("recommendation_reason.json")
 
 
+def get_clinical_decision_schema() -> dict:
+    """Return the ``ClinicalDecisionResult`` JSON Schema (Draft 2020-12)."""
+    return _load_schema("clinical_decision.json")
+
+
 __all__ = [
+    "get_clinical_decision_schema",
     "get_drug_score_schema",
     "get_evidence_score_schema",
     "get_recommendation_reason_schema",
