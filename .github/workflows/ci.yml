@@ -62,13 +62,31 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
         run: |
-          set -e
+          EXIT=0
           echo "=== Restart Recovery Test on Postgres ==="
-          pytest -v --tb=long tests/test_restart_recovery.py
+          pytest -v --tb=long tests/test_restart_recovery.py 2>&1 | tee /tmp/pg-test-restart.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
           echo "=== Trace Persistence Tests ==="
-          pytest -v --tb=short tests/test_trace_persistence.py tests/test_acceptance_real_trace.py
+          pytest -v --tb=long tests/test_trace_persistence.py tests/test_acceptance_real_trace.py 2>&1 | tee /tmp/pg-test-trace.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
           echo "=== Other Backend Tests ==="
-          pytest -v --tb=short tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py
+          pytest -v --tb=long tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py 2>&1 | tee /tmp/pg-test-other.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
+          # Emit annotations for any failures found in logs
+          for log in /tmp/pg-test-*.log; do
+            [ -f "$log" ] || continue
+            while IFS= read -r line; do
+              case "$line" in
+                *FAILED*)
+                  echo "::error title=FAILED TEST::$line"
+                  ;;
+                *ERROR*)
+                  echo "::error title=TEST ERROR::$line"
+                  ;;
+                *assert*)
+                  echo "::error title=ASSERTION::$line"
+                  ;;
+              esac
+            done < "$log"
+          done
+          exit $EXIT
 
       - name: Postgres Integration Gate - Alembic downgrade & re-upgrade
         env:
