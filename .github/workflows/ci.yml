@@ -70,8 +70,8 @@ jobs:
           echo "=== Other Backend Tests ==="
           pytest -v --tb=long tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py 2>&1 | tee /tmp/pg-test-other.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
           # Emit annotations for any failures found in logs
-          python3 -c "
-import os, glob, sys
+          python3 -u -c "
+import os, glob
 for f in sorted(glob.glob('/tmp/pg-test-*.log')):
     if not os.path.isfile(f):
         continue
@@ -140,4 +140,3 @@ for f in sorted(glob.glob('/tmp/pg-test-*.log')):
       - name: Build frontend
         run: npm run build
         working-directory: src/frontend
-
