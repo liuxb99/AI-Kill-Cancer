@@ -181,3 +181,8 @@ Commit: a64f7a1 | 796 tests passed | Pushed to origin/master ✅
 2026-07-25 15:00 | [v] 修復 Service 層 trace_id bug（Engine 內部重複 start_trace 導致 steps 遺失）
 2026-07-25 15:00 | [v] 修復 db_url fixture Postgres 偵測邏輯（CI env check）
 2026-07-25 15:02 | [v] GATE-6 完整驗證：50 passed 1 skipped ✅ | lint 全過 ✅ | YAML valid ✅
+2026-07-25 16:21 | [v] task(子代理) -> Step 0A 完成：子代理已向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」
+2026-07-25 16:30 | [v] 使用者確認 CI 錯誤：Run #55 Postgres Integration Gate FAIL（exit code 1）
+2026-07-25 16:31 | [v] 診斷：嘗試 API 獲取日誌失敗（403/401）、代碼分析所有 Postgres 測試（40 passed on SQLite）
+2026-07-25 16:32 | [v] 修復：EvidenceAggregator set→list、close_db 重置 engine、mock set 修正
+2026-07-25 16:32 | [v] 推送 commit 95f32b5 → CI Run #60 進行中
