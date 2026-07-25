@@ -265,6 +265,8 @@ class RecommendationService:
             await self._db.commit()
         except Exception as exc:
             await self._db.rollback()
+            with open("/tmp/db_diag.log", "a") as _f:
+                _f.write(f"OUTER_PERSIST_ERROR: {type(exc).__name__}: {exc}\n")
             logger.exception(
                 "Failed to persist recommendation %s — rolled back.",
                 recommendation_id,
@@ -398,8 +400,9 @@ class RecommendationService:
         except IntegrityError as ie:
             # created_by user doesn't exist in DB (e.g., mocked auth in tests)
             # Re-try without created_by since the column is nullable
+            with open("/tmp/db_diag.log", "a") as _f:
+                _f.write(f"INTEGRITY_ERROR: {ie}\n")
             import traceback
-            print(f"INTEGRITY_ERROR: {ie}", flush=True)
             traceback.print_exc()
             await self._db.rollback()
             rec_model = RecommendationModel(
