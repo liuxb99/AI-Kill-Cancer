@@ -268,7 +268,8 @@ class RecommendationService:
                 "Failed to persist recommendation %s — rolled back.",
                 recommendation_id,
             )
-            raise RuntimeError(f"Failed to persist recommendation: {exc}") from exc
+            print(f"PERSIST_ERROR: {exc}", flush=True)
+            raise RuntimeError("Failed to persist recommendation") from exc
 
         return response
 
