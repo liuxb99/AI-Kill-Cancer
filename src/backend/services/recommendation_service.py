@@ -263,14 +263,13 @@ class RecommendationService:
                 trace_manager=trace_manager,
             )
             await self._db.commit()
-        except Exception:
+        except Exception as exc:
             await self._db.rollback()
             logger.exception(
                 "Failed to persist recommendation %s — rolled back.",
                 recommendation_id,
             )
-            # Return the in-memory result even if persistence fails
-            # (the pipeline result is still valid for the caller)
+            raise RuntimeError("Failed to persist recommendation") from exc
 
         return response
 
@@ -370,13 +369,19 @@ class RecommendationService:
 
             # Persist individual steps
             for idx, step in enumerate(calc_trace.steps):
+                output_data = step.output_data if isinstance(step.output_data, dict) else {}
+                input_data = step.input_data if isinstance(step.input_data, dict) else {}
+
                 step_model = RecommendationTraceStepModel(
                     trace_id=trace_model.id,
                     step_order=idx,
-                    step_type=step.step_type,
+                    step_type=step.step_type or "",
                     input_summary=step.input_data,
                     output_summary=step.output_data,
-                    weight=step.input_data.get("weight") if isinstance(step.input_data, dict) else None,
+                    evidence_references=output_data.get("evidence_references"),
+                    weight=input_data.get("weight") or output_data.get("weight"),
+                    score=output_data.get("score"),
+                    rank=output_data.get("rank"),
                     status="completed",
                 )
                 await self._trace_repo.create_step(step_model)

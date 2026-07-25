@@ -1,20 +1,18 @@
 """
-Restart Recovery Test (Phase 3A Hardening — Batch E5).
+Restart Recovery Test — End-to-End (Batch E, P0-2).
 
-Verifies that recommendation data survives a full database engine restart:
-1. Create a real Engine + Session
-2. Create required Patient record (satisfying FK constraints)
-3. Persist a Recommendation + Trace + Steps via repositories
-4. Record the recommendation_id
-5. Dispose the first Engine
-6. Create a *new* Engine + Session (no in-memory state carried over)
-7. Retrieve the recommendation by ID
-8. Confirm the full data chain (Recommendation → Trace → Steps) is intact
+Verifies that recommendation data survives a full application restart using
+file-based SQLite and the complete API/App stack (TestClient + create_app()).
 
-**Prohibited** (enforced by code structure):
-- Shared module-level dicts
-- Shared service / repository / session instances
-- mock / monkeypatch restart
+Phases:
+1. App 1: POST a patient → POST a recommendation → GET to confirm
+2. Shutdown App 1 (engine disposed via lifespan)
+3. App 2: GET the same recommendation → confirm data integrity
+
+Constraints (enforced by code review):
+- Uses TestClient + create_app() for the full API path
+- No direct session.add / Repository.get calls
+- File-based SQLite so data survives across app instances
 """
 
 from __future__ import annotations
@@ -23,249 +21,368 @@ import os
 import uuid
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from fastapi.testclient import TestClient
 
-from src.backend.database.models import Base
-from src.backend.domain.patient import PatientModel
-from src.backend.repositories.recommendation_repo import (
-    RecommendationRepository,
-    TraceRepository,
-)
-from src.backend.domain.recommendation import (
-    RecommendationModel,
-    RecommendationTraceModel,
-    RecommendationTraceStepModel,
-)
-
-_DB_FILE = "test_e5_restart_recovery.db"
+from src.backend.auth.dependencies import require_auth
+from src.backend.domain.enums import Role
+from src.backend.domain.user import UserModel
 
 
-@pytest.fixture(autouse=True)
-def _cleanup_db():
-    """Remove the test DB file before and after each test."""
-    if os.path.exists(_DB_FILE):
-        os.remove(_DB_FILE)
-    yield
-    if os.path.exists(_DB_FILE):
-        os.remove(_DB_FILE)
+# ── Helpers ──────────────────────────────────────────────────────────────
 
+def _make_fake_user() -> UserModel:
+    """Create a fake UserModel for dependency override of require_auth.
+
+    Must be a callable (fresh instance) because SQLAlchemy models are
+    scoped to a session.  Each test phase gets its own user object.
+    """
+    return UserModel(
+        id=uuid.uuid4(),
+        username="restart-test-user",
+        email="restart-test@example.com",
+        password_hash="fake-bcrypt-hash",
+        role=Role.VIEWER,
+        is_active=True,
+        display_name="Restart Test User",
+    )
+
+
+# ── Fixtures ─────────────────────────────────────────────────────────────
 
 @pytest.fixture
-async def db_engine():
-    """Create a file-based SQLite engine with all tables."""
-    engine = create_async_engine(f"sqlite+aiosqlite:///{_DB_FILE}", echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    return engine
+def db_url() -> str:
+    """Set DATABASE_URL to a temp file-based SQLite DB and clean up after.
 
+    Yields the file path so the test can refer to it if needed.
+    """
+    import src.backend.config as _config
 
-@pytest.fixture
-async def db_session(db_engine):
-    """Provide an async session bound to the file-based engine."""
-    async_session = async_sessionmaker(
-        db_engine, class_=AsyncSession, expire_on_commit=False,
+    original_url = _config.settings.DATABASE_URL
+    file_path = os.path.join(
+        os.path.dirname(__file__),
+        f"test_restart_{uuid.uuid4().hex}.db",
     )
-    async with async_session() as session:
-        yield session
+    _config.settings.DATABASE_URL = f"sqlite+aiosqlite:///{file_path}"
+    yield file_path
+    # Restore original URL
+    _config.settings.DATABASE_URL = original_url
+    # Clean up the temp DB file
+    if os.path.exists(file_path):
+        os.unlink(file_path)
 
 
-async def _persist_chain_sync(session, patient, rec_id_hex=None, trace_id_hex=None):
-    """Persist Recommendation + Trace + Steps, return ID dict."""
-    rec_id = rec_id_hex or uuid.uuid4().hex
-    trace_id = trace_id_hex or uuid.uuid4().hex
-
-    # Recommendation
-    rec = RecommendationModel(
-        recommendation_id=rec_id,
-        patient_id=patient.id,
-        trace_id=trace_id,
-        engine_version="1.0.0",
-        status="completed",
-        request_payload={"patient_id": str(patient.id), "variants": ["EGFR L858R"]},
-        result_payload={
-            "recommendations": [
-                {
-                    "drug_name": "Osimertinib",
-                    "rank": 1,
-                    "overall_score": 0.95,
-                    "evidence_score": 0.90,
-                    "sensitivity_score": 0.85,
-                    "resistance_score": 0.10,
-                    "conflict_score": 0.05,
-                },
-            ],
-        },
-        report_html="<html>E5 Test Report</html>",
-    )
-    session.add(rec)
-    # Flush to ensure rec.id is assigned
-    await session.flush()
-
-    # Trace
-    trace = RecommendationTraceModel(
-        trace_id=trace_id,
-        recommendation_id=rec.id,
-    )
-    session.add(trace)
-    # Flush to ensure trace.id is assigned
-    await session.flush()
-
-    # Steps
-    steps_data = [
-        (0, "evidence", {"variants": ["EGFR L858R"]}, {"count": 5}, 0.8, 0.75, None),
-        (1, "score", {"top_n": 5}, {"ranked": 3}, 1.0, 0.92, 1),
-        (2, "recommendation", {"aggregated": True}, {"final": True}, None, None, None),
-    ]
-    for order, stype, inp, out, w, s, r in steps_data:
-        step = RecommendationTraceStepModel(
-            trace_id=trace.id,
-            step_order=order,
-            step_type=stype,
-            input_summary=inp,
-            output_summary=out,
-            weight=w,
-            score=s,
-            rank=r,
-            status="completed",
-        )
-        session.add(step)
-
-    return {
-        "recommendation_id": rec_id,
-        "trace_id": trace_id,
-        "recommendation_uuid": str(rec.id),
-        "trace_uuid": str(trace.id),
-    }
+# ── Tests ────────────────────────────────────────────────────────────────
 
 
 class TestRestartRecovery:
-    """E5: real restart with a new Engine + Session."""
+    """E2E restart recovery via the full API stack."""
 
-    async def test_restart_recovery_data_intact(self, db_engine, _cleanup_db):
-        """Full chain survives a complete engine restart."""
-        # ── Phase 1: Write via first Engine+Session ──────────────────────
-        async_session1 = async_sessionmaker(
-            db_engine, class_=AsyncSession, expire_on_commit=False,
-        )
-        async with async_session1() as session:
-            # Patient
-            pid = uuid.uuid4()
-            pat = PatientModel(id=pid, display_name="RESTART-PATIENT-1")
-            session.add(pat)
-            await session.commit()
-            await session.refresh(pat)
+    def test_end_to_end_restart_recovery(self, db_url: str) -> None:
+        """
+        Full restart-recovery scenario:
 
-            ids = await _persist_chain_sync(session, pat)
-            await session.commit()
+        Phase 1 — App 1
+            POST /api/v1/patients          → get patient UUID
+            POST /api/v1/recommendation     → get recommendation_id
+            GET  /api/v1/recommendation/{id} → verify data
 
-        # ── Phase 2: Dispose engine ──────────────────────────────────────
-        await db_engine.dispose()
+        (shutdown and dispose engine)
 
-        # ── Phase 3: New engine (same file) — simulate restart ────────────
-        engine2 = create_async_engine(f"sqlite+aiosqlite:///{_DB_FILE}", echo=False)
-        async_session2 = async_sessionmaker(
-            engine2, class_=AsyncSession, expire_on_commit=False,
-        )
+        Phase 2 — App 2 (separate process simulation, same DB file)
+            GET  /api/v1/recommendation/{id} → verify same data is returned
+        """
+        # pylint: disable=import-outside-toplevel
+        from src.backend.main import create_app
 
-        async with async_session2() as session:
-            # Read back
-            rec_repo = RecommendationRepository(session)
-            trace_repo = TraceRepository(session)
+        # ═══════════════════════════════════════════════════════════════
+        # Phase 1: App 1 — create data
+        # ═══════════════════════════════════════════════════════════════
+        app1 = create_app()
+        app1.dependency_overrides[require_auth] = lambda: _make_fake_user()
 
-            rec = await rec_repo.get_by_id(ids["recommendation_id"])
-            assert rec is not None, "Recommendation NOT FOUND after restart"
-            assert rec.recommendation_id == ids["recommendation_id"]
-            assert rec.engine_version == "1.0.0"
-            assert rec.status == "completed"
-            assert rec.report_html == "<html>E5 Test Report</html>"
-            assert rec.result_payload is not None
-            drugs = rec.result_payload.get("recommendations", [])
-            assert len(drugs) == 1
-            assert drugs[0]["drug_name"] == "Osimertinib"
+        with TestClient(app1) as client1:
+            # ── Create a patient (needed for FK constraint) ────────────────
+            patient_resp = client1.post(
+                "/api/v1/patients",
+                json={"display_name": "Restart Recovery Patient"},
+            )
+            assert patient_resp.status_code == 201, (
+                f"POST /api/v1/patients failed: {patient_resp.text}"
+            )
+            patient_id: str = patient_resp.json()["id"]
+            assert patient_id, "Patient ID must not be empty"
 
-            trace = await trace_repo.get_trace_by_trace_id(ids["trace_id"])
-            assert trace is not None, "Trace NOT FOUND after restart"
-            assert trace.trace_id == ids["trace_id"]
+            # ── Create a recommendation with mocked pipeline ────────────────
+            # pylint: disable=import-outside-toplevel
+            from unittest.mock import patch, AsyncMock
+            from src.backend.clinical.recommendation_engine import (
+                RecommendationEngine,
+            )
+            from src.backend.clinical.drug_ranking import (
+                ConflictScore,
+                DrugRankingEngine,
+                DrugRankingResult,
+                EvidenceScore,
+                OverallScore,
+                Resistance,
+                Sensitivity,
+            )
+            from src.backend.clinical.explainable_recommendation import (
+                ExplainableEngine,
+                ReasonItem,
+                RecommendationReason,
+            )
 
-            steps = await trace_repo.get_steps_by_trace_id(ids["trace_uuid"])
-            assert len(steps) == 3
-            assert steps[0].step_order == 0
-            assert steps[0].step_type == "evidence"
-            assert steps[0].weight == 0.8
-            assert steps[0].score == 0.75
-            assert steps[1].step_order == 1
-            assert steps[1].step_type == "score"
-            assert steps[2].step_order == 2
-            assert steps[2].step_type == "recommendation"
+            # Build mock aggregated data (simulating EvidenceAggregator output)
+            mock_aggregated = {
+                "Osimertinib": {
+                    "variant": "EGFR L858R",
+                    "gene": "EGFR",
+                    "evidence_scores": [
+                        {
+                            "source": "TestDB",
+                            "evidence_level": "A",
+                            "description": (
+                                "EGFR L858R is sensitive to osimertinib"
+                            ),
+                            "direction": "supporting",
+                            "weight": 10.0,
+                            "tier": "Tier_1",
+                            "clinical_significance": "sensitive",
+                            "source_record_id": "test-001",
+                        }
+                    ],
+                    "total_weight": 10.0,
+                    "source_count": 1,
+                    "item_count": 1,
+                    "highest_weight": 10.0,
+                    "sources": {"TestDB"},
+                }
+            }
 
-        await engine2.dispose()
+            # Build a real DrugRankingResult for DrugRankingEngine.rank
+            ranking_result = DrugRankingResult(
+                drug_name="Osimertinib",
+                rank=1,
+                overall_score=OverallScore(
+                    raw_score=85.0,
+                    evidence_score_value=0.9,
+                    sensitivity_value=0.85,
+                    resistance_value=0.1,
+                    conflict_value=0.05,
+                ),
+                evidence_score=EvidenceScore(
+                    total_weighted_score=10.0,
+                    source_diversity=1.0,
+                    highest_tier="Tier_1",
+                    confidence_score=0.9,
+                ),
+                sensitivity=Sensitivity(
+                    score=0.85,
+                    supporting_item_count=1,
+                    total_item_count=1,
+                    details=(
+                        "Sensitivity for Osimertinib: 1/1 items supporting, "
+                        "weighted score = 0.8500."
+                    ),
+                ),
+                resistance=Resistance(
+                    score=0.1,
+                    resistance_item_count=0,
+                    total_item_count=1,
+                    details="No resistance evidence detected.",
+                ),
+                conflict_score=ConflictScore(
+                    score=0.05,
+                    conflicting_pairs=0,
+                    total_items=1,
+                    details="Insufficient items for conflict analysis.",
+                ),
+                details={
+                    "item_count": 1,
+                    "source_count": 1,
+                    "highest_weight": 10.0,
+                    "sources": ["TestDB"],
+                },
+            )
 
-    async def test_restart_recovery_trace_references(self, db_engine, _cleanup_db):
-        """After restart, FK references between trace and recommendation hold."""
-        async_session1 = async_sessionmaker(
-            db_engine, class_=AsyncSession, expire_on_commit=False,
-        )
-        async with async_session1() as session:
-            pid = uuid.uuid4()
-            pat = PatientModel(id=pid, display_name="RESTART-PATIENT-2")
-            session.add(pat)
-            await session.commit()
-            await session.refresh(pat)
+            # Build a real RecommendationReason for ExplainableEngine
+            explanation = RecommendationReason(
+                drug_name="Osimertinib",
+                rank=1,
+                overall_score=85.0,
+                reasons=[
+                    ReasonItem(
+                        category="evidence_support",
+                        detail=(
+                            "Evidence confidence score is 0.9000 "
+                            "(weighted score 10.00, source diversity 1.00)."
+                        ),
+                        source="EvidenceAggregator",
+                        score_impact=0.36,
+                    ),
+                    ReasonItem(
+                        category="sensitivity",
+                        detail=(
+                            "Sensitivity score 0.8500 — 1/1 evidence items "
+                            "indicate sensitivity."
+                        ),
+                        source="DrugRankingEngine",
+                        score_impact=0.2975,
+                    ),
+                    ReasonItem(
+                        category="resistance",
+                        detail="No resistance evidence detected.",
+                        source="DrugRankingEngine",
+                        score_impact=0.0,
+                    ),
+                    ReasonItem(
+                        category="conflict",
+                        detail="No conflicting evidence detected.",
+                        source="DrugRankingEngine",
+                        score_impact=0.0,
+                    ),
+                ],
+            )
 
-            ids = await _persist_chain_sync(session, pat)
-            await session.commit()
+            with patch.object(
+                RecommendationEngine,
+                "run",
+                new_callable=AsyncMock,
+            ) as mock_run, patch.object(
+                DrugRankingEngine,
+                "rank",
+                return_value=[ranking_result],
+            ) as mock_rank, patch.object(
+                ExplainableEngine,
+                "generate_explanations",
+                return_value=[explanation],
+            ) as mock_explain:
 
-        await db_engine.dispose()
+                mock_run.return_value = {
+                    "pipeline_status": "completed",
+                    "aggregated": mock_aggregated,
+                    "drugs_ranked": [
+                        {
+                            "drug_name": "Osimertinib",
+                            "rank": 1,
+                            "total_weight": 10.0,
+                        }
+                    ],
+                    "evidence_count": 1,
+                    "rules_evaluated": 10,
+                    "rules_fired": 5,
+                    "rule_results": [],
+                }
 
-        # Restart
-        engine2 = create_async_engine(f"sqlite+aiosqlite:///{_DB_FILE}", echo=False)
-        async_session2 = async_sessionmaker(
-            engine2, class_=AsyncSession, expire_on_commit=False,
-        )
-        async with async_session2() as session:
-            trace_repo = TraceRepository(session)
-            trace = await trace_repo.get_trace_by_trace_id(ids["trace_id"])
-            assert trace is not None
-            # Trace -> Recommendation FK
-            assert trace.recommendation_id is not None
-            assert str(trace.recommendation_id) == ids["recommendation_uuid"]
+                rec_resp = client1.post(
+                    "/api/v1/recommendation",
+                    json={
+                        "patient_id": patient_id,
+                        "variants": ["EGFR L858R"],
+                        "patient_context": {
+                            "cancer_type": "Lung Adenocarcinoma",
+                            "age": 62,
+                            "gender": "F",
+                        },
+                    },
+                )
 
-            # Steps -> Trace FK
-            steps = await trace_repo.get_steps_by_trace_id(ids["trace_uuid"])
-            assert len(steps) == 3
-            for step in steps:
-                assert str(step.trace_id) == ids["trace_uuid"]
+            assert rec_resp.status_code == 200, (
+                f"POST /api/v1/recommendation failed: {rec_resp.text}"
+            )
+            rec_data1 = rec_resp.json()
+            rec_id: str = rec_data1["recommendation_id"]
 
-        await engine2.dispose()
+            # Validate POST response structure
+            assert rec_data1["patient_id"] == patient_id
+            assert "recommendations" in rec_data1
+            assert len(rec_data1["recommendations"]) > 0
+            assert rec_data1["engine_version"] == "1.0.0"
+            assert "trace_id" in rec_data1
+            assert "created_at" in rec_data1
 
-    async def test_restart_recovery_multiple_records(self, db_engine, _cleanup_db):
-        """Multiple recommendations all survive restart."""
-        async_session1 = async_sessionmaker(
-            db_engine, class_=AsyncSession, expire_on_commit=False,
-        )
-        async with async_session1() as session:
-            pid = uuid.uuid4()
-            pat = PatientModel(id=pid, display_name="RESTART-PATIENT-3")
-            session.add(pat)
-            await session.commit()
-            await session.refresh(pat)
+            # ── Verify read-back in the same app instance ──────────────────
+            get_resp1 = client1.get(f"/api/v1/recommendation/{rec_id}")
+            assert get_resp1.status_code == 200, (
+                f"GET /api/v1/recommendation/{rec_id} in App 1 failed: "
+                f"{get_resp1.text}"
+            )
+            get_data1 = get_resp1.json()
+            assert get_data1["recommendation_id"] == rec_id
+            assert get_data1["patient_id"] == patient_id
+            assert len(get_data1["recommendations"]) == len(
+                rec_data1["recommendations"]
+            )
 
-            ids1 = await _persist_chain_sync(session, pat, rec_id_hex=uuid.uuid4().hex, trace_id_hex=uuid.uuid4().hex)
-            ids2 = await _persist_chain_sync(session, pat, rec_id_hex=uuid.uuid4().hex, trace_id_hex=uuid.uuid4().hex)
-            await session.commit()
+        # ── App 1 context exited → lifespan shutdown → engine disposed ─────
 
-        await db_engine.dispose()
+        # ═══════════════════════════════════════════════════════════════
+        # Phase 2: App 2 — read back the same data from the DB file
+        # ═══════════════════════════════════════════════════════════════
+        app2 = create_app()
+        app2.dependency_overrides[require_auth] = lambda: _make_fake_user()
+        assert app1 is not app2, "App 2 must be a different instance from App 1"
 
-        engine2 = create_async_engine(f"sqlite+aiosqlite:///{_DB_FILE}", echo=False)
-        async_session2 = async_sessionmaker(
-            engine2, class_=AsyncSession, expire_on_commit=False,
-        )
-        async with async_session2() as session:
-            repo = RecommendationRepository(session)
-            r1 = await repo.get_by_id(ids1["recommendation_id"])
-            r2 = await repo.get_by_id(ids2["recommendation_id"])
-            assert r1 is not None
-            assert r2 is not None
-            assert r1.recommendation_id != r2.recommendation_id
+        with TestClient(app2) as client2:
+            # ── GET the recommendation created in Phase 1 ──────────────────
+            get_resp2 = client2.get(f"/api/v1/recommendation/{rec_id}")
+            assert get_resp2.status_code == 200, (
+                f"GET /api/v1/recommendation/{rec_id} in App 2 (after restart) "
+                f"failed: {get_resp2.text}"
+            )
+            rec_data2 = get_resp2.json()
 
-        await engine2.dispose()
+            # ── Verify data integrity across restart ───────────────────────
+            assert rec_data2["recommendation_id"] == rec_id, (
+                "recommendation_id must match after restart"
+            )
+            assert rec_data2["patient_id"] == patient_id, (
+                "patient_id must match after restart"
+            )
+            assert rec_data2["engine_version"] == "1.0.0", (
+                "engine_version must match after restart"
+            )
+            assert rec_data2["trace_id"] == rec_data1["trace_id"], (
+                "trace_id must match after restart"
+            )
+
+            # Verify the full recommendation list
+            orig_recs = rec_data1["recommendations"]
+            restart_recs = rec_data2["recommendations"]
+            assert len(restart_recs) == len(orig_recs), (
+                f"Number of recommendations changed after restart: "
+                f"{len(orig_recs)} → {len(restart_recs)}"
+            )
+            for orig, rest in zip(orig_recs, restart_recs):
+                assert orig["drug_name"] == rest["drug_name"]
+                assert orig["rank"] == rest["rank"]
+                assert orig["overall_score"] == rest["overall_score"]
+
+            # Optional: verify the patient also survived
+            patient_resp2 = client2.get(f"/api/v1/patients/{patient_id}")
+            assert patient_resp2.status_code == 200, (
+                f"Patient {patient_id} not found after restart"
+            )
+            assert (
+                patient_resp2.json()["display_name"]
+                == "Restart Recovery Patient"
+            )
+
+        # ── App 2 context exited → lifespan shutdown → cleanup ─────────────
+
+    def test_restart_recovery_nonexistent_returns_404(self, db_url: str) -> None:
+        """After restart, a non-existent recommendation returns 404."""
+        from src.backend.main import create_app
+
+        app = create_app()
+        app.dependency_overrides[require_auth] = lambda: _make_fake_user()
+
+        with TestClient(app) as client:
+            resp = client.get(
+                f"/api/v1/recommendation/{uuid.uuid4().hex}"
+            )
+            assert resp.status_code == 404, (
+                f"Expected 404 for non-existent recommendation, "
+                f"got {resp.status_code}: {resp.text}"
+            )

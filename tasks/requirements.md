@@ -156,3 +156,44 @@ dict 代替 DB、mock restart、monkeypatch、只新增 Model 不接 API、只�
 
 ## 驗收條件
 共 22 項檢查清單（見需求回歸檢查章節），只要任一 FAIL/PARTIAL/Pending 則滿足需求=NO，Reviewer 最高 89 分。
+
+## 2026-07-25 — Phase 3A Hardening Final Fix
+
+### P0-1：Persistence Failure 不得回傳成功
+- recommendation_service.py 中 try/except 吞掉 persistence 例外後仍 return response 的行為必須修正
+- 持久化失敗必須 rollback → 拋出固定例外 → API 映射為 HTTP 500
+- Client 不得取得 recommendation_id 當 DB 無資料
+- Recommendation、Trace、Trace Steps 必須在同一 Transaction，All-or-Nothing
+- API 500 不得洩漏 Exception 細節（SQL、DB URL、internal path）
+
+### P0-2：建立真正 End-to-End Restart Recovery Integration Test
+- 必須使用 Postgres Test Database
+- 完整 App Instance 1 → POST → 確認 → shutdown → dispose engine → 全新 App Instance 2 → GET 確認
+- POST 必須走完整 API → Service → Repository → Postgres 鏈路
+- GET 必須走完整 API → Service → Repository → Postgres 鏈路
+- 不得直接 session.add 代替 POST
+- 不得直接 Repository.get 代替 GET API
+- 必須證明 app1 ≠ app2、engine1 ≠ engine2、sessionmaker1 ≠ sessionmaker2
+
+### P0-3：完整 Trace Persistence
+- 正式 Recommendation Pipeline 必須寫入 Evidence、Evidence References、Weight、Score、Rank、Explanation
+- 每個 Trace Step 依 step_type 保存相應資訊
+- explanation 可從 output_summary 還原
+- 從 Database 可還原完整 Trace
+
+### Transaction Tests
+- Case 1：Recommendation create 失敗 → rollback → 無殘留 → API 500
+- Case 2：Trace create 失敗 → rollback → 無殘留 → API 500
+- Case 3：Trace Step create 失敗 → rollback → 無殘留 → API 500
+- Case 4：Commit 失敗 → rollback → API 500
+- Case 5：成功 → 全部 commit → GET 可讀
+
+### Migration / Postgres 驗證
+- alembic upgrade head
+- alembic downgrade 最新版本前一個版本
+- alembic upgrade head
+- 驗證 domain_recommendations、domain_recommendation_traces、domain_recommendation_trace_steps 的 Foreign Keys、Indexes、Constraints、JSON/JSONB
+
+### 提交範圍
+- 只允許修改：recommendation_service.py、recommendation.py (API)、必要的 domain/repository、必要的 migration、新測試檔案、tasks/ 文檔
+- 不得修改無關檔案

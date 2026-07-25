@@ -502,7 +502,7 @@ class TestCreateRecommendation:
         mock_trace_manager,
         mock_report_generator,
     ):
-        """If persistence fails (commit raises), the pipeline result is returned but DB is clean."""
+        """If persistence fails (commit raises), the exception is propagated and DB is clean."""
         from src.backend.services.recommendation_service import RecommendationService
 
         # Make commit raise
@@ -514,17 +514,14 @@ class TestCreateRecommendation:
         db_session.commit = failing_commit
 
         service = RecommendationService(db_session)
-        result = await service.create_recommendation(
-            request_data={
-                "patient_id": "550e8400-e29b-41d4-a716-446655440000",
-                "variants": ["EGFR L858R"],
-            },
-            user_id="550e8400-e29b-41d4-a716-446655440000",
-        )
-
-        # Should still return the in-memory result
-        assert result["recommendation_id"] is not None
-        assert len(result["recommendations"]) == 2
+        with pytest.raises(RuntimeError, match="Failed to persist recommendation"):
+            await service.create_recommendation(
+                request_data={
+                    "patient_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "variants": ["EGFR L858R"],
+                },
+                user_id="550e8400-e29b-41d4-a716-446655440000",
+            )
 
         # Restore commit and verify DB is clean
         db_session.commit = original_commit
