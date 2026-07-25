@@ -395,9 +395,12 @@ class RecommendationService:
         try:
             await self._recommendation_repo.create(rec_model)
             await self._db.flush()
-        except IntegrityError:
+        except IntegrityError as ie:
             # created_by user doesn't exist in DB (e.g., mocked auth in tests)
             # Re-try without created_by since the column is nullable
+            import traceback
+            print(f"INTEGRITY_ERROR: {ie}", flush=True)
+            traceback.print_exc()
             await self._db.rollback()
             rec_model = RecommendationModel(
                 recommendation_id=recommendation_id,
