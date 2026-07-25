@@ -58,10 +58,17 @@ jobs:
           PYTHONPATH: .
         run: alembic -c migrations/alembic.ini upgrade head
 
-      - name: Postgres Integration Gate - Run Postgres Integration Tests
+      - name: Postgres Integration Gate - Run Tests on Postgres
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
-        run: pytest -v --tb=short tests/test_restart_recovery.py tests/test_trace_persistence.py tests/test_acceptance_real_trace.py tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py
+        run: |
+          set -e
+          echo "=== Restart Recovery Test on Postgres ==="
+          pytest -v --tb=long tests/test_restart_recovery.py
+          echo "=== Trace Persistence Tests ==="
+          pytest -v --tb=short tests/test_trace_persistence.py tests/test_acceptance_real_trace.py
+          echo "=== Other Backend Tests ==="
+          pytest -v --tb=short tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py
 
       - name: Postgres Integration Gate - Alembic downgrade & re-upgrade
         env:
