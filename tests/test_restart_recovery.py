@@ -59,7 +59,13 @@ def db_url() -> str:
 
     if env_url.startswith("postgresql") and is_ci:
         # CI environment with Postgres available — use it directly
+        # Must also override settings.DATABASE_URL in case other tests polluted it
+        import src.backend.config as _config
+
+        original_url = _config.settings.DATABASE_URL
+        _config.settings.DATABASE_URL = env_url
         yield env_url
+        _config.settings.DATABASE_URL = original_url
         return
 
     # Fallback: file-based SQLite
