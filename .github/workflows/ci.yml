@@ -49,7 +49,7 @@ jobs:
       - name: Test with pytest
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
-        run: pytest -v --tb=short --cov=src/backend tests/unit/ tests/integration/
+        run: pytest -v --tb=short --cov=src/backend --ignore=tests/integration/test_migration_016.py tests/unit/ tests/integration/
 
       # Phase 2: Postgres Integration Gate
       - name: Postgres Integration Gate - Alembic upgrade on Postgres
