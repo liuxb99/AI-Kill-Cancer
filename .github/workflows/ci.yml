@@ -86,12 +86,6 @@ jobs:
               esac
             done < "$log"
           done
-          # Emit diagnostics from pg-diag.log (written by session.py via os.system)
-          if [ -f /tmp/pg-diag.log ]; then
-            while IFS= read -r diag_line; do
-              echo "::error title=DIAG::$diag_line"
-            done < /tmp/pg-diag.log
-          fi
           exit $EXIT
 
       - name: Postgres Integration Gate - Alembic downgrade & re-upgrade

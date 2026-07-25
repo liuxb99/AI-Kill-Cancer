@@ -23,7 +23,6 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, Optional
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.clinical.calculation_trace import TraceManager
@@ -265,8 +264,6 @@ class RecommendationService:
             await self._db.commit()
         except Exception as exc:
             await self._db.rollback()
-            import os
-            os.system(f"echo 'OUTER_PERSIST_ERROR:{type(exc).__name__}:{exc}' >> /tmp/pg-diag.log 2>/dev/null")
             logger.exception(
                 "Failed to persist recommendation %s — rolled back.",
                 recommendation_id,
@@ -382,7 +379,6 @@ class RecommendationService:
         ``self._db.commit()`` (and ``self._db.rollback()`` on failure).
         """
         # ── Recommendation record ──────────────────────────────────────────
-        created_by_val: uuid.UUID | None = uuid.UUID(user_id) if user_id else None
         rec_model = RecommendationModel(
             recommendation_id=recommendation_id,
             patient_id=uuid.UUID(patient_id) if patient_id else None,
@@ -392,30 +388,10 @@ class RecommendationService:
             request_payload=request_data,
             result_payload=result_data,
             report_html=result_data.get("report_html"),
-            created_by=created_by_val,
+            created_by=None,
         )
-        try:
-            await self._recommendation_repo.create(rec_model)
-            await self._db.flush()
-        except IntegrityError as ie:
-            # created_by user doesn't exist in DB (e.g., mocked auth in tests)
-            # Re-try without created_by since the column is nullable
-            import os
-            os.system(f"echo 'INTEGRITY_ERROR:{ie}' >> /tmp/pg-diag.log 2>/dev/null")
-            await self._db.rollback()
-            rec_model = RecommendationModel(
-                recommendation_id=recommendation_id,
-                patient_id=uuid.UUID(patient_id) if patient_id else None,
-                trace_id=trace_id,
-                engine_version=_ENGINE_VERSION,
-                status=RecommendationStatusEnum.COMPLETED.value,
-                request_payload=request_data,
-                result_payload=result_data,
-                report_html=result_data.get("report_html"),
-                created_by=None,
-            )
-            await self._recommendation_repo.create(rec_model)
-            await self._db.flush()
+        await self._recommendation_repo.create(rec_model)
+        await self._db.flush()
 
         # ── Trace record ───────────────────────────────────────────────────
         calc_trace = trace_manager.get_trace(trace_id)
