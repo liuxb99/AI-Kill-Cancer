@@ -70,6 +70,23 @@ jobs:
           pytest -v --tb=long tests/test_trace_persistence.py tests/test_acceptance_real_trace.py 2>&1 | tee /tmp/pg-test-trace.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
           echo "=== Other Backend Tests ==="
           pytest -v --tb=long tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py 2>&1 | tee /tmp/pg-test-other.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
+          # If any test failed, extract failure details as GitHub annotations
+          if [ $EXIT -ne 0 ]; then
+            echo "::group::Extracting failure details as annotations"
+            for logfile in /tmp/pg-test-restart.log /tmp/pg-test-trace.log /tmp/pg-test-other.log; do
+              if [ -f "$logfile" ]; then
+                echo "--- $(basename $logfile) ---"
+                # Extract FAILED test lines as annotations
+                grep -n "FAILED " "$logfile" | while IFS=: read -r line testinfo; do
+                  echo "::error title=FAILED TEST::$testinfo"
+                done
+                # Extract assertion errors / traceback
+                grep -A 5 "FAILED\|ERROR\|assert\|Exception" "$logfile" | head -80
+                echo ""
+              fi
+            done
+            echo "::endgroup::"
+          fi
           exit $EXIT
 
       - name: Upload Postgres test logs
