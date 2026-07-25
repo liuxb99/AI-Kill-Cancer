@@ -254,8 +254,8 @@ class EvidenceAggregator:
                 "source_count": len(sources),
                 "item_count": len(items),
                 "highest_weight": round(highest_weight, 6),
-                "sources": sources,
-                "directions": directions,
+                "sources": sorted(sources),
+                "directions": sorted(directions),
             }
 
         return result

@@ -172,7 +172,7 @@ class TestRestartRecovery:
                     "source_count": 1,
                     "item_count": 1,
                     "highest_weight": 10.0,
-                    "sources": {"TestDB"},
+                    "sources": ["TestDB"],
                 }
             }
 

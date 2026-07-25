@@ -27,6 +27,8 @@ async def init_db(db_url: str, debug: bool = False):
 
 
 async def close_db():
-    global engine
+    global engine, async_session_factory
     if engine:
         await engine.dispose()
+    engine = None
+    async_session_factory = None

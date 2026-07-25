@@ -61,57 +61,14 @@ jobs:
       - name: Postgres Integration Gate - Run Tests on Postgres
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
-        shell: bash
         run: |
-          python3 << 'PYEOF'
-          import subprocess, sys
-
-          tests_groups = [
-              ("Restart Recovery", ["tests/test_restart_recovery.py"]),
-              ("Trace Persistence", ["tests/test_trace_persistence.py", "tests/test_acceptance_real_trace.py"]),
-              ("Other Backend", ["tests/test_recommendation_transaction.py", "tests/test_api_recommendation.py", "tests/test_recommendation_service.py"]),
-          ]
-
-          exit_code = 0
-          for name, test_files in tests_groups:
-              print(f"\n::group::=== {name} Tests on Postgres ===")
-              sys.stdout.flush()
-              result = subprocess.run(
-                  ["pytest", "-v", "--tb=long"] + test_files,
-                  capture_output=True, text=True, timeout=120
-              )
-              print(result.stdout)
-              if result.stderr:
-                  print(result.stderr)
-              print("::endgroup::")
-              sys.stdout.flush()
-              if result.returncode != 0:
-                  exit_code = result.returncode
-                  # Emit annotations for failed tests
-                  for line in result.stdout.split('\n'):
-                      stripped = line.strip()
-                      if stripped.startswith('FAILED ') or stripped.startswith('ERROR '):
-                          print(f"::error title={name} Failed::{stripped}")
-                  # Extract traceback context
-                  fail_lines = []
-                  capture = False
-                  for line in result.stdout.split('\n'):
-                      if line.startswith('FAILED ') or line.startswith('ERROR '):
-                          capture = True
-                          fail_lines = []
-                      elif line.startswith('tests/') and '::' in line and 'PASSED' in line:
-                          capture = False
-                      elif capture and line.strip():
-                          fail_lines.append(line.strip())
-                  if fail_lines:
-                      tb_text = ' | '.join(fail_lines[-8:])
-                      if len(tb_text) > 500:
-                          tb_text = tb_text[:500] + '...'
-                      print(f"::error title={name} Traceback::{tb_text}")
-                  sys.stdout.flush()
-
-          sys.exit(exit_code)
-          PYEOF
+          set -e
+          echo "=== Restart Recovery Test on Postgres ==="
+          pytest -v --tb=long tests/test_restart_recovery.py
+          echo "=== Trace Persistence Tests ==="
+          pytest -v --tb=short tests/test_trace_persistence.py tests/test_acceptance_real_trace.py
+          echo "=== Other Backend Tests ==="
+          pytest -v --tb=short tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py
 
       - name: Postgres Integration Gate - Alembic downgrade & re-upgrade
         env:
