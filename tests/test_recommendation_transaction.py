@@ -456,7 +456,6 @@ class TestRecommendationTransaction:
                     from src.backend.clinical.calculation_trace import (
                         CalculationTrace,
                         TraceManager,
-                        TraceStep,
                     )
 
                     trace = CalculationTrace(trace_id="empty-trace", patient_id="P-EMPTY")

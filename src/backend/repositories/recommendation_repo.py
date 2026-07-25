@@ -25,7 +25,6 @@ from src.backend.domain.recommendation import (
 )
 from src.backend.repositories.base import BaseRepository
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # RecommendationRepository
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -185,7 +184,7 @@ class TraceRepository(BaseRepository[RecommendationTraceModel]):
         -------
         RecommendationTraceModel | None
         """
-        from sqlalchemy import cast, String
+        from sqlalchemy import String, cast
 
         stmt = select(RecommendationTraceModel).where(
             cast(RecommendationTraceModel.recommendation_id, String)
@@ -253,7 +252,7 @@ class TraceRepository(BaseRepository[RecommendationTraceModel]):
         -------
         list[RecommendationTraceStepModel]
         """
-        from sqlalchemy import cast, String
+        from sqlalchemy import String, cast
 
         stmt = (
             select(RecommendationTraceStepModel)

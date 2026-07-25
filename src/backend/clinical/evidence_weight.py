@@ -10,10 +10,9 @@ can be added dynamically via ``WeightRegistry.register_source()``.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Dict
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ─── Evidence Tier Enum ────────────────────────────────────────────────────────
 

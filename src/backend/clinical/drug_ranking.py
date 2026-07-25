@@ -22,8 +22,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from src.backend.clinical.evidence_models import EvidenceItem
-
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -119,7 +117,6 @@ def compute_evidence_score(
     total_weight: float = drug_aggregate.get("total_weight", 0.0)
     source_count: int = drug_aggregate.get("source_count", 0)
     item_count: int = drug_aggregate.get("item_count", 0)
-    highest_weight: float = drug_aggregate.get("highest_weight", 0.0)
 
     # Source diversity: ratio of distinct sources to total items
     source_diversity = 0.0

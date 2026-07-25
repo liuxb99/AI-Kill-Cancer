@@ -21,7 +21,6 @@ from src.backend.clinical.drug_ranking import (
     DrugRankingEngine,
     DrugRankingResult,
     EvidenceScore,
-    OverallScore,
     Resistance,
     Sensitivity,
     compute_conflict_score,
@@ -47,7 +46,6 @@ from src.backend.clinical.recommendation_engine import (
     RecommendationEngine,
     RecommendationRule,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # WeightRegistry Tests

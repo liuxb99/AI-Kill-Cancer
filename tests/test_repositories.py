@@ -333,7 +333,6 @@ class TestTraceRepository:
 
     async def test_create_trace(self, db_session):
         from src.backend.domain.recommendation import (
-            RecommendationModel,
             RecommendationTraceModel,
         )
         from src.backend.repositories.recommendation_repo import TraceRepository

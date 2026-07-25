@@ -12,7 +12,7 @@ use pure HTML/CSS (``<details>/<summary>``), no JavaScript required.
 from __future__ import annotations
 
 import html as html_lib
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -975,7 +975,6 @@ class ReportGenerator:
             out = s.get("output_data", {})
             inp_str = html_lib.escape(self._format_trace_data(inp))
             out_str = html_lib.escape(self._format_trace_data(out))
-            ts = s.get("timestamp", "")
             dur = s.get("duration_ms")
             dur_str = f" | {dur:.0f}ms" if dur is not None else ""
 

@@ -22,7 +22,6 @@ from pydantic import BaseModel, Field
 
 from src.backend.clinical.drug_ranking import DrugRankingResult
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # ReasonItem
 # ═══════════════════════════════════════════════════════════════════════════════

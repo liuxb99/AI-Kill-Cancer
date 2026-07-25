@@ -14,8 +14,8 @@ import json
 from pathlib import Path
 
 import jsonschema
-from jsonschema.validators import validator_for
 import pytest
+from jsonschema.validators import validator_for
 from referencing import Registry, Resource
 
 from src.backend.clinical.schemas import (

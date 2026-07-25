@@ -25,7 +25,6 @@ from src.backend.domain.recommendation import (
     RecommendationTraceStepModel,
 )
 
-
 # ─── Fixtures ─────────────────────────────────────────────────────────────
 
 
@@ -94,7 +93,7 @@ def _make_mock_pipeline_result(
 
 def _make_trace_manager(trace_id: str = "mock-trace-001"):
     """Build a lightweight in-memory TraceManager with a pre-started trace."""
-    from src.backend.clinical.calculation_trace import CalculationTrace, TraceManager, TraceStep
+    from src.backend.clinical.calculation_trace import TraceManager, TraceStep
 
     mgr = TraceManager()
     trace = mgr.start_trace(patient_id="P-MOCK")

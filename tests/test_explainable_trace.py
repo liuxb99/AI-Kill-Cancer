@@ -10,14 +10,12 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
-from uuid import uuid4
 
 import pytest
 
 from src.backend.clinical.calculation_trace import (
-    CalculationTrace,
     TraceManager,
     TraceStep,
 )
@@ -37,7 +35,6 @@ from src.backend.clinical.explainable_recommendation import (
     RecommendationReason,
 )
 from src.backend.clinical.report_generator import ReportGenerator
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Fixtures
@@ -652,7 +649,7 @@ class TestTraceManager:
 @pytest.fixture
 def mock_recommendation_response():
     """Create a minimal mock of RecommendationResponse for report testing."""
-    from pydantic import BaseModel, Field
+    from pydantic import BaseModel
 
     class MockDrugItem(BaseModel):
         drug_name: str

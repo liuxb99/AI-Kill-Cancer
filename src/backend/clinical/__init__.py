@@ -1,22 +1,10 @@
 """Clinical context package — frozen snapshot models for reasoning & reporting."""
 
-from src.backend.clinical.models import ClinicalContext
-
-# Evidence weight / tier / confidence models
-from src.backend.clinical.evidence_weight import (
-    ConfidenceLevel,
-    EvidenceLevel,
-    EvidenceTier,
-    EvidenceWeightConfig,
-    WeightRegistry,
-)
-
-# Recommendation engine (P3A-01)
-from src.backend.clinical.recommendation_engine import (
-    DrugRanker,
-    EvidenceAggregator,
-    RecommendationEngine,
-    RecommendationRule,
+# Calculation trace (P3A-05)
+from src.backend.clinical.calculation_trace import (
+    CalculationTrace,
+    TraceManager,
+    TraceStep,
 )
 
 # Drug ranking system (P3A-03)
@@ -30,6 +18,15 @@ from src.backend.clinical.drug_ranking import (
     Sensitivity,
 )
 
+# Evidence weight / tier / confidence models
+from src.backend.clinical.evidence_weight import (
+    ConfidenceLevel,
+    EvidenceLevel,
+    EvidenceTier,
+    EvidenceWeightConfig,
+    WeightRegistry,
+)
+
 # Explainable recommendation (P3A-04)
 from src.backend.clinical.explainable_recommendation import (
     ExplainableEngine,
@@ -37,12 +34,14 @@ from src.backend.clinical.explainable_recommendation import (
     ReasonItem,
     RecommendationReason,
 )
+from src.backend.clinical.models import ClinicalContext
 
-# Calculation trace (P3A-05)
-from src.backend.clinical.calculation_trace import (
-    CalculationTrace,
-    TraceManager,
-    TraceStep,
+# Recommendation engine (P3A-01)
+from src.backend.clinical.recommendation_engine import (
+    DrugRanker,
+    EvidenceAggregator,
+    RecommendationEngine,
+    RecommendationRule,
 )
 
 __all__ = [
