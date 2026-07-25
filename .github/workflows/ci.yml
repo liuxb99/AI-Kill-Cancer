@@ -86,6 +86,12 @@ jobs:
               esac
             done < "$log"
           done
+          # Emit diagnostics from db_diag.log (written by session.py)
+          if [ -f /tmp/db_diag.log ]; then
+            echo "::group::Database diagnostics"
+            cat /tmp/db_diag.log
+            echo "::endgroup::"
+          fi
           exit $EXIT
 
       - name: Postgres Integration Gate - Alembic downgrade & re-upgrade
