@@ -268,7 +268,7 @@ class RecommendationService:
                 "Failed to persist recommendation %s — rolled back.",
                 recommendation_id,
             )
-            raise RuntimeError("Failed to persist recommendation") from exc
+            raise RuntimeError(f"Failed to persist recommendation: {exc}") from exc
 
         return response
 
