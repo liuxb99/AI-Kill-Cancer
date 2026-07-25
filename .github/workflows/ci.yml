@@ -88,9 +88,9 @@ jobs:
           done
           # Emit diagnostics from db_diag.log (written by session.py)
           if [ -f /tmp/db_diag.log ]; then
-            echo "::group::Database diagnostics"
-            cat /tmp/db_diag.log
-            echo "::endgroup::"
+            while IFS= read -r diag_line; do
+              echo "::error title=DB_DIAG::$diag_line"
+            done < /tmp/db_diag.log
           fi
           exit $EXIT
 
