@@ -304,6 +304,8 @@ class TestRestartRecovery:
                     },
                 )
 
+            import sys
+            print(f"POST RESPONSE: status={rec_resp.status_code} body={rec_resp.text[:500]}", file=sys.stderr, flush=True)
             assert rec_resp.status_code == 200, (
                 f"POST /api/v1/recommendation failed: {rec_resp.text}"
             )
