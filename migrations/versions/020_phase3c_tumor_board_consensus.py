@@ -39,7 +39,7 @@ def upgrade() -> None:
         sa.Column("patient_id", sa.String(36), sa.ForeignKey("domain_patients.id", ondelete="CASCADE"), nullable=False, index=True),
         sa.Column("recommendation_id", sa.String(36), sa.ForeignKey("domain_recommendations.id", ondelete="SET NULL"), nullable=True, index=True),
         sa.Column("clinical_decision_id", sa.String(36), sa.ForeignKey("domain_clinical_decisions.id", ondelete="SET NULL"), nullable=True, index=True),
-        sa.Column("consensus_status", sa.String(32), nullable=False, server_default="unanimous"),
+        sa.Column("consensus_status", sa.String(32), nullable=False, server_default="pending"),
         sa.Column("consensus_score", sa.Float, nullable=True),
         sa.Column("final_recommendation", sa.Text, nullable=True),
         sa.Column("supporting_rationale", sa.Text, nullable=True),
@@ -86,8 +86,23 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    raise IrreversibleMigrationError(
-        "Cannot downgrade Migration 020. "
-        "Database already contains Tumor Board Consensus data. "
-        "Downgrade would destroy persisted consensus records."
-    )
+    bind = op.get_bind()
+
+    # Check each table for existing data
+    for table_name in (
+        "domain_tumor_board_consensus_traces",
+        "domain_tumor_board_opinions",
+        "domain_tumor_board_consensus",
+    ):
+        count = bind.execute(sa.text(f"SELECT COUNT(*) FROM {table_name}")).scalar()
+        if count > 0:
+            raise IrreversibleMigrationError(
+                f"Cannot downgrade Migration 020. "
+                f"Table '{table_name}' has {count} row(s). "
+                "Downgrade would destroy persisted consensus records."
+            )
+
+    # All tables are empty — safe to drop
+    op.drop_table("domain_tumor_board_consensus_traces")
+    op.drop_table("domain_tumor_board_opinions")
+    op.drop_table("domain_tumor_board_consensus")

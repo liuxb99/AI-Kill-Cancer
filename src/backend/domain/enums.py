@@ -379,6 +379,7 @@ class SpecialtyType(str, enum.Enum):
 
 class ConsensusStatus(str, enum.Enum):
     """Consensus result classifications for tumor board decisions."""
+    PENDING = "pending"
     UNANIMOUS = "unanimous"
     STRONG_CONSENSUS = "strong_consensus"
     MAJORITY_CONSENSUS = "majority_consensus"

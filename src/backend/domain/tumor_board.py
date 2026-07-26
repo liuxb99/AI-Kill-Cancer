@@ -30,7 +30,7 @@ class TumorBoardConsensusModel(DBBase):
     patient_id = Column(CompatUUID, ForeignKey("domain_patients.id", ondelete="CASCADE"), nullable=False, index=True)
     recommendation_id = Column(CompatUUID, ForeignKey("domain_recommendations.id", ondelete="SET NULL"), nullable=True, index=True)
     clinical_decision_id = Column(CompatUUID, ForeignKey("domain_clinical_decisions.id", ondelete="SET NULL"), nullable=True, index=True)
-    consensus_status = Column(String(32), nullable=False, default="unanimous")
+    consensus_status = Column(String(32), nullable=False, default="pending")
     consensus_score = Column(Float, nullable=True)
     final_recommendation = Column(Text, nullable=True)
     supporting_rationale = Column(Text, nullable=True)

@@ -953,9 +953,20 @@ class TestMigration020:
     # ── downgrade 020→019 ────────────────────────────────────────────────────
 
     def test_downgrade_020_to_019_raises_irreversible(self, alembic_config_020):
-        """Downgrade from 020 to 019 should raise IrreversibleMigrationError."""
+        """Downgrade from 020 to 019 should raise IrreversibleMigrationError when data exists."""
         cfg, db_path = alembic_config_020
         command.upgrade(cfg, "020")
+
+        # Insert a row into domain_tumor_board_consensus to make downgrade unsafe
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(
+            "INSERT INTO domain_tumor_board_consensus "
+            "(id, consensus_id, patient_id, consensus_status) "
+            "VALUES ('test-id', 'test-cid', 'test-pid', 'unanimous')"
+        )
+        conn.commit()
+        conn.close()
 
         with pytest.raises(Exception) as excinfo:
             command.downgrade(cfg, "019")
@@ -966,9 +977,20 @@ class TestMigration020:
         )
 
     def test_downgrade_020_to_019_error_message(self, alembic_config_020):
-        """Downgrade error message should mention 'Cannot downgrade'."""
+        """Downgrade error message should mention 'Cannot downgrade' when data exists."""
         cfg, db_path = alembic_config_020
         command.upgrade(cfg, "020")
+
+        # Insert a row into domain_tumor_board_consensus to make downgrade unsafe
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(
+            "INSERT INTO domain_tumor_board_consensus "
+            "(id, consensus_id, patient_id, consensus_status) "
+            "VALUES ('test-id-2', 'test-cid-2', 'test-pid-2', 'unanimous')"
+        )
+        conn.commit()
+        conn.close()
 
         with pytest.raises(Exception) as excinfo:
             command.downgrade(cfg, "019")
@@ -977,6 +999,24 @@ class TestMigration020:
         assert "Cannot downgrade Migration 020" in error_msg, (
             f"Error message missing expected text: {error_msg}"
         )
+
+    def test_downgrade_020_empty_db_ok(self, alembic_config_020):
+        """Downgrade from 020 to 019 should succeed when all tables are empty."""
+        cfg, db_path = alembic_config_020
+        command.upgrade(cfg, "020")
+
+        # Verify all three tables exist before downgrade
+        assert self._table_exists(db_path, "domain_tumor_board_consensus")
+        assert self._table_exists(db_path, "domain_tumor_board_opinions")
+        assert self._table_exists(db_path, "domain_tumor_board_consensus_traces")
+
+        # Downgrade should succeed (no data in any table)
+        command.downgrade(cfg, "019")
+
+        # Verify all three tables are removed
+        assert self._table_exists(db_path, "domain_tumor_board_consensus") is False
+        assert self._table_exists(db_path, "domain_tumor_board_opinions") is False
+        assert self._table_exists(db_path, "domain_tumor_board_consensus_traces") is False
 
     # ── re-upgrade cycle ─────────────────────────────────────────────────────
 

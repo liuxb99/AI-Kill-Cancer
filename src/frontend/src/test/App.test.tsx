@@ -140,7 +140,9 @@ describe('App — Route: /clinical-decision (for reference)', () => {
 
     renderAppAt('/clinical-decision/dec-001')
 
-    expect(screen.getByText('臨床決策')).toBeInTheDocument()
+    // The nav bar and the page heading both contain '臨床決策' — use getAllByText
+    const headings = screen.getAllByText('臨床決策')
+    expect(headings.length).toBeGreaterThanOrEqual(1)
 
     await waitFor(() => {
       expect(screen.getByText('決策詳情')).toBeInTheDocument()

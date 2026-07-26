@@ -18,8 +18,14 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
 from src.backend.auth.dependencies import require_auth
-from src.backend.domain.enums import Role
+from src.backend.domain.clinical_decision import ClinicalDecisionModel
+from src.backend.domain.enums import ConsentStatusEnum, Role, SexEnum
+from src.backend.domain.patient import PatientModel
+from src.backend.domain.recommendation import RecommendationModel
 from src.backend.domain.user import UserModel
 
 
@@ -178,12 +184,77 @@ class TestTumorBoardRestartRecovery:
         ), f"Consensus creation failed: {resp.text}"
         return resp.json()["consensus_id"]
 
+    def _create_prerequisite_data(self, db_url: str) -> dict[str, str]:
+        """Write patient, recommendation, and clinical_decision directly to DB.
+
+        Uses a synchronous SQLAlchemy connection to the same SQLite file that
+        the app's async engine writes to, bypassing the Engine (which requires
+        external evidence API keys).
+
+        Returns dict with ``patient_id``, ``recommendation_id``,
+        ``clinical_decision_id`` (business identifiers).
+        """
+        import uuid
+        from datetime import UTC, datetime
+
+        # Convert async URL to sync URL for the same file
+        sync_url = db_url.replace("sqlite+aiosqlite:///", "sqlite:///")
+        engine = create_engine(sync_url)
+
+        with Session(engine) as session:
+            patient_id = uuid.uuid4()
+            patient = PatientModel(
+                id=patient_id,
+                display_name="TB-Restart-Patient",
+                sex=SexEnum.F,
+                consent_status=ConsentStatusEnum.GRANTED,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+            session.add(patient)
+
+            rec_biz_id = uuid.uuid4().hex
+            recommendation = RecommendationModel(
+                id=uuid.uuid4(),
+                recommendation_id=rec_biz_id,
+                patient_id=patient_id,
+                engine_version="1.0.0",
+                status="completed",
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+            session.add(recommendation)
+            session.flush()  # ensure recommendation.id is populated
+
+            cd_biz_id = uuid.uuid4().hex
+            clinical_decision = ClinicalDecisionModel(
+                id=uuid.uuid4(),
+                decision_id=cd_biz_id,
+                patient_id=patient_id,
+                recommendation_id=recommendation.id,
+                decision_type="treatment",
+                reason="Test reason for restart recovery test",
+                confidence="high",
+                status="active",
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+            session.add(clinical_decision)
+
+            session.commit()
+
+            return {
+                "patient_id": str(patient_id),
+                "recommendation_id": rec_biz_id,
+                "clinical_decision_id": cd_biz_id,
+            }
+
     def test_end_to_end_restart_recovery(self, db_url: str) -> None:
         """
         Full restart-recovery scenario:
 
         Phase 1 — App 1
-            POST patient → POST recommendation → POST clinical decision
+            (DB direct write: patient → recommendation → clinical decision)
             → POST tumor board consensus → GET to confirm
         Phase 2 — Shutdown (session scope closes)
         Phase 3 — App 2 (new TestClient, new app instance)
@@ -196,12 +267,11 @@ class TestTumorBoardRestartRecovery:
         # ═════════════════════════════════════════════════════════════════
         app1 = self._create_app_with_auth_override()
         with TestClient(app1) as client1:
-            # Create prerequisite data: patient → recommendation → clinical decision
-            patient_id = self._create_patient(client1)
-            rec_id = self._create_recommendation(client1, patient_id)
-            cd_id = self._create_clinical_decision(
-                client1, patient_id, rec_id,
-            )
+            # ── Write prerequisite data directly to DB (bypass Engine) ──
+            prereq = self._create_prerequisite_data(db_url)
+            patient_id = prereq["patient_id"]
+            rec_id = prereq["recommendation_id"]
+            cd_id = prereq["clinical_decision_id"]
 
             # Create the tumor board consensus
             consensus_id = self._create_consensus(
