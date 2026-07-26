@@ -8,6 +8,14 @@ from alembic import command
 from alembic.config import Config
 
 
+class IrreversibleMigrationError(Exception):
+    """Raised when a migration cannot be reversed safely.
+
+    This class was removed from alembic.util in Alembic ≥1.9.
+    We define it locally to keep the same semantic contract.
+    """
+
+
 @pytest.fixture
 def alembic_config(tmp_path):
     """Create a temporary Alembic config pointing to async SQLite."""
@@ -432,16 +440,19 @@ class TestMigration018:
         conn = sqlite3.connect(str(db_path))
 
         # Check FK on domain_clinical_decisions
+        # PRAGMA foreign_key_list returns: (id, seq, table, from, to, on_update, on_delete, match)
         cursor = conn.execute("PRAGMA foreign_key_list(domain_clinical_decisions)")
-        fks = {row[3]: row[4] for row in cursor.fetchall()}
+        fks = {row[3]: {"ref_table": row[2], "ref_column": row[4]} for row in cursor.fetchall()}
         assert "patient_id" in fks, "Missing FK on patient_id"
-        assert fks["patient_id"] == "domain_patients", "patient_id FK target mismatch"
+        assert fks["patient_id"]["ref_table"] == "domain_patients", "patient_id FK should reference domain_patients"
+        assert fks["patient_id"]["ref_column"] == "id", "patient_id FK should reference domain_patients.id"
 
         # Check FK on domain_clinical_decision_traces
         cursor = conn.execute("PRAGMA foreign_key_list(domain_clinical_decision_traces)")
-        fks = {row[3]: row[4] for row in cursor.fetchall()}
+        fks = {row[3]: {"ref_table": row[2], "ref_column": row[4]} for row in cursor.fetchall()}
         assert "clinical_decision_id" in fks, "Missing FK on clinical_decision_id"
-        assert fks["clinical_decision_id"] == "domain_clinical_decisions", "clinical_decision_id FK target mismatch"
+        assert fks["clinical_decision_id"]["ref_table"] == "domain_clinical_decisions", "clinical_decision_id FK should reference domain_clinical_decisions"
+        assert fks["clinical_decision_id"]["ref_column"] == "id", "clinical_decision_id FK should reference domain_clinical_decisions.id"
 
         conn.close()
 
@@ -704,3 +715,91 @@ class TestMigration019:
         conn.close()
 
         assert columns_018 == columns_019, "Columns changed after 019 upgrade"
+
+    # ── Strategy A: downgrade safety (MIG-2) ────────────────────────────
+    #
+    # These three tests verify the revised downgrade behaviour for
+    # Migration 019 (Strategy A):
+    #
+    #   Case 1 – Empty database downgrade succeeds
+    #   Case 2 – Multi-step trace data → IrreversibleMigrationError
+    #   Case 3 – 018 → 019 upgrade succeeds
+    # ─────────────────────────────────────────────────────────────────────
+
+    def test_downgrade_empty_database_success(self, alembic_config_019):
+        """Case1: Empty database — downgrade 019→018 should succeed without error."""
+        cfg, db_path = alembic_config_019
+
+        # 018 → 019
+        command.upgrade(cfg, "019")
+
+        # No data inserted → downgrade must NOT raise
+        command.downgrade(cfg, "018")
+
+        # Sanity-check: we are back at 018 schema
+        indexes = self._get_indexes(db_path, "domain_clinical_decision_traces")
+        idx = indexes.get("ix_domain_clinical_decision_traces_trace_id")
+        assert idx is not None, "trace_id index missing after downgrade"
+        assert idx["unique"] is True, "trace_id index should be UNIQUE after downgrade"
+        assert "uq_trace_step" not in indexes, "uq_trace_step should be gone after downgrade"
+
+    def test_downgrade_with_multistep_trace_raises(self, alembic_config_019):
+        """Case2: Multi-step trace data → downgrade raises IrreversibleMigrationError."""
+        cfg, db_path = alembic_config_019
+
+        # 018 → 019
+        command.upgrade(cfg, "019")
+
+        # Insert 5 steps sharing the same trace_id
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        trace_id = "multi-step-guard-001"
+        for step_order in range(5):  # step_order 0..4
+            conn.execute(
+                """INSERT INTO domain_clinical_decision_traces
+                   (id, trace_id, step_order, step_type, input_summary, output_summary)
+                   VALUES (?, ?, ?, ?, '{}', '{}')""",
+                (f"id-{step_order}", trace_id, step_order, "reasoning"),
+            )
+        conn.commit()
+
+        # Verify 5 rows exist
+        cursor = conn.execute(
+            "SELECT COUNT(*) FROM domain_clinical_decision_traces WHERE trace_id=?",
+            (trace_id,),
+        )
+        assert cursor.fetchone()[0] == 5, "Expected 5 trace steps before downgrade"
+        conn.close()
+
+        # Downgrade must raise IrreversibleMigrationError
+        with pytest.raises(Exception) as excinfo:
+            command.downgrade(cfg, "018")
+
+        error_msg = str(excinfo.value)
+        assert "Cannot downgrade Migration 019" in error_msg, (
+            f"Error message missing 'Cannot downgrade Migration 019': {error_msg}"
+        )
+        assert "multi-step Clinical Decision Trace" in error_msg, (
+            f"Error message missing 'multi-step Clinical Decision Trace': {error_msg}"
+        )
+
+    def test_reupgrade_019_success(self, alembic_config_019):
+        """Case3: 018 → 019 upgrade should succeed (idempotent)."""
+        cfg, db_path = alembic_config_019
+
+        # Fixture is at 018; upgrade to 019
+        command.upgrade(cfg, "019")
+
+        # Verify final state reflects 019 schema
+        indexes = self._get_indexes(db_path, "domain_clinical_decision_traces")
+        idx = indexes.get("ix_domain_clinical_decision_traces_trace_id")
+        assert idx is not None, "trace_id index missing after upgrade"
+        assert idx["unique"] is False, "trace_id index should be non-unique after upgrade"
+
+        uq = indexes.get("uq_trace_step")
+        assert uq is not None, "uq_trace_step missing after upgrade"
+        assert uq["unique"] is True, "uq_trace_step should be UNIQUE"
+        assert uq["columns"] == ["trace_id", "step_order"], (
+            f"Expected uq_trace_step on (trace_id, step_order), got {uq['columns']}"
+        )

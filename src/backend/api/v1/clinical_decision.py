@@ -13,7 +13,7 @@ import logging
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -76,8 +76,8 @@ class ClinicalDecisionListResponse(BaseModel):
 @router.get("", response_model=ClinicalDecisionListResponse)
 async def list_clinical_decisions(
     patient_id: str,
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(ge=0, default=0, description="Number of records to skip"),
+    limit: int = Query(ge=1, le=100, default=50, description="Max records to return"),
     user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ) -> ClinicalDecisionListResponse:

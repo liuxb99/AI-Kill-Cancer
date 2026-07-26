@@ -21,6 +21,15 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
+
+
+class IrreversibleMigrationError(Exception):
+    """Raised when a migration cannot be reversed safely.
+
+    This class was removed from alembic.util in Alembic ≥1.9.
+    We define it locally to keep the same semantic contract.
+    """
 
 # revision identifiers, used by Alembic.
 revision: str = "019"
@@ -54,6 +63,22 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Strategy A: Check for multi-step traces before downgrading
+    conn = op.get_bind()
+    result = conn.execute(
+        text(
+            "SELECT trace_id FROM domain_clinical_decision_traces "
+            "GROUP BY trace_id HAVING COUNT(*) > 1 LIMIT 1"
+        )
+    ).fetchone()
+
+    if result is not None:
+        raise IrreversibleMigrationError(
+            "Cannot downgrade Migration 019. "
+            "Database already contains multi-step Clinical Decision Trace. "
+            "Downgrade would destroy persisted data."
+        )
+
     # 1. Drop the compound unique index
     op.drop_index(
         "uq_trace_step",
