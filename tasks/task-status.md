@@ -1,103 +1,64 @@
-# Task Status
+# Task Status — Phase 3C Tumor Board Consensus Engine
 
-## 場景
-Phase 3A Final Acceptance Gate — PostgreSQL CI Gate + Real Pipeline Trace
+## 場景識別
 
-## 任務
+| 項目 | 內容 |
+|------|------|
+| **場景分類** | feature-dev（功能開發） |
+| **場景說明** | 開發全新 Tumor Board Consensus Engine 模組，包含 Models / Migration / Repositories / Service / Engine / API / Frontend / Tests，採用 Minimal Integration / Repository Pattern / Service Transaction Boundary |
+| **對照 scene_rules.yaml** | feature-dev：新功能模組的完整開發流程 ✓ |
+| **需求來源** | tasks/requirements.md（Phase 3C 規格） |
+
+## 角色分派
+
+| 角色 | 職責 |
+|------|------|
+| **planner** | 制定執行計劃（Step 2 PLANNER） |
+| **backend-logic** | 後端業務邏輯（Engine / Service / Repositories） |
+| **api-designer** | API 設計（Router / Handler / Request/Response schema） |
+| **db-modeler** | 資料庫建模（Models / Migration） |
+| **frontend-logic** | 前端業務邏輯（Tumor Board 頁面與互動） |
+| **unit-tester** | 單元測試（Engine / Service / API unit tests） |
+| **integration-tester** | 整合測試（跨模組整合測試） |
+| **doc-writer** | 文件撰寫（API docs / README） |
+| **reviewer** | 評分代理（目標 >= 95 分） |
+
+## 任務清單
+
 | ID | 描述 | 優先級 | 狀態 |
 |----|------|--------|------|
-| GATE-1 | GitHub Actions Postgres Integration Gate（修改 ci.yml） | P0 | [ ] |
-| GATE-2 | Postgres Restart Recovery（修改 test_restart_recovery.py） | P0 | [ ] |
-| GATE-3 | Real Pipeline Trace（修改 test_trace_persistence.py + source） | P0 | [ ] |
-| GATE-4 | Real Trace Acceptance Test（新增 test_real_pipeline_trace_persistence.py） | P0 | [ ] |
-| GATE-5 | Trace 欄位映射 Helper（修改 trace 寫入邏輯） | P0 | [ ] |
-| GATE-6 | 完整驗證 + Git Commit & Push | P0 | [ ] |
+| **TBC-1** | PLANNER 制定執行計劃（模組拆解、依賴拓撲、里程碑） | P0 | [ ] |
+| **TBC-2** | DB Modeler — Models & Migration（TumorBoardSession / ConsensusRecord） | P0 | [ ] |
+| **TBC-3** | Backend Logic — Repositories（Session / Consensus CRUD） | P0 | [ ] |
+| **TBC-4** | Backend Logic — Service Layer（Transaction Boundary / Business Logic） | P0 | [ ] |
+| **TBC-5** | Backend Logic — Consensus Engine（投票邏輯 / 加權計算 / 結果產生） | P0 | [ ] |
+| **TBC-6** | API Designer — REST API（Router / Handler / Validation） | P0 | [ ] |
+| **TBC-7** | Frontend Logic — Tumor Board 前端頁面 | P1 | [ ] |
+| **TBC-8** | Unit Tests（Engine / Service / API） | P0 | [ ] |
+| **TBC-9** | Integration Tests（跨模組流程測試） | P0 | [ ] |
+| **TBC-10** | Doc Writer — API 文件與 README 更新 | P1 | [ ] |
+| **TBC-11** | REVIEWER 評分 + 最終驗證 | P0 | [ ] |
 
-## 禁止修改
-- AGENTS.md
-- Phase 3B 功能
-- Vercel 部署
-- 前端 UI
-- 認證系統
-- 無關格式化 / dependency upgrade
+## 約束條件
 
----
+- ❌ 不得修改任何已驗收模組（Phase 1 / 2 / 3A / 3B 既有程式碼）
+- ❌ 不得修改 Clinical Decision 模組
+- ❌ 不得修改 Recommendation 模組
+- ✅ 採用 Minimal Integration（僅新增必要模組）
+- ✅ 遵循 Repository Pattern + Service Transaction Boundary
+- ✅ 所有新程式碼需通過測試驗證
 
-## Phase 3B — Clinical Decision Layer
+## 完成條件
 
-**場景**：feature-dev（功能開發）
-
-**啟動時間**：2026-07-25 19:02
-
-**狀態**：進行中
-
-**角色分派**：
-| 角色 | 職責 |
-|------|------|
-| planner | 制定執行計劃 |
-| backend-logic | 後端業務邏輯（Engine、Service） |
-| api-designer | API 設計 |
-| db-modeler | 資料庫建模（Model、Migration） |
-| frontend-logic | 前端頁面與路由 |
-| test-writer | 測試撰寫 |
-| doc-writer | 文件與報告 |
-| reviewer | 評分代理 |
-
-**任務清單（待 planner 產出）**：
-待 Step 2 PLANNER 完成後更新
+- 所有 TBC 任務完成（TBC-1 ~ TBC-11）
+- 測試全部 PASS（Unit + Integration）
+- Reviewer 評分 >= 95
+- Git Commit & Push 成功
 
 ---
 
-## Phase 3B Hardening — 架構問題修正
+## 歷史記錄
 
-**場景**：hardening（架構強化）
-
-**啟動時間**：2026-07-26
-
-**狀態**：待啟動
-
-**角色分派**：
-| 角色 | 職責 |
+| 時間 | 事件 |
 |------|------|
-| planner | 制定強化計劃與優先級排序 |
-| backend-logic | 後端邏輯修正（validation、audit trail、DTO） |
-| frontend-logic | 前端邏輯修正（navigation、sample data 移除） |
-| test-writer | 撰寫回歸測試驗證修正 |
-| reviewer | 評分代理 |
-
-**修正項目**：
-| 優先級 | ID | 描述 | 狀態 |
-|--------|----|------|------|
-| P0 | HARDEN-1 | Recommendation 必須屬於同一位 Patient（加 validation） | [ ] |
-| P0 | HARDEN-2 | created_by 必須完整傳遞（Audit Trail） | [ ] |
-| P0 | HARDEN-3 | context.patient 不得覆蓋 Database Patient | [ ] |
-| P0 | HARDEN-4 | Frontend Navigation 移除假資料 sample | [ ] |
-| P1 | HARDEN-5 | Clinical Decision Trace 拆成 4~5 個 Step | [ ] |
-| P1 | HARDEN-6 | DTO Mutable Default 修正 | [ ] |
-
-**禁止修改**：
-- AGENTS.md
-- Phase 3A 已完成功能
-- Vercel 部署
-- 認證系統
-
-## 2026-07-26 — Phase 3B Final Acceptance Fix
-
-場景：bug-fix
-
-角色：
-- PLANNER: 制定修復計劃
-- backend-logic: Migration 019 + Repository count_by_patient 新增
-- api-designer: Clinical Decision Collection API 新增
-- test-writer: Migration Tests + API Tests + Frontend Integration Test
-- reviewer: 評分代理
-
-任務：
-- [ ] TASK-FIX-01: Migration 019 — 新增 migration 檔案（drop trace_id unique → compound unique）
-- [ ] TASK-FIX-02: Repository — 新增 count_by_patient_id 方法
-- [ ] TASK-FIX-03: Service — 確保 list_decisions_by_patient + 新增 count_decisions_by_patient
-- [ ] TASK-FIX-04: API Router — 新增 GET /api/v1/clinical-decision collection route（放在 /{decision_id} 之前）
-- [ ] TASK-FIX-05: API Tests — List Empty / List One / Pagination / Wrong Patient / Unauthorized
-- [ ] TASK-FIX-06: Migration Tests — 018→019→insert 5 steps→PASS / downgrade→PASS / re-upgrade→PASS
-- [ ] TASK-FIX-07: Frontend Integration Test — 真正呼叫 List API
-- [ ] TASK-FIX-08: 完整回歸測試 + Git Commit & Push
+| 待填 | Step 1 場景識別完成 |

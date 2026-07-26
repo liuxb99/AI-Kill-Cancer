@@ -186,6 +186,65 @@ export function compareCases(caseIds: string[]): Promise<CaseComparisonResult> {
   return request('/workbench/compare/cases', { method: 'POST', body: caseIds })
 }
 
+// ─── Tumor Board Consensus API ──────────────────────────────────────────────
+
+export interface SpecialistOpinion {
+  specialty: string
+  position: string
+  confidence: string
+  rationale: string
+}
+
+export interface TumorBoardConsensus {
+  consensus_id: string
+  patient_id: string
+  clinical_decision_id: string
+  recommendation_id: string
+  consensus_status: string
+  consensus_score?: number
+  final_recommendation?: string
+  supporting_rationale?: string
+  dissenting_opinions: any[]
+  unresolved_questions: string[]
+  required_follow_up: string[]
+  participating_specialties: string[]
+  specialist_opinions: SpecialistOpinion[]
+  created_by?: string
+  trace_id?: string
+  created_at: string
+  updated_at: string
+}
+
+export type TumorBoardConsensusListResponse = TumorBoardConsensus[]
+
+export interface CreateTumorBoardConsensusRequest {
+  patient_id: string
+  recommendation_id: string
+  clinical_decision_id: string
+  specialist_opinions: SpecialistOpinion[]
+}
+
+export function createTumorBoardConsensus(data: CreateTumorBoardConsensusRequest): Promise<TumorBoardConsensus> {
+  return request('/tumor-board-consensus', { method: 'POST', body: data })
+}
+
+export function getTumorBoardConsensus(consensusId: string): Promise<TumorBoardConsensus> {
+  return request(`/tumor-board-consensus/${consensusId}`)
+}
+
+export function listTumorBoardConsensus(patientId: string, skip = 0, limit = 20): Promise<TumorBoardConsensusListResponse> {
+  const params = new URLSearchParams({ patient_id: patientId, skip: String(skip), limit: String(limit) })
+  return request(`/tumor-board-consensus?${params}`)
+}
+
+export function getTumorBoardConsensusOpinions(consensusId: string): Promise<SpecialistOpinion[]> {
+  return request(`/tumor-board-consensus/${consensusId}/opinions`)
+}
+
+export function getTumorBoardConsensusTrace(consensusId: string): Promise<any[]> {
+  return request(`/tumor-board-consensus/${consensusId}/trace`)
+}
+
 // ─── Notes API ──────────────────────────────────────────────────────────────
 
 export interface WorkbenchNote {

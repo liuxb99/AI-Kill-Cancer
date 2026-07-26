@@ -85,8 +85,11 @@ from src.backend.domain.enums import (
     VariantTypeEnum,
     ZygosityEnum,
     ConfidenceLevelEnum,
+    ConsensusStatus,
     DecisionStatusEnum,
     DecisionTypeEnum,
+    Position,
+    SpecialtyType,
 )
 from src.backend.domain.evidence import (
     EvidenceCreate,
@@ -131,6 +134,11 @@ from src.backend.domain.uploaded_file import (
     UploadedFileModel,
     UploadedFileResponse,
 )
+from src.backend.domain.tumor_board import (
+    TumorBoardConsensusModel,
+    TumorBoardConsensusTraceModel,
+    TumorBoardOpinionModel,
+)
 from src.backend.domain.user import (
     LoginRequest,
     LogoutRequest,
@@ -167,7 +175,10 @@ __all__ = [
     "CancerTypeEnum",
     "ConsentStatusEnum",
     "ConsentTypeEnum",
+    "ConsensusStatus",
     "DriverStatusEnum",
+    "Position",
+    "SpecialtyType",
     "EvidenceDirectionEnum",
     "EvidenceLevelEnum",
     "EvidenceTypeEnum",
@@ -212,8 +223,14 @@ __all__ = [
     "ClinicalDecisionModel",
     "ClinicalDecisionTraceModel",
     "ConfidenceLevelEnum",
+    "ConsensusStatus",
     "DecisionStatusEnum",
     "DecisionTypeEnum",
+    "Position",
+    "SpecialtyType",
+    "TumorBoardConsensusModel",
+    "TumorBoardConsensusTraceModel",
+    "TumorBoardOpinionModel",
     # Pydantic
     "PatientCreate",
     "PatientUpdate",

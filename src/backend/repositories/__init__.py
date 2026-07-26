@@ -19,6 +19,11 @@ from src.backend.repositories.recommendation_repo import (
 from src.backend.repositories.report_repo import ReportRepository
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.repositories.specimen_repo import SpecimenRepository
+from src.backend.repositories.tumor_board_repo import (
+    TumorBoardConsensusRepository,
+    TumorBoardConsensusTraceRepository,
+    TumorBoardOpinionRepository,
+)
 from src.backend.repositories.uploaded_file_repo import UploadedFileRepository
 from src.backend.repositories.user_repo import UserRepository
 from src.backend.repositories.variant_repo import VariantRepository
@@ -39,4 +44,7 @@ __all__ = [
     "TraceRepository",
     "UserRepository",
     "CaseACLRepository",
+    "TumorBoardConsensusRepository",
+    "TumorBoardOpinionRepository",
+    "TumorBoardConsensusTraceRepository",
 ]

@@ -69,6 +69,8 @@ jobs:
           pytest -v --tb=long tests/test_trace_persistence.py tests/test_acceptance_real_trace.py 2>&1 | tee /tmp/pg-test-trace.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
           echo "=== Other Backend Tests ==="
           pytest -v --tb=long tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py 2>&1 | tee /tmp/pg-test-other.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
+          echo "=== Phase 3C: Tumor Board Tests ==="
+          pytest -v --tb=long tests/test_tumor_board_engine.py tests/test_tumor_board_models.py tests/test_tumor_board_repo.py tests/test_tumor_board_service.py tests/test_api_tumor_board.py tests/test_tumor_board_digital_thread.py tests/test_tumor_board_restart_recovery.py 2>&1 | tee /tmp/pg-test-tumor-board.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
           # Emit annotations for any failures found in logs
           bash scripts/emit_annotations.sh 2>&1 || true
           exit $EXIT
@@ -78,6 +80,9 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
           PYTHONPATH: .
         run: |
+          # Verify 020→019 downgrade is blocked (irreversible migration)
+          alembic -c migrations/alembic.ini downgrade 019 2>&1 && { echo "ERROR: 020→019 downgrade should have been blocked"; exit 1; } || echo "OK: 020→019 downgrade blocked as expected (irreversible)"
+          # Full downgrade to 016 and re-upgrade
           alembic -c migrations/alembic.ini downgrade 016
           alembic -c migrations/alembic.ini upgrade head
 

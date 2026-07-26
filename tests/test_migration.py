@@ -803,3 +803,380 @@ class TestMigration019:
         assert uq["columns"] == ["trace_id", "step_order"], (
             f"Expected uq_trace_step on (trace_id, step_order), got {uq['columns']}"
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 3C — Migration 020: Tumor Board Consensus Tables
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def alembic_config_020(tmp_path):
+    """Isolated Alembic config for 019→020 migration tests."""
+    db_path = tmp_path / "test_migration_020.db"
+    cfg = Config()
+    cfg.set_main_option("script_location", "migrations")
+    cfg.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{db_path}")
+    return cfg, db_path
+
+
+class TestMigration020:
+    """Tests for Phase 3C migration 020 (tumor board consensus tables)."""
+
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _table_exists(db_path, table_name):
+        """Check if a table exists in the SQLite database."""
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,),
+        )
+        exists = cursor.fetchone() is not None
+        conn.close()
+        return exists
+
+    @staticmethod
+    def _get_indexes(db_path, table_name):
+        """Return dict mapping index name → {unique, columns} for a table."""
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=?",
+            (table_name,),
+        )
+        index_names = [row[0] for row in cursor.fetchall()]
+
+        result = {}
+        for idx_name in index_names:
+            cursor = conn.execute(f"PRAGMA index_info('{idx_name}')")
+            columns = [row[2] for row in cursor.fetchall()]
+            cursor = conn.execute(f"PRAGMA index_list('{table_name}')")
+            unique = False
+            for row in cursor.fetchall():
+                # row[1] = name, row[2] = unique flag (0/1)
+                if row[1] == idx_name:
+                    unique = bool(row[2])
+                    break
+            result[idx_name] = {"unique": unique, "columns": columns}
+        conn.close()
+        return result
+
+    @staticmethod
+    def _get_unique_constraints(db_path, table_name):
+        """Return dict mapping constraint name → columns for a table."""
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute(
+            "SELECT name, sql FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            conn.close()
+            return {}
+        create_sql = row[1] or ""
+        conn.close()
+
+        constraints = {}
+        # Parse unique constraints from CREATE TABLE statement
+        import re
+        for match in re.finditer(
+            r"CONSTRAINT\s+(\w+)\s+UNIQUE\s*\(([^)]+)\)",
+            create_sql, re.IGNORECASE,
+        ):
+            name = match.group(1)
+            columns = [c.strip().strip('"') for c in match.group(2).split(",")]
+            constraints[name] = columns
+        return constraints
+
+    # ── file existence ───────────────────────────────────────────────────────
+
+    def test_migration_020_file_exists(self):
+        """Verify migration 020 file exists with correct metadata."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "migration_020",
+            "migrations/versions/020_phase3c_tumor_board_consensus.py",
+        )
+        assert spec is not None, "Migration 020 file not found"
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert hasattr(module, "upgrade"), "Migration 020 missing upgrade()"
+        assert hasattr(module, "downgrade"), "Migration 020 missing downgrade()"
+        assert module.revision == "020"
+        assert module.down_revision == "019"
+
+    def test_migration_019_exists_as_prerequisite(self):
+        """Migration 019 must exist as the base for 020."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "migration_019",
+            "migrations/versions/019_phase3b_trace_compound_unique.py",
+        )
+        assert spec is not None, "Migration 019 file not found"
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert module.revision == "019"
+
+    # ── upgrade 019→020 ──────────────────────────────────────────────────────
+
+    def test_upgrade_019_to_020_creates_tables(self, alembic_config_020):
+        """Upgrade from 019 to 020 creates all three tumor board tables."""
+        cfg, db_path = alembic_config_020
+        command.upgrade(cfg, "019")
+
+        # Verify tables do not exist before upgrade
+        assert self._table_exists(db_path, "domain_tumor_board_consensus") is False
+        assert self._table_exists(db_path, "domain_tumor_board_opinions") is False
+        assert self._table_exists(db_path, "domain_tumor_board_consensus_traces") is False
+
+        # Upgrade to 020
+        command.upgrade(cfg, "020")
+
+        # Verify all three new tables exist
+        assert self._table_exists(
+            db_path, "domain_tumor_board_consensus",
+        ), "domain_tumor_board_consensus table missing after upgrade"
+        assert self._table_exists(
+            db_path, "domain_tumor_board_opinions",
+        ), "domain_tumor_board_opinions table missing after upgrade"
+        assert self._table_exists(
+            db_path, "domain_tumor_board_consensus_traces",
+        ), "domain_tumor_board_consensus_traces table missing after upgrade"
+
+    # ── downgrade 020→019 ────────────────────────────────────────────────────
+
+    def test_downgrade_020_to_019_raises_irreversible(self, alembic_config_020):
+        """Downgrade from 020 to 019 should raise IrreversibleMigrationError."""
+        cfg, db_path = alembic_config_020
+        command.upgrade(cfg, "020")
+
+        with pytest.raises(Exception) as excinfo:
+            command.downgrade(cfg, "019")
+
+        error_msg = str(excinfo.value)
+        assert "Cannot downgrade Migration 020" in error_msg or "irreversible" in error_msg.lower(), (
+            f"Error message missing expected text: {error_msg}"
+        )
+
+    def test_downgrade_020_to_019_error_message(self, alembic_config_020):
+        """Downgrade error message should mention 'Cannot downgrade'."""
+        cfg, db_path = alembic_config_020
+        command.upgrade(cfg, "020")
+
+        with pytest.raises(Exception) as excinfo:
+            command.downgrade(cfg, "019")
+
+        error_msg = str(excinfo.value)
+        assert "Cannot downgrade Migration 020" in error_msg, (
+            f"Error message missing expected text: {error_msg}"
+        )
+
+    # ── re-upgrade cycle ─────────────────────────────────────────────────────
+
+    def test_reupgrade_020_cycle(self, alembic_config_020):
+        """019 → 020 → (cannot downgrade, but upgrade is idempotent)."""
+        cfg, db_path = alembic_config_020
+
+        # First pass: 019 → 020
+        command.upgrade(cfg, "020")
+        assert self._table_exists(db_path, "domain_tumor_board_consensus")
+
+        # Cannot downgrade, but upgrading again should succeed (idempotent)
+        command.upgrade(cfg, "020")
+        assert self._table_exists(db_path, "domain_tumor_board_consensus")
+        assert self._table_exists(db_path, "domain_tumor_board_opinions")
+        assert self._table_exists(db_path, "domain_tumor_board_consensus_traces")
+
+    # ── FK existence ─────────────────────────────────────────────────────────
+
+    def test_upgrade_020_foreign_keys_exist(self, alembic_config_020):
+        """Verify that FK constraints are created on the new tables."""
+        cfg, db_path = alembic_config_020
+        command.upgrade(cfg, "020")
+
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+
+        # Check FK on domain_tumor_board_consensus
+        cursor = conn.execute("PRAGMA foreign_key_list(domain_tumor_board_consensus)")
+        fks = {row[3]: row[4] for row in cursor.fetchall()}
+        assert "patient_id" in fks, "Missing FK from consensus to domain_patients"
+        assert fks["patient_id"] == "id"
+        assert "recommendation_id" in fks, "Missing FK from consensus to domain_recommendations"
+        assert "clinical_decision_id" in fks, "Missing FK from consensus to domain_clinical_decisions"
+
+        # Check FK on domain_tumor_board_opinions
+        cursor = conn.execute("PRAGMA foreign_key_list(domain_tumor_board_opinions)")
+        fks = {row[3]: row[4] for row in cursor.fetchall()}
+        assert "consensus_id" in fks, "Missing FK from opinions to consensus"
+        assert fks["consensus_id"] == "id"
+
+        # Check FK on domain_tumor_board_consensus_traces
+        cursor = conn.execute("PRAGMA foreign_key_list(domain_tumor_board_consensus_traces)")
+        fks = {row[3]: row[4] for row in cursor.fetchall()}
+        assert "consensus_id" in fks, "Missing FK from traces to consensus"
+        assert fks["consensus_id"] == "id"
+
+        conn.close()
+
+    # ── Index existence ──────────────────────────────────────────────────────
+
+    def test_upgrade_020_indexes_exist(self, alembic_config_020):
+        """Verify indexes are created as expected."""
+        cfg, db_path = alembic_config_020
+        command.upgrade(cfg, "020")
+
+        # Check indexes on domain_tumor_board_consensus
+        indexes = self._get_indexes(db_path, "domain_tumor_board_consensus")
+        idx_names = list(indexes.keys())
+        assert any("consensus_id" in str(idx) for idx in idx_names), (
+            "Missing index on consensus_id"
+        )
+        assert any("patient_id" in str(idx) for idx in idx_names), (
+            "Missing index on patient_id"
+        )
+
+        # Check indexes on domain_tumor_board_opinions
+        indexes = self._get_indexes(db_path, "domain_tumor_board_opinions")
+        idx_names = list(indexes.keys())
+        assert any("consensus_id" in str(idx) for idx in idx_names), (
+            "Missing index on opinions.consensus_id"
+        )
+
+        # Check indexes on domain_tumor_board_consensus_traces
+        indexes = self._get_indexes(db_path, "domain_tumor_board_consensus_traces")
+        idx_names = list(indexes.keys())
+        assert any("trace_id" in str(idx) for idx in idx_names), (
+            "Missing index on traces.trace_id"
+        )
+        assert any("consensus_id" in str(idx) for idx in idx_names), (
+            "Missing index on traces.consensus_id"
+        )
+
+    # ── Unique constraint ────────────────────────────────────────────────────
+
+    def test_upgrade_020_unique_constraint_exists(self, alembic_config_020):
+        """Verify the (trace_id, step_order) unique constraint on traces."""
+        cfg, db_path = alembic_config_020
+        command.upgrade(cfg, "020")
+
+        unique_constraints = self._get_unique_constraints(
+            db_path, "domain_tumor_board_consensus_traces",
+        )
+
+        # Check for the constraint by name or columns
+        found = False
+        for name, columns in unique_constraints.items():
+            if set(columns) == {"trace_id", "step_order"}:
+                found = True
+                break
+
+        # Also check via index introspection (unique index)
+        if not found:
+            indexes = self._get_indexes(db_path, "domain_tumor_board_consensus_traces")
+            for name, info in indexes.items():
+                if info["unique"] and set(info["columns"]) == {"trace_id", "step_order"}:
+                    found = True
+                    break
+
+        assert found, (
+            "Missing unique constraint on (trace_id, step_order) "
+            "in domain_tumor_board_consensus_traces"
+        )
+
+    # ── upgrade preserves existing tables ────────────────────────────────────
+
+    def test_upgrade_020_preserves_019_tables(self, alembic_config_020):
+        """Upgrading to 020 should not drop tables created by 019."""
+        cfg, db_path = alembic_config_020
+
+        command.upgrade(cfg, "019")
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables_before = {row[0] for row in cursor.fetchall()}
+        conn.close()
+
+        command.upgrade(cfg, "020")
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables_after = {row[0] for row in cursor.fetchall()}
+        conn.close()
+
+        missing = tables_before - tables_after
+        assert not missing, f"Tables from 019 missing after 020 upgrade: {missing}"
+
+        # New tables should be present
+        assert "domain_tumor_board_consensus" in tables_after
+        assert "domain_tumor_board_opinions" in tables_after
+        assert "domain_tumor_board_consensus_traces" in tables_after
+
+    # ── columns verification ─────────────────────────────────────────────────
+
+    def test_upgrade_020_columns_consensus_table(self, alembic_config_020):
+        """Verify columns of domain_tumor_board_consensus."""
+        cfg, db_path = alembic_config_020
+        command.upgrade(cfg, "020")
+
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("PRAGMA table_info(domain_tumor_board_consensus)")
+        columns = {row[1]: row[2] for row in cursor.fetchall()}
+        conn.close()
+
+        expected = {
+            "consensus_id", "patient_id", "recommendation_id",
+            "clinical_decision_id", "consensus_status", "consensus_score",
+            "final_recommendation", "supporting_rationale",
+            "dissenting_opinions", "unresolved_questions", "required_follow_up",
+            "participating_specialties", "created_by", "created_at", "updated_at",
+        }
+        for col in expected:
+            assert col in columns, f"Column {col} missing from domain_tumor_board_consensus"
+
+    def test_upgrade_020_columns_opinions_table(self, alembic_config_020):
+        """Verify columns of domain_tumor_board_opinions."""
+        cfg, db_path = alembic_config_020
+        command.upgrade(cfg, "020")
+
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("PRAGMA table_info(domain_tumor_board_opinions)")
+        columns = {row[1]: row[2] for row in cursor.fetchall()}
+        conn.close()
+
+        expected = {
+            "consensus_id", "specialty", "participant_id",
+            "position", "confidence", "rationale",
+            "supporting_evidence", "contraindications",
+            "preferred_option", "alternative_option",
+            "requires_more_information", "created_at",
+        }
+        for col in expected:
+            assert col in columns, f"Column {col} missing from domain_tumor_board_opinions"
+
+    def test_upgrade_020_columns_traces_table(self, alembic_config_020):
+        """Verify columns of domain_tumor_board_consensus_traces."""
+        cfg, db_path = alembic_config_020
+        command.upgrade(cfg, "020")
+
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("PRAGMA table_info(domain_tumor_board_consensus_traces)")
+        columns = {row[1]: row[2] for row in cursor.fetchall()}
+        conn.close()
+
+        expected = {
+            "trace_id", "consensus_id", "step_order",
+            "step_type", "input_summary", "output_summary", "created_at",
+        }
+        for col in expected:
+            assert col in columns, f"Column {col} missing from domain_tumor_board_consensus_traces"
+

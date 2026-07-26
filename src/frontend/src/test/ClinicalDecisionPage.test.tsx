@@ -9,8 +9,8 @@
  * - Navigation menu includes clinical-decision link
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
@@ -19,9 +19,23 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 const mockFetch = vi.fn()
 const MOCK_DECISION_ID = 'dec-001'
 
+// Mock useNavigate for consensus form submission tests
+const mockNavigate = vi.hoisted(() => vi.fn())
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  }
+})
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.stubGlobal('fetch', mockFetch)
+})
+
+afterEach(() => {
+  cleanup()
 })
 
 // ─── Helper: render with router ──────────────────────────────────────────────
@@ -416,5 +430,215 @@ describe('ClinicalDecisionPage — Navigation', () => {
     expect(appTsx).toContain('臨床決策')
     expect(appTsx).toContain('/clinical-decision')
     expect(appTsx).toContain("label: '臨床決策'")
+  })
+})
+
+// ─── Tumor Board Consensus Form Tests ─────────────────────────────────────────
+// These tests cover the Tumor Board Consensus form added to ClinicalDecisionPage
+
+describe('ClinicalDecisionPage — Tumor Board Consensus Form', () => {
+  // Helper: render page with decision data loaded and form interaction
+  async function renderPageAndLoadDecision(decisionOverrides: Record<string, any> = {}) {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => createMockResponse(decisionOverrides),
+    })
+
+    renderPage()
+
+    await waitFor(() => {
+      expect(screen.queryByText('正在載入臨床決策，請稍候…')).not.toBeInTheDocument()
+    })
+
+    return {
+      // Wait for decision detail to be visible
+      waitForDecision: async () => {
+        await waitFor(() => {
+          expect(screen.getByText('決策詳情')).toBeInTheDocument()
+        })
+      },
+    }
+  }
+
+  it('renders the "建立腫瘤委員會共識" button when decision is loaded', async () => {
+    const { waitForDecision } = await renderPageAndLoadDecision()
+    await waitForDecision()
+
+    const btn = screen.getByText('建立腫瘤委員會共識')
+    expect(btn).toBeInTheDocument()
+    expect(btn.tagName).toBe('BUTTON')
+  })
+
+  it('expands the consensus form when clicking the button', async () => {
+    const { waitForDecision } = await renderPageAndLoadDecision()
+    await waitForDecision()
+
+    const btn = screen.getByText('建立腫瘤委員會共識')
+    await userEvent.click(btn)
+
+    // Form should now be visible
+    expect(screen.getByText('專家意見')).toBeInTheDocument()
+    expect(screen.getByText('意見 #1')).toBeInTheDocument()
+    expect(screen.getByText('+ 新增意見')).toBeInTheDocument()
+    expect(screen.getByText('提交共識')).toBeInTheDocument()
+  })
+
+  it('collapses the form when clicking the button again (toggles to "取消")', async () => {
+    const { waitForDecision } = await renderPageAndLoadDecision()
+    await waitForDecision()
+
+    // Open form
+    await userEvent.click(screen.getByText('建立腫瘤委員會共識'))
+    expect(screen.getByText('專家意見')).toBeInTheDocument()
+
+    // Close form (button changes to "取消")
+    await userEvent.click(screen.getByText('取消'))
+    expect(screen.queryByText('專家意見')).not.toBeInTheDocument()
+  })
+
+  it('adds a new opinion row when clicking "+ 新增意見"', async () => {
+    const { waitForDecision } = await renderPageAndLoadDecision()
+    await waitForDecision()
+
+    // Open form
+    await userEvent.click(screen.getByText('建立腫瘤委員會共識'))
+
+    // One row initially
+    expect(screen.getByText('意見 #1')).toBeInTheDocument()
+    expect(screen.queryByText('意見 #2')).not.toBeInTheDocument()
+
+    // Add a second row
+    await userEvent.click(screen.getByText('+ 新增意見'))
+    expect(screen.getByText('意見 #1')).toBeInTheDocument()
+    expect(screen.getByText('意見 #2')).toBeInTheDocument()
+  })
+
+  it('removes an opinion row when clicking "移除"', async () => {
+    const { waitForDecision } = await renderPageAndLoadDecision()
+    await waitForDecision()
+
+    // Open form
+    await userEvent.click(screen.getByText('建立腫瘤委員會共識'))
+
+    // Add second row so we can remove one (cannot remove the last row)
+    await userEvent.click(screen.getByText('+ 新增意見'))
+    expect(screen.getByText('意見 #2')).toBeInTheDocument()
+
+    // Find all "移除" buttons and click the first one
+    const removeBtns = screen.getAllByText('移除')
+    expect(removeBtns.length).toBe(2)
+    await userEvent.click(removeBtns[0])
+
+    // Should now have only one row left
+    expect(screen.queryByText('意見 #2')).not.toBeInTheDocument()
+  })
+
+  it('does not show "移除" button when there is only one opinion row', async () => {
+    const { waitForDecision } = await renderPageAndLoadDecision()
+    await waitForDecision()
+
+    // Open form
+    await userEvent.click(screen.getByText('建立腫瘤委員會共識'))
+
+    // Only one row — no "移除" button should be visible
+    expect(screen.queryByText('移除')).not.toBeInTheDocument()
+  })
+
+  it('submits consensus and navigates to the new consensus detail page on success', async () => {
+    const { waitForDecision } = await renderPageAndLoadDecision()
+    await waitForDecision()
+
+    // Open form
+    await userEvent.click(screen.getByText('建立腫瘤委員會共識'))
+
+    // Mock the POST response for createTumorBoardConsensus
+    const mockConsensusResponse = {
+      consensus_id: 'cons-new-001',
+      patient_id: 'P-12345',
+      consensus_status: 'unanimous',
+    }
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockConsensusResponse,
+    })
+
+    // Click submit
+    await userEvent.click(screen.getByText('提交共識'))
+
+    // Should navigate to the new consensus page
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/tumor-board/cons-new-001')
+    })
+  })
+
+  it('shows loading state on submit (button text changes to "建立中…")', async () => {
+    const { waitForDecision } = await renderPageAndLoadDecision()
+    await waitForDecision()
+
+    // Open form
+    await userEvent.click(screen.getByText('建立腫瘤委員會共識'))
+
+    // Return a promise that never resolves to keep loading visible
+    mockFetch.mockReturnValueOnce(new Promise(() => {}))
+
+    // Click submit
+    await userEvent.click(screen.getByText('提交共識'))
+
+    // Button text should change
+    expect(await screen.findByText('建立中…')).toBeInTheDocument()
+  })
+
+  it('shows error message when consensus creation fails', async () => {
+    const { waitForDecision } = await renderPageAndLoadDecision()
+    await waitForDecision()
+
+    // Open form
+    await userEvent.click(screen.getByText('建立腫瘤委員會共識'))
+
+    // Mock API failure
+    mockFetch.mockRejectedValueOnce(new Error('Failed to create consensus'))
+
+    // Click submit
+    await userEvent.click(screen.getByText('提交共識'))
+
+    // Error message should appear
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to create consensus/)).toBeInTheDocument()
+    })
+  })
+
+  it('sends correct API request when creating consensus', async () => {
+    const { waitForDecision } = await renderPageAndLoadDecision({
+      decision_id: 'dec-api-test',
+      patient_id: 'P-API',
+      recommendation_id: 'rec-api',
+    })
+    await waitForDecision()
+
+    // Open form
+    await userEvent.click(screen.getByText('建立腫瘤委員會共識'))
+
+    // Mock the POST response
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ consensus_id: 'cons-api-001' }),
+    })
+
+    // Click submit
+    await userEvent.click(screen.getByText('提交共識'))
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2) // First call was GET for decision, second is POST
+    })
+
+    const [url, options] = mockFetch.mock.calls[1]
+    expect(url).toContain('/api/v1/tumor-board-consensus')
+    expect(options.method).toBe('POST')
+
+    const body = JSON.parse(options.body)
+    expect(body.patient_id).toBe('P-API')
+    expect(body.clinical_decision_id).toBe('dec-api-test')
+    expect(body.specialist_opinions).toBeInstanceOf(Array)
+    expect(body.specialist_opinions.length).toBeGreaterThanOrEqual(1)
   })
 })

@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { fetchClinicalDecisionById, type ClinicalDecisionResponse } from '../api/clinical_decision'
+import { createTumorBoardConsensus, type SpecialistOpinion } from '../api/workbench'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -51,9 +52,49 @@ export default function ClinicalDecisionPage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
 
+  const handleOpinionChange = (index: number, field: string, value: string | number | boolean) => {
+    const updated = [...specialistOpinions]
+    ;(updated[index] as any)[field] = value
+    setSpecialistOpinions(updated)
+  }
+
+  const addOpinionRow = () => {
+    setSpecialistOpinions([...specialistOpinions, { specialty: 'medical_oncology', position: 'support', confidence: 0.8, rationale: '' }])
+  }
+
+  const removeOpinionRow = (index: number) => {
+    if (specialistOpinions.length <= 1) return
+    setSpecialistOpinions(specialistOpinions.filter((_, i) => i !== index))
+  }
+
+  const handleCreateConsensus = async () => {
+    if (!decision) return
+    setConsensusCreating(true)
+    setConsensusError(null)
+    try {
+      const result = await createTumorBoardConsensus({
+        patient_id: decision.patient_id,
+        recommendation_id: decision.recommendation_id || '',
+        clinical_decision_id: decision.decision_id || '',
+        specialist_opinions: specialistOpinions,
+      })
+      navigate(`/tumor-board/${result.consensus_id}`)
+    } catch (err: any) {
+      setConsensusError(err.message || '建立共識失敗')
+    } finally {
+      setConsensusCreating(false)
+    }
+  }
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [decision, setDecision] = useState<ClinicalDecisionResponse | null>(null)
+  const [showConsensusForm, setShowConsensusForm] = useState(false)
+  const [consensusCreating, setConsensusCreating] = useState(false)
+  const [consensusError, setConsensusError] = useState<string | null>(null)
+  const [specialistOpinions, setSpecialistOpinions] = useState<SpecialistOpinion[]>([
+    { specialty: 'medical_oncology', position: 'support', confidence: 0.8, rationale: '' },
+  ])
 
   useEffect(() => {
     if (!id) {
@@ -273,6 +314,123 @@ export default function ClinicalDecisionPage() {
                 </p>
               </div>
             </div>
+
+            {/* ── Tumor Board Consensus Section ────────────────────────────── */}
+            {decision && (
+              <div className="mt-8 border-t border-gray-200 pt-6">
+                <button
+                  onClick={() => setShowConsensusForm(!showConsensusForm)}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm font-medium"
+                >
+                  {showConsensusForm ? '取消' : '建立腫瘤委員會共識'}
+                </button>
+
+                {showConsensusForm && (
+                  <div className="mt-4 space-y-4">
+                    <h3 className="text-base font-semibold text-gray-800">專家意見</h3>
+
+                    {consensusError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                        {consensusError}
+                      </div>
+                    )}
+
+                    {specialistOpinions.map((opinion, index) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-gray-500">意見 #{index + 1}</span>
+                          {specialistOpinions.length > 1 && (
+                            <button onClick={() => removeOpinionRow(index)} className="text-xs text-red-500 hover:text-red-700">
+                              移除
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">專科</label>
+                            <select
+                              value={opinion.specialty}
+                              onChange={(e) => handleOpinionChange(index, 'specialty', e.target.value)}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                            >
+                              <option value="medical_oncology">腫瘤內科</option>
+                              <option value="surgical_oncology">腫瘤外科</option>
+                              <option value="radiation_oncology">放射腫瘤科</option>
+                              <option value="pathology">病理科</option>
+                              <option value="radiology">放射科</option>
+                              <option value="genomics">基因組學</option>
+                              <option value="pharmacy">藥學</option>
+                              <option value="nursing">護理</option>
+                              <option value="palliative_care">安寧緩和</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">立場</label>
+                            <select
+                              value={opinion.position}
+                              onChange={(e) => handleOpinionChange(index, 'position', e.target.value)}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                            >
+                              <option value="support">支持</option>
+                              <option value="oppose">反對</option>
+                              <option value="abstain">棄權</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">信心度: {opinion.confidence}</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.1"
+                              value={opinion.confidence}
+                              onChange={(e) => handleOpinionChange(index, 'confidence', parseFloat(e.target.value))}
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">參與者 ID（選填）</label>
+                            <input
+                              type="text"
+                              value={opinion.participant_id || ''}
+                              onChange={(e) => handleOpinionChange(index, 'participant_id', e.target.value)}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                              placeholder="optional"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">理由（選填）</label>
+                          <textarea
+                            value={opinion.rationale || ''}
+                            onChange={(e) => handleOpinionChange(index, 'rationale', e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                            rows={2}
+                            placeholder="請說明此意見的理由..."
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={addOpinionRow}
+                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                      >
+                        + 新增意見
+                      </button>
+                      <button
+                        onClick={handleCreateConsensus}
+                        disabled={consensusCreating}
+                        className="px-4 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                      >
+                        {consensusCreating ? '建立中…' : '提交共識'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </main>

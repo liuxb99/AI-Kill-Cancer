@@ -360,3 +360,35 @@ class Permission(str, enum.Enum):
     CONSENT_REVOKE = "consent_revoke"
     ANALYSIS_START = "analysis_start"
     ANALYSIS_COMPLETE = "analysis_complete"
+
+
+# ── Tumor Board / Consensus enums ─────────────────────────────────────────
+
+class SpecialtyType(str, enum.Enum):
+    """Medical specialties involved in tumor board review."""
+    MEDICAL_ONCOLOGY = "medical_oncology"
+    SURGICAL_ONCOLOGY = "surgical_oncology"
+    RADIATION_ONCOLOGY = "radiation_oncology"
+    PATHOLOGY = "pathology"
+    RADIOLOGY = "radiology"
+    GENOMICS = "genomics"
+    PHARMACY = "pharmacy"
+    NURSING = "nursing"
+    PALLIATIVE_CARE = "palliative_care"
+
+
+class ConsensusStatus(str, enum.Enum):
+    """Consensus result classifications for tumor board decisions."""
+    UNANIMOUS = "unanimous"
+    STRONG_CONSENSUS = "strong_consensus"
+    MAJORITY_CONSENSUS = "majority_consensus"
+    SPLIT_DECISION = "split_decision"
+    INSUFFICIENT_INFORMATION = "insufficient_information"
+    DEFERRED = "deferred"
+
+
+class Position(str, enum.Enum):
+    """Position a specialty or participant takes on a clinical option."""
+    SUPPORT = "support"
+    OPPOSE = "oppose"
+    ABSTAIN = "abstain"

@@ -9,6 +9,8 @@ import Workbench from './pages/Workbench'
 import RecommendationPage from './pages/RecommendationPage'
 import ClinicalDecisionPage from './pages/ClinicalDecisionPage'
 import ClinicalDecisionListPage from './pages/ClinicalDecisionListPage'
+import TumorBoardConsensusListPage from './pages/TumorBoardConsensusListPage'
+import TumorBoardConsensusPage from './pages/TumorBoardConsensusPage'
 import StatusBanner from './components/StatusBanner'
 
 function AppNavbar() {
@@ -21,6 +23,7 @@ function AppNavbar() {
   const links = [
     { label: '藥物推薦', path: '/recommendation' },
     { label: '臨床決策', path: '/clinical-decision' },
+    { label: '腫瘤委員會', path: '/tumor-board' },
     { label: '知識庫', path: '/knowledge' },
     { label: '工具', path: '/tools' },
     { label: '論文', path: '/research' },
@@ -67,6 +70,8 @@ function App() {
         <Route path="/recommendation" element={<RecommendationPage />} />
         <Route path="/clinical-decision" element={<ClinicalDecisionListPage />} />
         <Route path="/clinical-decision/:id" element={<ClinicalDecisionPage />} />
+        <Route path="/tumor-board" element={<TumorBoardConsensusListPage />} />
+        <Route path="/tumor-board/:id" element={<TumorBoardConsensusPage />} />
       </Routes>
     </div>
   )

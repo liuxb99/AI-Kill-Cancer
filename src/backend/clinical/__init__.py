@@ -7,10 +7,29 @@ from src.backend.clinical.calculation_trace import (
     TraceStep,
 )
 
+# Tumor board consensus engine (P3C-C1)
+from src.backend.clinical.tumor_board_engine import (
+    ConsensusEngine,
+    ConsensusResult,
+    SpecialistOpinionInput,
+    TRACE_STEP_TYPES,
+    TumorBoardConsensusInput,
+    WeightedOpinion,
+)
+
 # Clinical decision engine (P3B-C1)
 from src.backend.clinical.clinical_decision_engine import (
     ClinicalDecisionEngine,
     ClinicalDecisionResult,
+)
+
+# Consensus rule set (P3C-A3)
+from src.backend.clinical.consensus_rules import (
+    ConfidenceWeight,
+    ConsensusRuleSet,
+    ConsensusThresholds,
+    DEFAULT_RULES,
+    SpecialtyWeight,
 )
 
 # Decision rule set (P3B-C3)
@@ -58,6 +77,12 @@ __all__ = [
     "ClinicalDecisionEngine",
     "ClinicalDecisionResult",
     "ConfidenceLevel",
+    # consensus_rules
+    "ConfidenceWeight",
+    "ConsensusRuleSet",
+    "ConsensusThresholds",
+    "DEFAULT_RULES",
+    "SpecialtyWeight",
     # decision_rules
     "DecisionRuleSet",
     "EvidenceLevel",
@@ -82,6 +107,13 @@ __all__ = [
     "ExplanationFormatter",
     "ReasonItem",
     "RecommendationReason",
+    # tumor_board_engine
+    "ConsensusEngine",
+    "ConsensusResult",
+    "SpecialistOpinionInput",
+    "TRACE_STEP_TYPES",
+    "TumorBoardConsensusInput",
+    "WeightedOpinion",
     # calculation_trace
     "CalculationTrace",
     "TraceManager",

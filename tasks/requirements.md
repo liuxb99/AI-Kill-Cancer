@@ -1,507 +1,1200 @@
-# Requirements History
+# AI-Kill-Cancer — Phase 3C：Tumor Board Consensus Engine
 
-## 2026-07-24 — Vercel / Phase E
+Repository：
 
-Vercel / Phase E 需求歷史詳見 Git 歷史記錄
+```text
+https://github.com/liuxb99/AI-Kill-Cancer
+```
 
----
+Branch：
 
-## 2026-07-24 — Phase 3A Drug Recommendation Engine
+```text
+master
+```
 
-# AI-Kill-Cancer Phase 3A
+Base Commit：
 
-Repository：https://github.com/liuxb99/AI-Kill-Cancer
+```text
+5b2c658
+```
 
-Branch：master
+已正式驗收：
 
-目前狀態：
-- Phase 1 ✅ 完成
-- Phase 2 ✅ 完成（CI/CD、GitHub Actions、Vercel、Production、Secrets 已驗收）
-- Phase 3 開始
-
----
-
-# 本輪目標
-
-開始真正的 Clinical Intelligence。
-
-不是再做部署、CI、Workflow、Docker、Vercel — 那些全部停止。
-
----
-
-# 本輪一次完成
-
-建立 Drug Recommendation Engine V1，完整鏈路：
-
-Variant → Evidence → Drug → Evidence Score → Drug Score → Rank → Recommendation
-
----
-
-# 必做功能
-
-## 1. Recommendation Engine
-建立 RecommendationEngine、RecommendationRule、EvidenceAggregator、DrugRanker。不要寫死，全部規則化。
-
-## 2. Evidence Weight / Tier / Confidence / Evidence Level
-支援 FDA、NCCN、OncoKB、CIViC、DGIdb、OpenCRAVAT 等來源。全部可擴充。
-
-## 3. Drug Ranking
-包含 Overall Score、Evidence Score、Sensitivity、Resistance、Conflict Score。最終排序輸出 Top N。
-
-## 4. Explainable AI
-每個 Recommendation 必須產生 Reason、Evidence、Source、Score Detail。例如：為何第一名、為何第二名、為何被扣分、哪些證據支持。全部可追溯。
-
-## 5. Calculation Trace
-沿用既有架構：Input → Evidence → Score → Recommendation → Output。所有計算必須 Traceable。
-
-## 6. JSON Schema
-建立 RecommendationResult、DrugScore、EvidenceScore、RecommendationReason，全部 Versioned。
-
-## 7. API
-POST /recommendation 以及 GET /recommendation/{id}
-
-## 8. Report
-HTML Drug Recommendation Report，包含 Patient、Variants、Evidence、Top Drugs、Reason、Warnings、Trace。
-
-## 9. Frontend
-不要重新設計，只補 Recommendation Page。
-
-## 10. Test
-至少 Unit Tests、Integration Tests、API Tests、Golden Tests，全部通過。
-
----
-
-# 品質要求
-
-不得有 Placeholder、TODO、Fake Data、Mock Recommendation。正式完成。
-
----
-
-# 驗證
-
-完成後須執行：go test ./...、Frontend build、Backend build、API Smoke Test、Coverage、Git Diff，全部完成。
-
----
-
-# Git
-
-全部完成後一次 git add、git commit、git push。不要中途回報。
-
----
-
-# Reviewer
-
-Reviewer 重新閱讀 tasks/requirements.md，重新確認需求是否全部完成。必須執行 Step 4b Requirement Regression Check。低於 90 分直接返工。
-
----
-
-# 最後回報
-
-只回報：Commit SHA、修改檔案數、新增 API、新增 Package、新增 Tests、Coverage、Build、Test、Push、Reviewer Score。不要貼程式碼。
-
----
-
-## 2026-07-24 — Phase 3A Hardening
-
-**狀態**：PARTIAL（82/100，不可驗收，不可進入 Phase 3B）
-
-## 已確認問題
-
-### P0-1 Recommendation 使用記憶體 dict
-`_recommendations: dict[str, dict] = {}` 必須改為 Postgres Database 正式儲存。禁止使用 dict、global variable、singleton cache、module-level cache、process memory、temporary file、JSON file、SQLite fallback。
-
-### P0-2 Calculation Trace 沒有資料庫持久化
-TraceManager 只存在請求內記憶體，必須讓 Calculation Trace 正式持久化到 Database，伺服器重啟後仍可查詢。
-
-### P0-3 RecommendationPage 是孤立頁面
-必須接入 App Router、Route、Navigation、Menu、Link，讓使用者可從前端 UI 真正進入。
-
-### P0-4 Commit 混入無關內容
-Phase 3A commit 混入 Phase E/Vercel task artefacts，必須移除（但先確認無其他正式功能引用）。
-
-### P0-5 requirements.md 被覆蓋
-本輪必須恢復需求歷史（保留舊有 Vercel/Phase E 需求、保留 Phase 3A 原始需求、新增 Phase 3A Hardening 章節），從此只 append。
-
-### P1 HTTP 500 洩漏 Exception
-`f"internal error: {exc}"` 把內部 Exception 傳給 Client，必須改為 logger.exception() + 固定 Error Code + Generic Message。
-
-## 正式實作要求
-
-1. **RecommendationModel**：建立正式 SQLAlchemy Model（id, patient_id, case_id, trace_id, engine_version, status, request_payload, result_payload, report_html, created_by, created_at, updated_at 等）
-2. **Calculation Trace Persistence**：建立正式 Trace Persistence（RecommendationTraceModel / RecommendationTraceStepModel），保存完整計算鏈
-3. **Migration**：新增正式 Alembic Migration，upgrade/downgrade 安全
-4. **RecommendationRepository**：建立正式 Repository（create, get_by_id, get_by_trace_id, list_by_patient_id），不自行 commit
-5. **RecommendationService**：建立正式 Service（執行 Pipeline、建立 Record + Trace、生成 HTML Report、同一 Transaction）
-6. **API**：保留 POST /api/v1/recommendation 和 GET /api/v1/recommendation/{recommendation_id}，改為全 Database 操作
-7. **Restart Recovery**：新增真實 Restart Recovery Integration Test
-8. **Frontend Router**：RecommendationPage 正式接入 App.tsx、Route、Navigation、Menu
-9. **Frontend API Integration**：確保 RecommendationPage 呼叫正式 API，不 fake data
-10. **HTTP Error Security**：所有非預期 500 用 logger.exception()，Client 只收固定 error code + generic message
-
-## 測試要求
-- Backend Model Tests（RecommendationModel, JSON round-trip, Index, Trace relation）
-- Repository Tests（create, get_by_id, get_by_trace_id, list_by_patient_id, not found, rollback）
-- Service Tests（成功建立、同 transaction、Report failure、Pipeline failure rollback）
-- API Integration Tests（POST→DB、GET→DB、404、422、500 generic）
-- Restart Recovery Test（真實新 App、新 Engine、新 Session）
-- Trace Persistence Test（Evidence→Weight→Score→Rank→Explanation 可從 DB 還原）
-- Frontend Route Test（Route registered、Navigation clickable、Page renders、API path correct）
-- Migration Tests（upgrade→downgrade→upgrade again）
-
-## 清理要求
-Hardening Commit 只包含：Recommendation persistence、Trace persistence、Repository、Service、Migration、API hardening、Frontend route、相關 tests、requirements history restoration、Phase 3A 無關 artefacts 清理。
-
-## 禁止事項
-dict 代替 DB、mock restart、monkeypatch、只新增 Model 不接 API、只接 Route 不接 Navigation、force push、rebase master。
-
-## 驗收條件
-共 22 項檢查清單（見需求回歸檢查章節），只要任一 FAIL/PARTIAL/Pending 則滿足需求=NO，Reviewer 最高 89 分。
-
-## 2026-07-25 — Phase 3A Hardening Final Fix
-
-### P0-1：Persistence Failure 不得回傳成功
-- recommendation_service.py 中 try/except 吞掉 persistence 例外後仍 return response 的行為必須修正
-- 持久化失敗必須 rollback → 拋出固定例外 → API 映射為 HTTP 500
-- Client 不得取得 recommendation_id 當 DB 無資料
-- Recommendation、Trace、Trace Steps 必須在同一 Transaction，All-or-Nothing
-- API 500 不得洩漏 Exception 細節（SQL、DB URL、internal path）
-
-### P0-2：建立真正 End-to-End Restart Recovery Integration Test
-- 必須使用 Postgres Test Database
-- 完整 App Instance 1 → POST → 確認 → shutdown → dispose engine → 全新 App Instance 2 → GET 確認
-- POST 必須走完整 API → Service → Repository → Postgres 鏈路
-- GET 必須走完整 API → Service → Repository → Postgres 鏈路
-- 不得直接 session.add 代替 POST
-- 不得直接 Repository.get 代替 GET API
-- 必須證明 app1 ≠ app2、engine1 ≠ engine2、sessionmaker1 ≠ sessionmaker2
-
-### P0-3：完整 Trace Persistence
-- 正式 Recommendation Pipeline 必須寫入 Evidence、Evidence References、Weight、Score、Rank、Explanation
-- 每個 Trace Step 依 step_type 保存相應資訊
-- explanation 可從 output_summary 還原
-- 從 Database 可還原完整 Trace
-
-### Transaction Tests
-- Case 1：Recommendation create 失敗 → rollback → 無殘留 → API 500
-- Case 2：Trace create 失敗 → rollback → 無殘留 → API 500
-- Case 3：Trace Step create 失敗 → rollback → 無殘留 → API 500
-- Case 4：Commit 失敗 → rollback → API 500
-- Case 5：成功 → 全部 commit → GET 可讀
-
-### Migration / Postgres 驗證
-- alembic upgrade head
-- alembic downgrade 最新版本前一個版本
-- alembic upgrade head
-- 驗證 domain_recommendations、domain_recommendation_traces、domain_recommendation_trace_steps 的 Foreign Keys、Indexes、Constraints、JSON/JSONB
-
-### 提交範圍
-- 只允許修改：recommendation_service.py、recommendation.py (API)、必要的 domain/repository、必要的 migration、新測試檔案、tasks/ 文檔
-- 不得修改無關檔案
-
-## 2026-07-25 — Phase 3A Final Acceptance Gate
-
-- GitHub Actions PostgreSQL integration gate
-- PostgreSQL migration upgrade/downgrade/re-upgrade
-- Full API restart recovery on PostgreSQL
-- Real pipeline trace persistence without mocked TraceManager
-
----
-
-## 2026-07-25 — Phase 3B Clinical Decision Layer
-
-Repository：https://github.com/liuxb99/AI-Kill-Cancer
-
-Branch：master
-
-基線 Commit：2896cb0
-
+```text
 Phase 3A：Accepted
+Phase 3B：Accepted
+```
 
-本輪開始：Phase 3B
+本輪開始：
 
----
-
-# 一、工作方式
-
-嚴格依照 AGENTS.md：
-
-Step 0B → Scene → Planner → Workflow → Batch → Step 4b → Reviewer → Git Commit → Git Push
-
-不得跳步。不得中途回報。完成全部後一次回報。
+```text
+Phase 3C
+Tumor Board Consensus Engine
+```
 
 ---
 
-# 二、本輪定位
+# 一、任務定位
 
-本輪不是：Bug Fix / Hardening / CI 修復
+本輪建立：
 
-本輪正式開始：Clinical Decision Layer
+```text
+Clinical Decision
+↓
+Multi-specialty Opinions
+↓
+Consensus Calculation
+↓
+Tumor Board Consensus
+```
 
-建立 Recommendation 之上的臨床決策層。
+本輪是一個完整、可獨立驗收的模組。
 
-保持：Model / Repository / Service / API / Frontend / Tests / Migration / Digital Thread 完整架構。
+不得同時開始：
+
+```text
+Treatment Plan
+Medication Order
+Guideline Execution
+Follow-up Plan
+Phase 3D
+Phase 4
+```
+
+不得重寫已驗收的：
+
+```text
+Drug Recommendation Engine
+Clinical Decision Engine
+Recommendation Persistence
+Clinical Decision Persistence
+既有 Trace 架構
+```
+
+採用：
+
+```text
+Minimal Integration
+Repository Pattern
+Service Transaction Boundary
+Postgres Source of Truth
+Complete Digital Thread
+```
 
 ---
 
-# 三、目標
+# 二、執行流程
 
-建立 Clinical Decision Engine
+嚴格依照 `AGENTS.md`：
 
-輸入：Patient / Variant / Evidence / Recommendation
+```text
+Step 0A
+↓
+Step 0B
+↓
+Scene Identification
+↓
+Planner
+↓
+Workflow Update
+↓
+Batch Execution
+↓
+Step 4b Regression Check
+↓
+Reviewer
+↓
+Summary
+↓
+Git Commit
+↓
+Git Push
+```
 
-輸出：Clinical Decision
+不要中途回報。
 
-至少包含：Decision Type / Reason / Evidence / Confidence / Alternatives / Contraindications
+全部完成後一次回報。
 
 ---
 
-## Decision Repository
+# 三、開始前必讀
 
-建立 ClinicalDecisionModel / ClinicalDecisionRepository / ClinicalDecisionService
+完整閱讀：
 
-正式寫入 Postgres。不得使用 dict / memory cache。
+```text
+AGENTS.md
+tasks/requirements.md
+
+src/backend/domain/recommendation.py
+src/backend/domain/clinical_decision.py
+
+src/backend/repositories/recommendation_repo.py
+src/backend/repositories/clinical_decision_repo.py
+
+src/backend/services/recommendation_service.py
+src/backend/services/clinical_decision_service.py
+
+src/backend/clinical/recommendation_engine.py
+src/backend/clinical/clinical_decision_engine.py
+
+src/backend/api/v1/recommendation.py
+src/backend/api/v1/clinical_decision.py
+
+src/frontend/src/pages/RecommendationPage.tsx
+src/frontend/src/pages/ClinicalDecisionListPage.tsx
+src/frontend/src/pages/ClinicalDecisionPage.tsx
+src/frontend/src/App.tsx
+
+migrations/versions/017*
+migrations/versions/018*
+migrations/versions/019*
+
+tests/test_recommendation*
+tests/test_clinical_decision*
+tests/test_api_clinical_decision.py
+tests/test_migration.py
+```
+
+先確認專案現有：
+
+```text
+Model Pattern
+Repository Pattern
+Service Pattern
+Transaction Boundary
+API Error Schema
+Authentication Pattern
+Audit Trail Pattern
+Migration Pattern
+Frontend Route Pattern
+Postgres CI Pattern
+```
+
+不得自行建立第二套架構。
 
 ---
 
-## Digital Thread
+# 四、核心目標
 
-形成 Patient → Evidence → Recommendation → Clinical Decision 完整可追溯。
+建立：
+
+```text
+Tumor Board Consensus Engine
+```
+
+輸入至少包含：
+
+```text
+patient_id
+recommendation_id
+clinical_decision_id
+specialist_opinions
+meeting_context
+```
+
+輸出至少包含：
+
+```text
+consensus_id
+consensus_status
+consensus_score
+final_recommendation
+supporting_rationale
+dissenting_opinions
+unresolved_questions
+required_follow_up
+participating_specialties
+created_by
+created_at
+trace_id
+```
 
 ---
 
-## API
+# 五、專科意見模型
+
+每一筆 Specialist Opinion 至少包含：
+
+```text
+specialty
+participant_id
+position
+confidence
+rationale
+supporting_evidence
+contraindications
+preferred_option
+alternative_option
+requires_more_information
+```
+
+建議 specialty 支援：
+
+```text
+medical_oncology
+surgical_oncology
+radiation_oncology
+pathology
+radiology
+genomics
+pharmacy
+nursing
+palliative_care
+```
+
+不得把 Specialty 寫死在大量 `if/elif` 中。
+
+應使用：
+
+```text
+Enum
+Registry
+Rule Configuration
+```
+
+---
+
+# 六、Consensus 狀態
+
+至少支援：
+
+```text
+unanimous
+strong_consensus
+majority_consensus
+split_decision
+insufficient_information
+deferred
+```
+
+不得只用：
+
+```text
+PASS / FAIL
+```
+
+Consensus 必須根據：
+
+```text
+有效意見數
+支持比例
+反對比例
+專科權重
+信心值
+Contraindication
+Evidence Strength
+```
+
+計算。
+
+---
+
+# 七、Consensus 計算規則
+
+建立正式、可測試的計算模型。
+
+建議：
+
+```text
+Opinion Weight
+=
+Specialty Weight
+×
+Confidence Weight
+×
+Evidence Weight
+```
+
+至少產生：
+
+```text
+support_score
+oppose_score
+abstain_score
+consensus_ratio
+confidence_score
+```
+
+Consensus 狀態可參考：
+
+```text
+100% 支持
+→ unanimous
+
+>= 80% 加權支持
+→ strong_consensus
+
+>= 60% 加權支持
+→ majority_consensus
+
+支持與反對接近
+→ split_decision
+
+有效資料不足
+→ insufficient_information
+
+需要補資料或重新討論
+→ deferred
+```
+
+實際 Threshold 必須集中放在：
+
+```text
+ConsensusRuleSet
+```
+
+不得散落在 Engine 中。
+
+---
+
+# 八、P0 資料一致性
+
+建立 Consensus 前必須驗證：
+
+```text
+Recommendation.patient_id
+==
+ClinicalDecision.patient_id
+==
+Request.patient_id
+```
+
+還必須驗證：
+
+```text
+ClinicalDecision.recommendation_id
+==
+Request.recommendation_id
+```
+
+任一不一致：
+
+```text
+422
+```
+
+不得執行 Engine。
+
+不得建立：
+
+```text
+Consensus
+Consensus Trace
+Opinion Records
+```
+
+資料庫不得殘留部分資料。
+
+---
+
+# 九、Audit Trail
+
+authenticated user 必須一路寫入：
+
+```text
+API
+↓
+Service
+↓
+TumorBoardConsensusModel.created_by
+```
+
+每一筆 Specialist Opinion 若有 participant_id，也必須保存。
+
+不得全部寫：
+
+```text
+NULL
+```
+
+必須可回答：
+
+```text
+誰建立 Tumor Board Consensus？
+哪些專科參與？
+誰提出哪一個意見？
+何時建立？
+```
+
+---
+
+# 十、Database Models
+
+新增正式 Model。
+
+建議至少包括：
+
+## TumorBoardConsensusModel
+
+```text
+id
+consensus_id
+patient_id
+recommendation_id
+clinical_decision_id
+consensus_status
+consensus_score
+final_recommendation
+supporting_rationale
+dissenting_opinions
+unresolved_questions
+required_follow_up
+participating_specialties
+created_by
+created_at
+updated_at
+```
+
+## TumorBoardOpinionModel
+
+```text
+id
+consensus_id / consensus_uuid
+specialty
+participant_id
+position
+confidence
+rationale
+supporting_evidence
+contraindications
+preferred_option
+alternative_option
+requires_more_information
+created_at
+```
+
+## TumorBoardConsensusTraceModel
+
+```text
+id
+trace_id
+consensus_id
+step_order
+step_type
+input_summary
+output_summary
+created_at
+```
+
+關聯至少應為：
+
+```text
+Patient
+↓
+Recommendation
+↓
+Clinical Decision
+↓
+Tumor Board Consensus
+↓
+Specialist Opinions
+↓
+Consensus Trace
+```
+
+---
+
+# 十一、Migration 020
 
 新增：
-- POST /api/v1/clinical-decision
-- GET /api/v1/clinical-decision/{id}
 
-保持：Repository Pattern / Service Pattern / Transaction Pattern
+```text
+Migration 020
+```
 
----
+不得修改：
 
-## Frontend
+```text
+017
+018
+019
+```
 
-新增 Clinical Decision Page，並正式接入 Router / Navigation / Menu。
+Migration 必須建立：
 
----
+```text
+domain_tumor_board_consensus
+domain_tumor_board_opinions
+domain_tumor_board_consensus_traces
+```
 
-## HTML Report
+要求：
 
-Recommendation Report 加入 Clinical Decision / Reason / Alternatives / Evidence Summary。
+```text
+Foreign Keys 正確
+Indexes 正確
+Unique Constraints 正確
+Cascade 行為正確
+upgrade 正確
+downgrade 正確
+re-upgrade 正確
+```
 
----
+若 Trace 使用同一 `trace_id` 多 Step，必須一開始就使用：
 
-# 四、Migration
+```text
+UNIQUE(trace_id, step_order)
+```
 
-新增 ClinicalDecision / ClinicalDecisionTrace
-
-不得修改既有 migration。
-
----
-
-# 五、測試
-
-至少新增：
-
-## Repository
-CRUD / Rollback / Not Found
-
-## Service
-Decision Creation / Decision Update / Transaction / Failure Rollback
-
-## API
-POST / GET / 404 / 422 / 500
-
-## Integration
-Patient → Recommendation → Clinical Decision → Restart → GET
-
-## Digital Thread
-Evidence → Recommendation → Clinical Decision 全部可還原。
+不得再次犯 Phase 3B 的單欄唯一錯誤。
 
 ---
 
-# 六、禁止事項
+# 十二、Repository
 
-不得：修改 Phase 3A / 修改已驗收功能 / 重新設計 Recommendation / 重新設計 Trace / 修改 AGENTS.md / 修改 CI / 修改 Vercel / 混入 Phase 4
+新增：
+
+```text
+TumorBoardConsensusRepository
+TumorBoardOpinionRepository
+TumorBoardConsensusTraceRepository
+```
+
+至少提供：
+
+## Consensus Repository
+
+```text
+create
+get_by_id
+get_by_uuid
+list_by_patient_id
+list_by_clinical_decision_id
+count_by_patient_id
+```
+
+## Opinion Repository
+
+```text
+create
+create_many
+list_by_consensus_id
+```
+
+## Trace Repository
+
+```text
+create
+create_many
+get_by_consensus_id
+get_by_trace_id
+```
+
+規則：
+
+```text
+Repository 不得 commit
+Repository 不得 rollback
+Repository 不得吞 Exception
+```
+
+Transaction 由 Service 管理。
 
 ---
 
-# 七、Commit Scope
+# 十三、Service
 
-只能包含：Clinical Decision / Migration / Repository / Service / API / Frontend / Tests / Workflow / Review / Summary
+建立：
+
+```text
+TumorBoardConsensusService
+```
+
+職責：
+
+```text
+驗證 Patient / Recommendation / Clinical Decision 關聯
+整理 Specialist Opinions
+執行 Consensus Engine
+建立 Consensus Model
+建立 Opinion Models
+建立 Trace Models
+同一 Transaction 寫入
+Commit
+回傳 DTO
+```
+
+失敗時：
+
+```text
+rollback
+raise
+API generic error
+Database 無部分資料
+```
+
+不得：
+
+```text
+Persistence failure 仍回傳成功
+```
+
+---
+
+# 十四、Consensus Trace
+
+至少記錄以下 Step：
+
+```text
+0 load_context
+1 validate_links
+2 normalize_opinions
+3 calculate_weights
+4 calculate_consensus
+5 resolve_dissent
+6 finalize_consensus
+7 prepare_persistence
+```
+
+每個 Step 必須有：
+
+```text
+step_order
+step_type
+input_summary
+output_summary
+```
+
+至少可追溯：
+
+```text
+每一個 Specialty Opinion
+每一個 Weight
+Support / Oppose Score
+Consensus Ratio
+Dissent
+Final Decision
+```
+
+不得只存一個總結果 JSON。
+
+---
+
+# 十五、API
+
+新增：
+
+```text
+POST /api/v1/tumor-board-consensus
+GET /api/v1/tumor-board-consensus/{consensus_id}
+GET /api/v1/tumor-board-consensus?patient_id=&skip=&limit=
+```
+
+可視需要增加：
+
+```text
+GET /api/v1/tumor-board-consensus/{consensus_id}/opinions
+GET /api/v1/tumor-board-consensus/{consensus_id}/trace
+```
+
+但不得擴大到 Phase 3D。
+
+分頁限制：
+
+```text
+skip >= 0
+1 <= limit <= 100
+```
+
+錯誤處理：
+
+```text
+404：不存在
+422：資料關聯錯誤或輸入錯誤
+500：固定 generic message
+```
+
+不得將以下內容回傳 Client：
+
+```text
+Exception
+SQL
+Stack Trace
+Internal Path
+Database URL
+```
+
+---
+
+# 十六、Frontend
+
+新增：
+
+```text
+TumorBoardConsensusListPage
+TumorBoardConsensusPage
+```
+
+正式接入：
+
+```text
+App.tsx
+Router
+Navigation
+```
+
+路由建議：
+
+```text
+/tumor-board
+/tumor-board/:id
+```
+
+列表頁至少支援：
+
+```text
+輸入 patient_id
+查詢 Consensus
+顯示 status
+顯示 score
+顯示 specialties
+顯示 created_at
+進入 Detail
+```
+
+Detail Page 至少顯示：
+
+```text
+Consensus Status
+Consensus Score
+Final Recommendation
+Supporting Rationale
+Dissenting Opinions
+Unresolved Questions
+Required Follow-up
+Specialist Opinions
+Trace Summary
+```
+
+不得使用：
+
+```text
+sample
+fake id
+hardcoded data
+mock production response
+```
+
+---
+
+# 十七、建立入口
+
+必須建立一個真實建立 Consensus 的流程。
+
+可以放在：
+
+```text
+ClinicalDecisionPage
+```
+
+新增：
+
+```text
+建立 Tumor Board Consensus
+```
+
+流程：
+
+```text
+Clinical Decision
+↓
+填入 Specialist Opinions
+↓
+POST Consensus
+↓
+取得 consensus_id
+↓
+navigate("/tumor-board/{consensus_id}")
+```
+
+不得只有 GET Detail Page，卻沒有任何正式建立入口。
+
+---
+
+# 十八、HTML Report
+
+在既有報告中新增：
+
+```text
+Tumor Board Consensus Section
+```
+
+至少包含：
+
+```text
+Consensus Status
+Consensus Score
+Participating Specialties
+Final Recommendation
+Supporting Rationale
+Dissenting Opinions
+Unresolved Questions
+Required Follow-up
+```
+
+不得重寫整個 Report Generator。
+
+---
+
+# 十九、測試要求
+
+## Engine Tests
+
+至少驗證：
+
+```text
+unanimous
+strong_consensus
+majority_consensus
+split_decision
+insufficient_information
+deferred
+specialty weighting
+confidence weighting
+contraindication impact
+dissent extraction
+```
+
+## Model Tests
+
+```text
+Model creation
+Relations
+Cascade
+JSON round-trip
+Unique constraints
+```
+
+## Repository Tests
+
+```text
+create
+get
+list
+count
+create_many
+pagination
+not found
+```
+
+## Service Tests
+
+```text
+successful consensus
+patient mismatch
+recommendation mismatch
+clinical decision mismatch
+created_by persistence
+transaction rollback
+opinion persistence failure
+trace persistence failure
+commit failure
+```
+
+## API Tests
+
+```text
+POST success
+GET success
+List empty
+List one
+Pagination
+401
+404
+422
+500 generic
+```
+
+## Digital Thread Test
+
+必須驗證：
+
+```text
+Patient
+↓
+Recommendation
+↓
+Clinical Decision
+↓
+Tumor Board Consensus
+↓
+Opinions
+↓
+Trace
+```
+
+全部可從 Database 還原。
+
+## Restart Recovery Test
+
+```text
+App 1
+POST Consensus
+GET Consensus
+Shutdown
+App 2
+GET Consensus
+Opinions
+Trace
+```
+
+## Frontend Tests
+
+```text
+List route
+Detail route
+Navigation
+Create form
+POST API
+Redirect
+Empty state
+Error state
+```
+
+## Migration Tests
+
+```text
+019 → 020 upgrade
+020 → 019 downgrade
+019 → 020 re-upgrade
+FK
+Index
+Unique
+Multiple Trace Steps
+```
+
+---
+
+# 二十、真實 Postgres Gate
+
+Phase 3C 的 Migration、Transaction、Digital Thread 與 Restart Recovery 必須在 GitHub Actions Postgres service 上執行。
+
+不得只使用：
+
+```text
+SQLite create_all
+```
+
+正式驗收至少需要：
+
+```text
+Alembic upgrade head
+Tumor Board transaction tests
+Digital Thread tests
+Restart Recovery
+Alembic downgrade 020→019
+Alembic re-upgrade 019→020
+```
+
+CI 未通過：
+
+```text
+Reviewer 最高 89
+Phase 3C = PARTIAL
+Ready for Next Phase = NO
+```
+
+---
+
+# 二十一、禁止事項
+
+禁止：
+
+```text
+使用 dict 或 memory cache 作正式 Storage
+Mock Repository 代替 Integration Test
+手工 session.add 冒充 API 鏈路
+跳過 Postgres Test
+xfail 核心測試
+刪除失敗測試
+降低 Coverage
+修改已驗收 Migration 017/018/019
+修改 Phase 3A / Phase 3B 核心功能
+修改 AGENTS.md
+修改 Vercel
+開始 Treatment Plan
+開始 Phase 3D
+```
+
+---
+
+# 二十二、Commit Scope
+
+只能包含：
+
+```text
+Tumor Board Consensus Engine
+Rules
+Models
+Migration 020
+Repositories
+Service
+API
+Frontend
+Report Section
+Tests
+Workflow
+Review
+Summary
+```
 
 不得混入其他功能。
 
 ---
 
-# 八、完成後只回報
+# 二十三、Reviewer Gate
 
-Commit SHA / Files Changed / New Tables / New Models / New Repository / New Service / New API / Frontend Route / Migration / Backend Tests / Frontend Tests / Integration Tests / Coverage / Push Result / Reviewer Score
+Reviewer 必須逐條確認：
 
-最後輸出：
-Phase 3B：PASS / PARTIAL
-Ready for ChatGPT GitHub Review：YES / NO
+```text
+[ ] Recommendation、Clinical Decision、Patient 關聯一致
+[ ] created_by 寫入
+[ ] Opinions 全部持久化
+[ ] Consensus Trace 多 Step 持久化
+[ ] Transaction All-or-Nothing
+[ ] API POST/GET/List 可用
+[ ] Frontend List/Detail/Create 可用
+[ ] Digital Thread 可還原
+[ ] Restart 後可讀
+[ ] Migration 020 upgrade/downgrade/re-upgrade
+[ ] Postgres CI 全綠
+```
 
-推送完成後停止，不要自行開始 Phase 3C。
+任一項：
+
+```text
+FAIL
+PARTIAL
+未驗證
+```
+
+則：
+
+```text
+滿足需求 = NO
+Reviewer 最高 89
+Ready for Next Phase = NO
+```
+
+Reviewer 必須：
+
+```text
+>=95
+```
+
+才可標記 Phase 3C 完成。
 
 ---
 
-## 2026-07-25 — Phase 3B Hardening
+# 二十四、Git 要求
 
-**狀態**：PARTIAL（ChatGPT GitHub Review：84/100，不可進入 Phase 3C）
+完成後建立單一主要 Commit：
 
-## 本輪目標
+```text
+feat(phase3c): add tumor board consensus engine
+```
 
-不是新增功能，而是修正 ChatGPT Review 找出的架構問題（Phase 3B Hardening）。
+若 GitHub Actions 發現真實問題，允許追加聚焦修復 Commit，但不得混入其他階段。
 
-## 工作方式
+推送：
 
-完全依 AGENTS.md：Step 0B → Scene → Planner → Workflow → Batch → Step4b → Reviewer → Git Commit → Git Push。一次完成，不要中途回報。
+```text
+origin/master
+```
 
-## P0-1：Recommendation 必須屬於同一位 Patient
+禁止：
 
-Service 中 patient_id 與 recommendation_id 分開查詢但沒有驗證 recommendation.patient_id == patient.id。必須在 Engine 執行前加入驗證，若不匹配則 raise ValidationError，不得建立 Clinical Decision 或 Trace，Transaction 全部 rollback。
-
-新增測試：Patient A + Recommendation B → 422 → Database 無資料 → Trace 無資料。
-
-## P0-2：created_by 必須完整傳遞
-
-目前 ClinicalDecisionModel.created_by = NULL。API 已有 Current User，必須一路傳到 Service 再到 Model，確保 Audit Trail 完整。
-
-新增測試：POST → created_by == 登入 User。
-
-## P0-3：context.patient 不得覆蓋 Database Patient
-
-Patient 的唯一來源必須是 Database，context 只能作為 Supplemental Context，不得修改 Age/Sex/Diagnosis。若 context.patient 與 Database 不同，仍採用 Database。
-
-新增測試：context.patient 與 Database 不同 → 仍採用 Database。
-
-## P0-4：Frontend Navigation 移除假資料
-
-Navbar 中 /clinical-decision/sample 是假資料，必須改成正式流程。至少完成方案 A（Clinical Decision List → Decision Detail）或方案 B（Recommendation → Create Decision → redirect → /clinical-decision/{id}）。不得保留 sample，不得有 Fake Route。
-
-新增 Frontend Route Test + Browser Test。
-
-## P1-1：Clinical Decision Trace 至少拆成 4~5 個 Step
-
-目前只有 Step0，必須至少拆成：Load Recommendation → Validate Patient → Evaluate → Decision → Persist。不得全部塞成 output_summary。
-
-## P1-2：DTO Mutable Default 修正
-
-所有 =[] 改成 Field(default_factory=list)，避免 Mutable Default。
-
-## 禁止事項
-
-不得修改已驗收 Phase3A、Migration、CI、Recommendation Engine、AGENTS、Vercel。不得加入 Phase3C/Tumor Board/Consensus Engine。
-
-## Reviewer
-
-低於 95 分必須返工。>= 95 分才可停止。
-
-## Commit Scope
-
-只能包含：Clinical Decision Hardening / Audit Trail / Validation / Frontend Navigation / Trace / Tests。不得混入其他功能。
-
-## 完成後只回報
-
-Commit SHA / Files Changed / Validation Added / Audit Trail / Trace Steps / Frontend Route / Tests Added / Backend PASS / Frontend PASS / Coverage / Push / Reviewer Score
-
-最後輸出：
-Phase 3B：PASS / PARTIAL
-Ready for ChatGPT GitHub Review：YES / NO
-
-推送後停止，不要開始 Phase 3C。
+```text
+force push
+rebase master
+只提交 workflow 記錄
+```
 
 ---
 
-## 2026-07-26 — Phase 3B Final Acceptance Fix
+# 二十五、完成後只回報
 
-**狀態**：PARTIAL（ChatGPT GitHub Review：86/100，Accepted：NO，不可進入 Phase 3C）
+不要描述中間過程。
 
-## 本輪目標
+全部完成、測試、CI、Reviewer、Commit、Push 後，只輸出：
 
-不是新增功能，而是修正 ChatGPT Review 找出的兩個 P0 缺陷，使 Phase 3B 達到 Accepted。
+```text
+Commit SHA
 
-## P0-1：Migration 缺失
+Files Changed
 
-目前 Migration 018 中 `domain_clinical_decision_traces.trace_id` 為 `unique=True`，但 ORM 模型已改為 `UniqueConstraint("trace_id", "step_order")` 且 `trace_id` 為 `unique=False`。
+Migration 020
+New Tables
+New Models
+New Repositories
+New Service
+Consensus Engine
+Consensus Rule Set
 
-必須新增 Migration 019（019_phase3b_trace_compound_unique.py）：
+POST API
+GET API
+List API
+Opinions API
+Trace API
 
-Upgrade：
-1. Drop trace_id unique constraint
-2. Create normal index on trace_id
-3. Create UNIQUE(trace_id, step_order)
+Frontend List Route
+Frontend Detail Route
+Frontend Create Flow
+Report Section
 
-Downgrade：
-1. Drop compound unique
-2. Drop normal index
-3. Restore trace_id unique
+Patient Link Validation
+Recommendation Link Validation
+Clinical Decision Link Validation
+created_by Audit
 
-不得修改 018。不得重建整張 Table。
+Opinion Persistence
+Consensus Persistence
+Trace Persistence
+Transaction Rollback
+Restart Recovery
+Digital Thread
 
-### Migration Tests
+Migration Upgrade
+Migration Downgrade
+Migration Re-upgrade
 
-新增 Migration Tests 驗證：
-- 018 → 019 → Insert 5 Trace Steps → PASS
-- 019 → 018 → PASS
-- 018 → 019 → PASS
+Backend Tests
+Frontend Tests
+Postgres Integration Tests
+CI Run ID
+CI Result
 
-CI 必須真正跑 Migration。
+requirements.md additions
+requirements.md deletions
 
-## P0-2：Clinical Decision List API 缺失
-
-前端 ClinicalDecisionListPage 呼叫 `GET /api/v1/clinical-decision?patient_id=...`，但後端只有 POST 和 GET /{id}，沒有 Collection API。
-
-必須新增：
-
-### Repository
-- `count_by_patient_id(patient_id: UUID) -> int`
-
-### Service
-- `list_decisions_by_patient()`（已存在於 service 中，需確保完整）
-- 新增 `count_decisions_by_patient(patient_id) -> int`
-
-### Router
-新增 `GET /api/v1/clinical-decision`（注意：Collection Route 必須放在 `/{decision_id}` 之前避免 Route Conflict）
-
-支援：patient_id（必填）、skip（預設 0）、limit（預設 50）
-
-回傳：
-```json
-{
-  "decisions": [],
-  "total": 0
-}
+Git Status
+Push Result
+Reviewer Score
 ```
 
-Response Schema 必須完全符合 Frontend 的 `ClinicalDecisionListResponse`。
+最後輸出：
 
-### API Tests
+```text
+Phase 3C：
+PASS / PARTIAL / FAIL
 
-至少：
-- List Empty
-- List One
-- Pagination
-- Wrong Patient
-- Unauthorized
+Accepted：
+YES / NO
 
-### Frontend Integration Test
+Ready for ChatGPT GitHub Review：
+YES / NO
 
-真正呼叫 List API。不得 Mock 不存在的 Endpoint。
-
-## 禁止事項
-
-不得修改 Recommendation、Phase 3A、AGENTS、CI、Vercel。不得開始 Phase 3C。不得混入其他功能。
-
-## Commit
-```
-fix(phase3b): add migration019 and clinical decision collection api
+Ready for Phase 3D：
+YES / NO
 ```
 
-## 驗收條件
-- Migration 019 PASS
-- CI Migration 018 → 019 → PASS
-- Collection API 正常回應
-- Frontend ClinicalDecisionListPage 正常顯示
-- Reviewer >= 95
+只有全部要求完成、Postgres CI 全綠、Reviewer ≥95 時，才允許：
+
+```text
+Phase 3C Accepted：YES
+Ready for Phase 3D：YES
+```
+
+推送後停止。
+
+不要自行開始 Phase 3D。

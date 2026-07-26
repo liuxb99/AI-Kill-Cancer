@@ -667,6 +667,112 @@ details.trace-details[open] summary {
   .reason-item .reason-impact { min-width: 48px; }
   .reason-item .reason-source { max-width: 100%; }
 }
+
+/* ── Tumor Board Consensus ──────────────────────────────────────────── */
+
+.tbc-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0 0 16px;
+  font-size: 13px;
+}
+
+.tbc-meta dt {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.tbc-meta dd {
+  margin: 0;
+}
+
+.tbc-specialties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.badge.badge-specialty {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: var(--color-primary);
+  border: 1px solid #bfdbfe;
+}
+
+.tbc-dissents,
+.tbc-questions,
+.tbc-followup {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+}
+
+.tbc-dissents {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.dissent-title,
+.questions-title,
+.followup-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.dissent-title { color: #991b1b; }
+.questions-title { color: #92400e; }
+.followup-title { color: #166534; }
+
+.dissent-item {
+  font-size: 13px;
+  padding: 4px 0;
+  line-height: 1.5;
+}
+
+.tbc-questions {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.tbc-questions ul,
+.tbc-followup ul {
+  margin: 0;
+  padding: 0 0 0 20px;
+  font-size: 13px;
+}
+
+.tbc-questions li,
+.tbc-followup li {
+  padding: 2px 0;
+  line-height: 1.5;
+}
+
+.tbc-followup {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.tbc-card h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 16px 0 4px;
+  color: var(--color-text);
+}
+
+.tbc-card p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
 """
 
 
@@ -691,6 +797,7 @@ class ReportGenerator:
         rules_fired: int = 0,
         trace_steps: list[dict[str, Any]] | None = None,
         clinical_decision: dict | None = None,
+        tumor_board_consensus: dict | None = None,
     ) -> str:
         """Produce a complete HTML report page.
 
@@ -719,6 +826,17 @@ class ReportGenerator:
             ``evidence_summary`` (free text).  When provided a dedicated
             "Clinical Decision Analysis" card is rendered; when ``None``
             the section is omitted entirely (backward-compatible).
+        tumor_board_consensus : dict, optional
+            Optional tumor board consensus data with keys
+            ``consensus_status``, ``consensus_score``,
+            ``final_recommendation``, ``supporting_rationale``,
+            ``participating_specialties`` (list of strings),
+            ``dissenting_opinions`` (list of dicts with ``specialty``
+            and ``rationale`` keys), ``unresolved_questions`` (list of
+            strings), and ``required_follow_up`` (list of strings).
+            When provided a dedicated "Tumor Board Consensus" card is
+            rendered; when ``None`` the section is omitted entirely
+            (backward-compatible).
 
         Returns
         -------
@@ -738,6 +856,7 @@ class ReportGenerator:
             self._render_patient_section(recommendation, variants or []),
             self._render_evidence_summary(recommendation, evidence_count),
             self._render_clinical_decision(clinical_decision) if clinical_decision else "",
+            self._render_tumor_board_consensus(tumor_board_consensus) if tumor_board_consensus else "",
             self._render_ranking_table(drugs),
             self._render_reason_breakdown(drugs),
             self._render_warnings(drugs) if has_conflicts_or_resistance else "",
@@ -1234,6 +1353,85 @@ class ReportGenerator:
   {alternatives_html}
   {contraindications_html}
   {evidence_html}
+</div>"""
+
+    # ── Section: Tumor Board Consensus ─────────────────────────────────────
+
+    def _render_tumor_board_consensus(self, tbc: dict) -> str:
+        """Render the Tumor Board Consensus section."""
+        if not tbc:
+            return ""
+
+        consensus_status = html_lib.escape(str(tbc.get("consensus_status", "N/A")))
+        consensus_score = tbc.get("consensus_score")
+        score_str = f"{consensus_score:.2f}" if consensus_score is not None else "N/A"
+        final_recommendation = html_lib.escape(str(tbc.get("final_recommendation", "")))
+        supporting_rationale = html_lib.escape(str(tbc.get("supporting_rationale", "")))
+
+        # ── Participating specialties ─────────────────────────────────────────
+        specialties_html = ""
+        specialties: list = tbc.get("participating_specialties", []) or []
+        if specialties:
+            items = "".join(
+                f'<span class="badge badge-specialty">{html_lib.escape(str(s))}</span>\n'
+                for s in specialties
+            )
+            specialties_html = f'<div class="tbc-specialties">{items}</div>'
+
+        # ── Dissenting opinions ───────────────────────────────────────────────
+        dissent_html = ""
+        dissents: list = tbc.get("dissenting_opinions", []) or []
+        if dissents:
+            items = "".join(
+                f'<div class="dissent-item">• <strong>{html_lib.escape(str(d.get("specialty", "")))}</strong>'
+                f' — {html_lib.escape(str(d.get("rationale", "")))}</div>\n'
+                for d in dissents
+            )
+            dissent_html = f"""\
+<div class="tbc-dissents">
+  <div class="dissent-title">⚠️ Dissenting Opinions</div>
+  {items}
+</div>"""
+
+        # ── Unresolved questions ──────────────────────────────────────────────
+        questions_html = ""
+        questions: list = tbc.get("unresolved_questions", []) or []
+        if questions:
+            items = "".join(
+                f'<li>{html_lib.escape(str(q))}</li>\n' for q in questions
+            )
+            questions_html = f"""\
+<div class="tbc-questions">
+  <div class="questions-title">❓ Unresolved Questions</div>
+  <ul>{items}</ul>
+</div>"""
+
+        # ── Required follow-up ────────────────────────────────────────────────
+        followup_html = ""
+        followup: list = tbc.get("required_follow_up", []) or []
+        if followup:
+            items = "".join(
+                f'<li>{html_lib.escape(str(f))}</li>\n' for f in followup
+            )
+            followup_html = f"""\
+<div class="tbc-followup">
+  <div class="followup-title">📋 Required Follow-up</div>
+  <ul>{items}</ul>
+</div>"""
+
+        return f"""\
+<div class="card tbc-card">
+  <h2 class="card-title">🏥 Tumor Board Consensus</h2>
+  <dl class="tbc-meta">
+    <dt>Status:</dt> <dd><strong>{consensus_status}</strong></dd>
+    <dt>Score:</dt> <dd>{score_str}</dd>
+  </dl>
+  {specialties_html}
+  {dissent_html}
+  {questions_html}
+  {followup_html}
+  {"<h3>Final Recommendation</h3><p>" + final_recommendation + "</p>" if final_recommendation else ""}
+  {"<h3>Supporting Rationale</h3><p>" + supporting_rationale + "</p>" if supporting_rationale else ""}
 </div>"""
 
     # ── Helpers ─────────────────────────────────────────────────────────────

@@ -109,8 +109,13 @@ class TestMigration016Downgrade:
 
     @pytest.mark.skipif(_SKIP, reason=_REASON)
     def test_downgrade_removes_phase2_tables(self, alembic_cfg):
-        """执行 upgrade head 后 downgrade -1，验证 Phase 2 表已删除。"""
-        command.upgrade(alembic_cfg, "head")
+        """执行 upgrade 016 后 downgrade -1，验证 Phase 2 表已删除。
+
+        注意：module-scope fixture 可能已被前序测试升到 019，
+        因此先 downgrade 到 015 再重新从 015→016→015。
+        """
+        command.downgrade(alembic_cfg, "015")
+        command.upgrade(alembic_cfg, "016")
         command.downgrade(alembic_cfg, "-1")
         sync_url = alembic_cfg.get_main_option("sqlalchemy.url").replace("+aiosqlite", "")
         engine = create_engine(sync_url)
@@ -124,18 +129,21 @@ class TestMigration016Cycle:
 
     @pytest.mark.skipif(_SKIP, reason=_REASON)
     def test_upgrade_downgrade_upgrade_cycle(self, alembic_cfg):
-        """执行 upgrade head → downgrade -1 → upgrade head，验证表状态。"""
+        """执行 upgrade 016 → downgrade -1 → upgrade 016，验证表状态。"""
         sync_url = alembic_cfg.get_main_option("sqlalchemy.url").replace("+aiosqlite", "")
 
-        # ── 第 1 步：upgrade head ──
-        command.upgrade(alembic_cfg, "head")
+        # 确保起点为 015（可能被前序测试升到 019）
+        command.downgrade(alembic_cfg, "015")
+
+        # ── 第 1 步：upgrade 016 ──
+        command.upgrade(alembic_cfg, "016")
         engine = create_engine(sync_url)
         inspector = sa_inspect(engine)
         for table in PHASE2_TABLES:
             assert _table_exists(inspector, table), f"Step 1: {table} 应存在"
         engine.dispose()
 
-        # ── 第 2 步：downgrade -1 ──
+        # ── 第 2 步：downgrade -1（回到 015） ──
         command.downgrade(alembic_cfg, "-1")
         engine = create_engine(sync_url)
         inspector = sa_inspect(engine)
@@ -143,8 +151,8 @@ class TestMigration016Cycle:
             assert not _table_exists(inspector, table), f"Step 2: {table} 应已被删除"
         engine.dispose()
 
-        # ── 第 3 步：再次 upgrade head ──
-        command.upgrade(alembic_cfg, "head")
+        # ── 第 3 步：再次 upgrade 016 ──
+        command.upgrade(alembic_cfg, "016")
         engine = create_engine(sync_url)
         inspector = sa_inspect(engine)
         for table in PHASE2_TABLES:

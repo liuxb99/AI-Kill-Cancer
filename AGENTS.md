@@ -31,15 +31,14 @@ Level 2：這是不是業務檔案？
 - 不確定 → 視為業務檔案
 
 ## 子代理示範啟動（首次強制）
-
-接第一個真實任務前，先用 task() 啟動 doc-writer 做一個最小任務（如建立 tasks/demo/start.md），讓系統實際體驗子代理的運作模式。示範完成後記錄到 `agent_workflow_History.md`（append 末尾）。一次經驗比十條規則有效。
+接第一個真實任務前，先用 task() 啟動 doc-writer 做一個最小任務（如建立 tasks/demo/start.md），讓系統實際體驗子代理的運作模式。示範完成後記錄到 agent_workflow_History.md（append 末尾）。一次經驗比十條規則有效。
 
 ## 工作流程
 
-### Step 0A：启动子代理向用户保证听话
-主代理必須先用 task() 啟動子代理，由子代理直接向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」，完成後方可進入 Step 0B。
+### Step 0A：啟動子代理向使用者保證聽話
+主代理必須先將上一輪 `tasks/requirements.md` 移至 `tasks/requirements-history/requirements-<上一任務ID>.md`，再用 task() 啟動子代理向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」，完成後方可進入 Step 0B。
 
-### Step 0B：接收需求：接收需求
+### Step 0B：接收需求
 記錄到 tasks/requirements.md。
 
 ### Step 1：場景識別
@@ -50,7 +49,6 @@ Level 2：這是不是業務檔案？
 記錄：`2026-06-05 16:33 | [v] task(PLANNER) -> 計劃完成`
 
 ### Step 3：更新 Workflow
-
 每次 task() 調用子代理後，必須立即 append 記錄到 `agent_workflow_History.md` 末尾，不可遺漏。
 
 ```
