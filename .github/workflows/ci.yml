@@ -106,7 +106,9 @@ jobs:
           async def main():
               engine = create_async_engine(os.environ['DATABASE_URL'])
               async with engine.connect() as conn:
-                  await conn.execute(text(\"DELETE FROM domain_tumor_board_consensus WHERE id = 'ci-test-id'\"))
+                  await conn.execute(text(\"DELETE FROM domain_tumor_board_opinions\"))
+                  await conn.execute(text(\"DELETE FROM domain_tumor_board_consensus_traces\"))
+                  await conn.execute(text(\"DELETE FROM domain_tumor_board_consensus\"))
                   await conn.execute(text(\"DELETE FROM domain_patients WHERE id = 'ci-test-pid'\"))
                   await conn.commit()
               await engine.dispose()
