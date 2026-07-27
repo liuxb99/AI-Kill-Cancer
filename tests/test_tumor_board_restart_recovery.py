@@ -182,79 +182,33 @@ class TestTumorBoardRestartRecovery:
         ), f"Consensus creation failed: {resp.text}"
         return resp.json()["consensus_id"]
 
-    def _create_prerequisite_data(self, db_url: str) -> dict[str, str]:
+    def _create_prerequisite_data(
+        self, db_url: str, client: TestClient | None = None,
+    ) -> dict[str, str]:
         """Write patient, recommendation, and clinical_decision directly to DB.
 
-        Uses a synchronous SQLAlchemy connection for SQLite, or an async
-        connection for Postgres, bypassing the Engine (which requires external
+        Uses a synchronous SQLAlchemy connection for SQLite, or the API
+        endpoints for Postgres, bypassing the Engine (which requires external
         evidence API keys).
 
         Returns dict with ``patient_id``, ``recommendation_id``,
         ``clinical_decision_id`` (business identifiers).
         """
         import uuid
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         is_postgres = db_url.startswith("postgresql")
 
         if is_postgres:
-            # Use async engine for Postgres to avoid sync/async datetime mismatch
-            import asyncio
-
-            from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-
-            async def _write():
-                engine = create_async_engine(db_url)
-                async with AsyncSession(engine) as session:
-                    patient_id = uuid.uuid4()
-                    patient = PatientModel(
-                        id=patient_id,
-                        display_name="TB-Restart-Patient",
-                        sex=SexEnum.F,
-                        consent_status=ConsentStatusEnum.GRANTED,
-                        created_at=datetime.now(timezone.utc),
-                        updated_at=datetime.now(timezone.utc),
-                    )
-                    session.add(patient)
-
-                    rec_biz_id = uuid.uuid4().hex
-                    recommendation = RecommendationModel(
-                        id=uuid.uuid4(),
-                        recommendation_id=rec_biz_id,
-                        patient_id=patient_id,
-                        engine_version="1.0.0",
-                        status="completed",
-                        created_at=datetime.now(timezone.utc),
-                        updated_at=datetime.now(timezone.utc),
-                    )
-                    session.add(recommendation)
-                    await session.flush()
-
-                    cd_biz_id = uuid.uuid4().hex
-                    clinical_decision = ClinicalDecisionModel(
-                        id=uuid.uuid4(),
-                        decision_id=cd_biz_id,
-                        patient_id=patient_id,
-                        recommendation_id=recommendation.id,
-                        decision_type="treatment",
-                        reason="Test reason for restart recovery test",
-                        confidence="high",
-                        status="active",
-                        created_at=datetime.now(timezone.utc),
-                        updated_at=datetime.now(timezone.utc),
-                    )
-                    session.add(clinical_decision)
-
-                    await session.commit()
-                    await engine.dispose()
-
-                    return {
-                        "patient_id": str(patient_id),
-                        "recommendation_id": rec_biz_id,
-                        "clinical_decision_id": cd_biz_id,
-                    }
-
-            return asyncio.run(_write())
+            assert client is not None, "Postgres prereq requires a TestClient"
+            patient_id = self._create_patient(client)
+            rec_id = self._create_recommendation(client, patient_id)
+            cd_id = self._create_clinical_decision(client, patient_id, rec_id)
+            return {
+                "patient_id": patient_id,
+                "recommendation_id": rec_id,
+                "clinical_decision_id": cd_id,
+            }
         else:
             # SQLite: sync connection works fine
             sync_url = db_url.replace("sqlite+aiosqlite:///", "sqlite:///")
@@ -267,8 +221,8 @@ class TestTumorBoardRestartRecovery:
                     display_name="TB-Restart-Patient",
                     sex=SexEnum.F,
                     consent_status=ConsentStatusEnum.GRANTED,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
                 )
                 session.add(patient)
 
@@ -279,8 +233,8 @@ class TestTumorBoardRestartRecovery:
                     patient_id=patient_id,
                     engine_version="1.0.0",
                     status="completed",
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
                 )
                 session.add(recommendation)
                 session.flush()
@@ -295,8 +249,8 @@ class TestTumorBoardRestartRecovery:
                     reason="Test reason for restart recovery test",
                     confidence="high",
                     status="active",
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
                 )
                 session.add(clinical_decision)
 
@@ -327,7 +281,7 @@ class TestTumorBoardRestartRecovery:
         app1 = self._create_app_with_auth_override()
         with TestClient(app1) as client1:
             # ── Write prerequisite data directly to DB (bypass Engine) ──
-            prereq = self._create_prerequisite_data(db_url)
+            prereq = self._create_prerequisite_data(db_url, client=client1)
             patient_id = prereq["patient_id"]
             rec_id = prereq["recommendation_id"]
             cd_id = prereq["clinical_decision_id"]
