@@ -185,9 +185,9 @@ class TestTumorBoardRestartRecovery:
     def _create_prerequisite_data(self, db_url: str) -> dict[str, str]:
         """Write patient, recommendation, and clinical_decision directly to DB.
 
-        Uses a synchronous SQLAlchemy connection to the same SQLite file that
-        the app's async engine writes to, bypassing the Engine (which requires
-        external evidence API keys).
+        Uses a synchronous SQLAlchemy connection for SQLite, or an async
+        connection for Postgres, bypassing the Engine (which requires external
+        evidence API keys).
 
         Returns dict with ``patient_id``, ``recommendation_id``,
         ``clinical_decision_id`` (business identifiers).
@@ -195,57 +195,117 @@ class TestTumorBoardRestartRecovery:
         import uuid
         from datetime import datetime
 
-        # Convert async URL to sync URL for the same file
-        sync_url = db_url.replace("sqlite+aiosqlite:///", "sqlite:///").replace("postgresql+asyncpg://", "postgresql://")
-        engine = create_engine(sync_url)
+        is_postgres = db_url.startswith("postgresql")
 
-        with Session(engine) as session:
-            patient_id = uuid.uuid4()
-            patient = PatientModel(
-                id=patient_id,
-                display_name="TB-Restart-Patient",
-                sex=SexEnum.F,
-                consent_status=ConsentStatusEnum.GRANTED,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            )
-            session.add(patient)
+        if is_postgres:
+            # Use async engine for Postgres to avoid sync/async datetime mismatch
+            import asyncio
+            from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
-            rec_biz_id = uuid.uuid4().hex
-            recommendation = RecommendationModel(
-                id=uuid.uuid4(),
-                recommendation_id=rec_biz_id,
-                patient_id=patient_id,
-                engine_version="1.0.0",
-                status="completed",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            )
-            session.add(recommendation)
-            session.flush()  # ensure recommendation.id is populated
+            async def _write():
+                engine = create_async_engine(db_url)
+                async with AsyncSession(engine) as session:
+                    patient_id = uuid.uuid4()
+                    patient = PatientModel(
+                        id=patient_id,
+                        display_name="TB-Restart-Patient",
+                        sex=SexEnum.F,
+                        consent_status=ConsentStatusEnum.GRANTED,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    )
+                    session.add(patient)
 
-            cd_biz_id = uuid.uuid4().hex
-            clinical_decision = ClinicalDecisionModel(
-                id=uuid.uuid4(),
-                decision_id=cd_biz_id,
-                patient_id=patient_id,
-                recommendation_id=recommendation.id,
-                decision_type="treatment",
-                reason="Test reason for restart recovery test",
-                confidence="high",
-                status="active",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            )
-            session.add(clinical_decision)
+                    rec_biz_id = uuid.uuid4().hex
+                    recommendation = RecommendationModel(
+                        id=uuid.uuid4(),
+                        recommendation_id=rec_biz_id,
+                        patient_id=patient_id,
+                        engine_version="1.0.0",
+                        status="completed",
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    )
+                    session.add(recommendation)
+                    await session.flush()
 
-            session.commit()
+                    cd_biz_id = uuid.uuid4().hex
+                    clinical_decision = ClinicalDecisionModel(
+                        id=uuid.uuid4(),
+                        decision_id=cd_biz_id,
+                        patient_id=patient_id,
+                        recommendation_id=recommendation.id,
+                        decision_type="treatment",
+                        reason="Test reason for restart recovery test",
+                        confidence="high",
+                        status="active",
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    )
+                    session.add(clinical_decision)
 
-            return {
-                "patient_id": str(patient_id),
-                "recommendation_id": rec_biz_id,
-                "clinical_decision_id": cd_biz_id,
-            }
+                    await session.commit()
+                    await engine.dispose()
+
+                    return {
+                        "patient_id": str(patient_id),
+                        "recommendation_id": rec_biz_id,
+                        "clinical_decision_id": cd_biz_id,
+                    }
+
+            return asyncio.run(_write())
+        else:
+            # SQLite: sync connection works fine
+            sync_url = db_url.replace("sqlite+aiosqlite:///", "sqlite:///")
+            engine = create_engine(sync_url)
+
+            with Session(engine) as session:
+                patient_id = uuid.uuid4()
+                patient = PatientModel(
+                    id=patient_id,
+                    display_name="TB-Restart-Patient",
+                    sex=SexEnum.F,
+                    consent_status=ConsentStatusEnum.GRANTED,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+                session.add(patient)
+
+                rec_biz_id = uuid.uuid4().hex
+                recommendation = RecommendationModel(
+                    id=uuid.uuid4(),
+                    recommendation_id=rec_biz_id,
+                    patient_id=patient_id,
+                    engine_version="1.0.0",
+                    status="completed",
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+                session.add(recommendation)
+                session.flush()
+
+                cd_biz_id = uuid.uuid4().hex
+                clinical_decision = ClinicalDecisionModel(
+                    id=uuid.uuid4(),
+                    decision_id=cd_biz_id,
+                    patient_id=patient_id,
+                    recommendation_id=recommendation.id,
+                    decision_type="treatment",
+                    reason="Test reason for restart recovery test",
+                    confidence="high",
+                    status="active",
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+                session.add(clinical_decision)
+
+                session.commit()
+
+                return {
+                    "patient_id": str(patient_id),
+                    "recommendation_id": rec_biz_id,
+                    "clinical_decision_id": cd_biz_id,
+                }
 
     def test_end_to_end_restart_recovery(self, db_url: str) -> None:
         """
