@@ -61,8 +61,8 @@ jobs:
           git init KnowGraphGo
           cd KnowGraphGo
           git remote add origin https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git
-          git fetch --depth=1 origin 6d2b20a68ba6ea25841e142918e186fb4beece0d
-          git checkout 6d2b20a68ba6ea25841e142918e186fb4beece0d
+          git fetch --depth=1 origin 950dd86926891789380381cb28f233ee007fe7b4
+          git checkout 950dd86926891789380381cb28f233ee007fe7b4
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -198,8 +198,8 @@ jobs:
           git init KnowGraphGo
           cd KnowGraphGo
           git remote add origin https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git
-          git fetch --depth=1 origin 6d2b20a68ba6ea25841e142918e186fb4beece0d
-          git checkout 6d2b20a68ba6ea25841e142918e186fb4beece0d
+          git fetch --depth=1 origin 950dd86926891789380381cb28f233ee007fe7b4
+          git checkout 950dd86926891789380381cb28f233ee007fe7b4
 
       - name: CI-01 Build Go CLI
         working-directory: KnowGraphGo
