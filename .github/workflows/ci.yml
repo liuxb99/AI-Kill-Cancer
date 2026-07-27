@@ -85,10 +85,12 @@ jobs:
           python -c "
           import asyncio, os
           from sqlalchemy.ext.asyncio import create_async_engine
-          from sqlalchemy import text
+          from sqlalchemy import text, Integer
           async def main():
               engine = create_async_engine(os.environ['DATABASE_URL'])
               async with engine.connect() as conn:
+                  # First create a patient to satisfy FK constraint (Postgres)
+                  await conn.execute(text(\"INSERT INTO domain_patients (id, display_name, sex, consent_status) VALUES ('ci-test-pid', 'CI Test Patient', 'F', 'granted')\"))
                   await conn.execute(text(\"INSERT INTO domain_tumor_board_consensus (id, consensus_id, patient_id, consensus_status) VALUES ('ci-test-id', 'ci-test-cid', 'ci-test-pid', 'pending')\"))
                   await conn.commit()
               await engine.dispose()
@@ -105,6 +107,7 @@ jobs:
               engine = create_async_engine(os.environ['DATABASE_URL'])
               async with engine.connect() as conn:
                   await conn.execute(text(\"DELETE FROM domain_tumor_board_consensus WHERE id = 'ci-test-id'\"))
+                  await conn.execute(text(\"DELETE FROM domain_patients WHERE id = 'ci-test-pid'\"))
                   await conn.commit()
               await engine.dispose()
           asyncio.run(main())
