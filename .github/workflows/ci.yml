@@ -55,10 +55,13 @@ jobs:
       # Phase 3D: KnowGraphGo Integration
       - name: Checkout KnowGraphGo
         uses: actions/checkout@v4
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
         with:
           repository: liuxb99/KnowGraphGo
           path: KnowGraphGo
-          ref: a7a5b2e
+          ref: 696c62d16e7aba827f33a74fdf587be17db3855c
+          token: ${{ secrets.GITHUB_TOKEN || secrets.PAT }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -269,10 +272,13 @@ jobs:
       # ============================================================
       - name: CI-01 Checkout KnowGraphGo (fixed SHA)
         uses: actions/checkout@v4
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
         with:
           repository: liuxb99/KnowGraphGo
           path: KnowGraphGo
           ref: 696c62d16e7aba827f33a74fdf587be17db3855c
+          token: ${{ secrets.GITHUB_TOKEN || secrets.PAT }}
 
       - name: CI-01 Build Go CLI
         working-directory: KnowGraphGo
