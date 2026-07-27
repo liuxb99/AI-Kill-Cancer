@@ -84,6 +84,7 @@ jobs:
       - name: Cross-repository Integration Test
         env:
           KNOWGRAPH_CLI: KnowGraphGo/bin/knowgraph
+          PYTHONPATH: .
         run: |
           echo "=== Cross-repository Integration Test ==="
           # Verify deterministic ID parity via Python/Go
@@ -128,6 +129,7 @@ jobs:
       - name: Cross-repository Digital Thread Test
         env:
           KNOWGRAPH_CLI: KnowGraphGo/bin/knowgraph
+          PYTHONPATH: ${{ github.workspace }}
         working-directory: KnowGraphGo
         run: |
           echo "=== Digital Thread Integration Test ==="
