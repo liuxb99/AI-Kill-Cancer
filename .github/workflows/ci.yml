@@ -272,7 +272,7 @@ jobs:
         with:
           repository: liuxb99/KnowGraphGo
           path: KnowGraphGo
-          ref: d6fa05a7d13ec3d51473c737ab4ebe3482ac2950
+          ref: 696c62d16e7aba827f33a74fdf587be17db3855c
 
       - name: CI-01 Build Go CLI
         working-directory: KnowGraphGo

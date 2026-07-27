@@ -383,3 +383,59 @@ Reviewer Score: 95/100 ✅ | Ready for Treatment Plan Phase: YES ✅
 2026-07-27 16:01 | [v] task(開發子代理) resume -> 返工第2次修復完成：evidence_references 提取 + idx bug 修復 + 21 新測試 ✅
 2026-07-27 16:03 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=NO 測試=YES | 完整性8 正確性15 可維護性20 測試12 | 總分62 不合格 ❌
 2026-07-27 16:05 | [v] CI 強化：所有 adapter tests + 跨語言 ID parity 驗證 ✅
+2026-07-27 16:52 | [v] 歸檔上一輪 requirements.md → requirements-history/requirements-phase3d-graph-correctness-hardening.md ✅
+2026-07-27 16:52 | [v] task(doc-writer) -> Step 0A 完成：子代理已向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」✅
+2026-07-27 16:52 | [v] agent_workflow.md 已重置為初始狀態，等待 Step 0B
+2026-07-27 16:53 | [v] task(doc-writer) -> Step 0B 完成，需求已記錄到 tasks/requirements.md（Phase 3D Final Acceptance）✅
+2026-07-27 16:53 | [v] task(場景識別子代理) -> Step 1 完成：場景 hardening，tasks/task-status.md 已更新（21 項任務，6 角色）✅
+2026-07-27 16:54 | [v] task(PLANNER) -> Step 2 完成，產出 tasks/plan-phase3d-final-acceptance.md（P0→P1→CI→Meta，14.5h）✅
+2026-07-27 16:55 | [v] Step 3 完成：Workflow 已更新 ✅
+2026-07-27 16:55 | [v] 開始 Step 4 執行開發：clone KnowGraphGo 並啟動子代理 ✅
+2026-07-27 17:00 | [v] task(knowgraphgo-dev) -> KnowGraphGo Go 端修復完成：P0-1a（golden test）+ P1-1a（Patient Properties）+ P1-1b（Stub）+ P1-2a（Relation Provenance）+ P1-1c（Stub test）+ P1-2b（Provenance test）+ P1-3d（No panic）✅
+2026-07-27 17:02 | [v] KnowGraphGo commit d6fa05a → push origin/main ✅
+2026-07-27 17:04 | [v] task(test-writer+backend-logic) -> AI-Kill-Cancer 端修復完成：P0-1b（Python golden test）+ P1-3a~c（test fixes）+ P1-2c（Provenance 確認）✅
+2026-07-27 17:08 | [v] task(backend-logic) -> 修復 Relation ID canonical key（kind 未 normalize）→ ID parity 11/11 PASS ✅
+2026-07-27 17:09 | [v] task(test-writer) -> E2E Digital Thread 腳本建立 scripts/cross_repo_e2e_test.py ✅
+2026-07-27 17:15 | [v] 修復 E2E 腳本：CLI 改 stdin pipe + display_name + title/description/specialist 字段 → ALL E2E TESTS PASSED ✅
+2026-07-27 17:15 | [v] Go adapter Patient stub 添加 display_name 修復 validation 問題 ✅
+2026-07-27 17:18 | [v] Step 4b 需求回歸檢查完成 → P0-2 Digital Thread 路徑查詢缺漏 ✅
+2026-07-27 17:20 | [v] 修復 E2E 腳本 query 命令 + Digital Thread Path 驗證 → ALL E2E TESTS PASSED（含 Digital Thread Path）✅
+2026-07-27 17:20 | [v] Python 24/24 PASS + Go 21/21 PASS + E2E ALL PASS ✅
+2026-07-27 17:20 | [v] CI 配置更新完成：CI-01~CI-05 加入 GitHub Actions ✅
+2026-07-27 17:21 | [v] 啟動 Step 5：REVIEWER 評分
+2026-07-27 17:23 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=NO 測試=YES | 完整性9 正確性25 可維護性23 測試驗證23 | 總分80 不合格 ❌（缺少 knowgraph clinical id CLI 命令）
+2026-07-27 17:23 | [v] 啟動返工第1次：PLANNER(resume) 重新規劃
+2026-07-27 17:27 | [v] task(PLANNER) resume -> 返工第1次重新規劃（新增 CLI id 命令 + CI 更新）
+2026-07-27 17:30 | [v] task(knowgraphgo-dev) resume -> 返工第1次開發完成：新增 `knowgraph clinical id` CLI（10 種 kind）
+2026-07-27 17:32 | [v] task(test-writer) resume -> 返工第1次：新增 Python `test_id_parity_via_cli`（12/12 PASS）
+2026-07-27 17:33 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=NO 滿足需求=NO 測試=YES | 完整性8 正確性8 可維護性15 測試驗證22 | 總分53 不合格 ❌（id_factory.go 仍有 panic）
+2026-07-27 17:37 | [v] 返工第2次：修復 id_factory.go panic → return error（含 adapter.go、clinical.go、測試檔案同步）
+2026-07-27 17:40 | [v] Go test 21/21 PASS + Python 25/25 PASS + E2E ALL PASS + CLI 驗證正確 ✅
+2026-07-27 17:40 | [v] 啟動 REVIEWER 返工第2次評分
+2026-07-27 17:42 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性23 正確性25 可維護性23 測試驗證24 | 總分95 合格 ✅
+2026-07-27 17:42 | [v] 啟動 Step 6：總結報告
+2026-07-27 17:43 | [v] task(doc-writer) -> Step 6 完成：總結報告產出 tasks/summary-report-phase3d-final-acceptance.md ✅
+2026-07-27 17:43 | [v] ✅ **Phase 3D Final Acceptance 全部完成！** 🎉（Reviewer 95/100 ✅）
+2026-07-27 17:45 | [v] Step 0A 完成：歸檔上一輪 requirements.md + 子代理向使用者回報 ✅
+2026-07-27 17:46 | [v] task(doc-writer) -> Step 0B 完成，需求已記錄到 tasks/requirements.md ✅
+2026-07-27 17:47 | [v] task(場景識別子代理) -> Step 1 完成：場景 devops，tasks/task-status.md 已更新 ✅
+2026-07-27 17:48 | [v] task(PLANNER) -> Step 2 完成，產出 tasks/plan-Phase-3D-Final-Acceptance-Submit.md ✅
+2026-07-27 17:49 | [v] Step 3 完成：Workflow 已更新 ✅
+2026-07-27 17:49 | [v] 開始 Step 4：啟動 devops 子代理執行 git 操作 ✅
+2026-07-27 17:50 | [v] task(devops) -> Step 4 完成：git add/commit/push 成功，commit fea2c02 ✅
+2026-07-27 17:51 | [v] task(需求回歸檢查) -> Step 4b 完成：全部需求通過，報告產出 tasks/regression-check-submit.md ✅
+2026-07-27 17:51 | [v] 啟動 Step 5：REVIEWER 評分
+2026-07-27 17:52 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性25 正確性25 可維護性22 測試25 | 總分97 合格 ✅
+2026-07-27 17:52 | [v] 啟動 Step 6：總結報告
+2026-07-27 17:53 | [v] task(doc-writer) -> Step 6 完成：總結報告產出 tasks/summary-report-submit.md ✅
+2026-07-27 17:53 | [v] ✅ **Phase 3D Final Acceptance 提交全部完成！** 🎉（REVIEWER 97/100 ✅）
+
+2026-07-27 20:08 | [v] Step 0A：歸檔上一輪 requirements.md → requirements-history/requirements-Phase-3D-Final-Acceptance-Submit.md ✅
+2026-07-27 20:08 | [v] task(子代理) -> Step 0A 完成：子代理已向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」✅
+
+2026-07-27 20:09 | [v] task(子代理) -> Step 0B 完成：需求已記錄到 tasks/requirements.md（Phase 3D Final Acceptance Fix，11834 bytes）✅
+
+2026-07-27 20:10 | [v] task(子代理) -> Step 1 完成：場景識別為 cross-repo-acceptance-fix，角色分派完成，tasks/task-status.md 已更新 ✅
+
+2026-07-27 20:11 | [v] task(PLANNER) -> Step 2 完成：計劃產出 tasks/plan-phase3d-final-acceptance-fix.md（13 項任務，4 Phase）✅
+2026-07-27 20:11 | [v] Step 3 完成：Workflow 已更新 ✅

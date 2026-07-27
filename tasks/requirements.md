@@ -1,140 +1,823 @@
-# AI-Kill-Cancer × KnowGraphGo — Phase 3D Graph Correctness Hardening
+# AI-Kill-Cancer × KnowGraphGo — Phase 3D Final Acceptance Fix
 
-AI-Kill-Cancer Repository：https://github.com/liuxb99/AI-Kill-Cancer（master, Base Commit: 5882612a42df044a7acdabb85a15ebd2a24acc8f）
-KnowGraphGo Repository：https://github.com/liuxb99/KnowGraphGo（main, Base Commit: 4b63405d3f4e6186ba2488b068f6046ecd7a49cf）
+AI-Kill-Cancer Repository：
 
-目前審查結果：Phase 3D PARTIAL，ChatGPT Review Score 約 60/100，Accepted NO，Ready for Treatment Plan NO。
+```text
+https://github.com/liuxb99/AI-Kill-Cancer
+```
 
-本輪任務：Phase 3D Graph Correctness Hardening
-本輪不是重新設計 Outbox，不是 Treatment Plan。
-只修知識圖譜的：Identity, Relations, Idempotency, Provenance, Query Consistency, Worker Correctness, Cross-repository Integration。
+AI-Kill-Cancer Branch：
+
+```text
+master
+```
+
+AI-Kill-Cancer Base Commit：
+
+```text
+fea2c02aa75def0b5e48fd821a6b8a77d24c1407
+```
+
+KnowGraphGo Repository：
+
+```text
+https://github.com/liuxb99/KnowGraphGo
+```
+
+KnowGraphGo Branch：
+
+```text
+main
+```
+
+KnowGraphGo Base Commit：
+
+```text
+d6fa05a7d13ec3d51473c737ab4ebe3482ac2950
+```
+
+目前審查結果：
+
+```text
+Phase 3D Final Acceptance：PARTIAL
+ChatGPT Review：86/100
+Accepted：NO
+Ready for Treatment Plan：NO
+```
+
+本輪唯一目標：
+
+```text
+修正最後四個驗收缺口
+```
+
+不得新增功能。
+
+不得重構 Outbox。
+
+不得修改已驗收的 Clinical Domain 功能。
+
+不得開始 Treatment Plan。
 
 ---
 
-## 一、工作方式
-嚴格遵守兩個 Repository 各自的 AGENTS.md 與既有流程。一次完成。不要中途回報。完成兩個 Repository、測試、CI、Commit、Push 後一次回報。不得自行開始下一階段。
+# 一、工作方式
 
-## 二、目前已確認的 P0 問題
-P0-1：Entity ID 每次隨機產生（graph.NewEntityID() / graph.NewRelationID()）→ 必須改成 Deterministic Entity/Relation ID
-P0-2：Relation Target 指向不存在的隨機 Entity（To: graph.NewEntityID() 但 Target Entity 未加入 GraphDelta）
-P0-3：Python Query ID 與 Graph ID 不一致（Python 用 patient_id/recommendation_id/consensus_id 但 Graph 內部是隨機 UUID）
-P0-4：Provenance 不完整（只有 ProvenanceImported，缺少 event_id/event_type/schema_version/source_system/source_table/source_id/actor_id/correlation_id/causation_id/occurred_at）
-P0-5：跨倉庫 CI checkout 分支錯誤（CI 用 ref: master 但 KnowGraphGo 正式分支是 main，且未 pin 特定 Commit）
+依兩個 Repository 各自既有流程執行。
 
-## 三、Deterministic ID 設計
-在 KnowGraphGo 建立 ClinicalIDFactory，提供 PatientID/RecommendationID/ClinicalDecisionID/ConsensusID/OpinionID/SpecialtyID/DrugID/EvidenceID/VariantID 以及 RelationID 方法。
-使用 UUIDv5 + 固定 Namespace UUID + 標準化 key。
-格式例如：clinical:patient:{patient_id}、clinical:recommendation:{recommendation_id} 等。
-要求：相同輸入永遠得到相同 ID、不同 Entity Kind 不得 collision、大小寫與空白需標準化、空 ID 必須拒絕。
-不得依賴 runtime random UUID、database auto increment、event_id 作為 entity identity。
+一次完成。
 
-## 四、真正建立 Target Entities
-Patient Event：建立 Patient Entity（patient_id, display_name/pseudonym, sex, age_range, cancer_type, source_system, source_id）
-Recommendation Event：建立/upsert Recommendation + Patient + Drug + Evidence Entities，Relation：FOR_PATIENT / RECOMMENDS / SUPPORTED_BY
-Clinical Decision Event：建立/upsert ClinicalDecision + Patient + Recommendation + Evidence Entities，Relation：FOR_PATIENT / BASED_ON / SUPPORTED_BY
-Tumor Board Consensus Event：建立/upsert Consensus + Patient + ClinicalDecision + SpecialistOpinion + Specialty + Evidence Entities，Relation：FOR_PATIENT / DERIVED_FROM / HAS_OPINION / PROVIDED_BY_SPECIALTY / SUPPORTED_BY
-若 payload 缺少 opinion_id / specialty / evidence_ids，須在 AI-Kill-Cancer Event Payload 中補足。
+不要中途回報。
 
-## 五、GraphDelta 完整性規則
-每個 Relation.From/To 必須在本次 Delta 中存在或可由 deterministic ID 對應既有節點。
-所有 Relation 依賴的 Entity 全部加入本次 GraphDelta 作 Upsert。
-不得假設 patient.created 一定先執行。
+完成兩個 Repository、Commit、Push、GitHub Actions 後一次回報。
 
-## 六、Idempotent Replay
-測試：Apply 同一 patient.created 兩次 → Entity 數量不增加
-Apply 同一 recommendation.created 兩次 → 不重複
-Apply created 後再 apply updated → 同一 Entity 被更新，不新增第二個
-Full rebuild 執行兩次 → Entity/Relation 數量一致
-驗收：ID 完全一致、Count 一致、Properties 更新正確
+本輪只允許修改：
 
-## 七、Provenance 正式設計
-每個 Entity Properties 保存：source_system, source_table, source_id, event_id, event_type, schema_version, actor_id, correlation_id, causation_id, occurred_at, aggregate_type, aggregate_id
-每個 Relation 也必須保存對應 Provenance。
-Evidence Entity 保存：evidence_id, source, citation, evidence_level, confidence
+## KnowGraphGo
 
-## 八、AI-Kill-Cancer Outbox Schema 補強
-Outbox 新增欄位：correlation_id, causation_id, occurred_at
-如需改 DB：新增 Migration 022（不得修改 Migration 021）
-Worker 重建 ClinicalGraphEvent 時完整傳遞所有欄位。
+```text
+Clinical CLI
+Clinical Adapter payload mapping
+Clinical tests
+```
 
-## 九、Event Payload 必須與真實模型一致
-逐一檢查 RecommendationService / ClinicalDecisionService / TumorBoardConsensusService 的 Domain Model 欄位。
-不得使用不存在或永遠為空的 title/description/drug_ids/evidence_ids/opinion_id。
-Recommendation Event：recommendation_id, patient_id, recommended_drugs, evidence_references, rank/score
-Clinical Decision Event：decision_id, patient_id, recommendation_id, decision_type, rationale, evidence_references, contraindications, alternatives
-Consensus Event：consensus_id, patient_id, clinical_decision_id, final_recommendation, consensus_status, consensus_score, supporting_evidence, specialist_opinions, participating_specialties
+## AI-Kill-Cancer
 
-## 十、Python Query ID 統一
-建立共享規格文件 docs/clinical-graph-id-spec.md。
-定義 UUID namespace、canonical key format、normalization rules、UUID version、relation key format。
-Python 實作 ClinicalGraphIDFactory，查詢時用 ClinicalGraphIDFactory.patient(patient_id) 等。
-必須有跨語言測試：Python ID == Go ID（至少測 patient/recommendation/decision/consensus/opinion/specialty/drug/evidence/relation）
+```text
+Cross-repository E2E script
+ID parity tests
+CI workflow
+Canonical event schema／fixtures（必要時）
+```
 
-## 十一、Explain Query 修正
-不得把 Entity ID 當 Relation ID。
-Recommendation Explain 至少找到 Patient/Recommendation/Drug/Evidence/Clinical Decision
-Consensus Explain 至少找到 ClinicalDecision/Consensus/Opinions/Specialties/Evidence
-不得只因 CLI 回傳 success 就標記 projection_status = connected，必須確認 entities 或 path 非空。
+---
 
-## 十二、ClinicalGraphClient 非阻塞化
-async def 內使用 subprocess.run() → 改為 asyncio.create_subprocess_exec()
-要求：shell=False, stdin pipe, stdout pipe, stderr pipe, timeout, process kill on timeout, return code validation, JSON parse validation
-新增測試：success, non-zero exit, timeout, invalid JSON, CLI not found, large stdout
+# 二、P0-1：真正實作 `clinical id` CLI
 
-## 十三、Worker Transaction 修正
-Claim Transaction：SELECT FOR UPDATE SKIP LOCKED → status=processing → claim_token → processing_started_at → commit
-External Work：不持有 DB lock → 執行 CLI
-Result Transaction：成功→completed，失敗→failed/pending retry
-新增 Outbox 欄位：claim_token, processing_started_at, last_failed_at（Migration 022）
-支援 stale recovery：processing 超過 timeout → 重新變為 pending
+目前 Python 測試會執行：
 
-## 十四、Failed Events 狀態一致性
-mark_failed() 將事件設為 failed（不是 pending），status 統一為：pending/processing/failed/completed/dead_letter
-claim_pending 查 status in (pending, failed) AND available_at <= now
+```text
+knowgraph clinical id patient P001
+```
 
-## 十五、Status API 真實健康度
-不得固定 {"status": "operational"}
-Status 必須結合：Outbox pending/failed/dead_letter, CLI availability, clinical verify, last completed projection time, oldest pending event age, stale processing count
-狀態：operational / degraded / unavailable
+但 KnowGraphGo 的 CLI 只支援：
 
-## 十六、CI 修正
-先完成 KnowGraphGo → Push → 取得 SHA → AI-Kill-Cancer CI ref 固定該 SHA → 再完成 AI-Kill-Cancer Commit
-不得使用 ref: master 或浮動 branch。
+```text
+apply
+rebuild
+verify
+```
 
-## 十七、真正跨倉庫 Integration Test
-Build CLI → 建立臨時 SQLite Graph DB → AI-Kill-Cancer 產生 Event → CLI apply → 再次 apply → CLI query → 驗證冪等 + Digital Thread
-事件順序：patient.created → recommendation.created → clinical_decision.created → tumor_board_consensus.created
-驗證：所有 Relation Target 存在、無 orphan relation、相同 Event 重放後 Count 不變、Provenance 可讀
+必須在 KnowGraphGo 正式新增：
 
-## 十八、KnowGraphGo 測試要求
-Deterministic ID golden tests, Patient/Recommendation/Decision/Consensus/Opinion/Specialty/Evidence/Drug mapping tests, Relation target integrity test, Duplicate replay test, Updated event upsert test, Rebuild idempotency test, Provenance test, Unknown schema version rejection, Sensitive payload rejection
-必須執行 go test ./... / go vet ./... / go build ./cmd/knowgraph
+```text
+knowgraph clinical id <kind> <business-key>
+```
 
-## 十九、AI-Kill-Cancer 測試要求
-Outbox full provenance round-trip, Migration 022 upgrade/downgrade/re-upgrade, Worker short transaction test, Concurrent worker claim test, Stale processing recovery, Failed event visibility, Async subprocess timeout, Python/Go ID parity, Recommendation/Decision/Consensus payload correctness, Patient thread real graph query, Recommendation explain real path, Consensus explain real path, Restart recovery with graph projection
+至少支援：
 
-## 二十、Commit Scope
-AI-Kill-Cancer：Migration 022, Outbox model/repository/service, Graph Event DTO, Graph client, Worker, Query API, Status API, Service event payload, Tests, CI, Phase 3D review/workflow documents
-KnowGraphGo：Clinical ID Factory, Clinical Adapter, Clinical Ontology, Clinical CLI, 相關 tests/docs
-不得混入 Treatment Plan/Phase 3E/其他功能/AGENTS.md 大型修改
+```text
+patient
+recommendation
+decision
+consensus
+opinion
+specialty
+drug
+evidence
+variant
+```
 
-## 二十一、Reviewer Gate
-逐項確認 20 項（Entity ID deterministic, Relation ID deterministic, Same Event replay idempotent, created→updated 不重複, 所有 Relation Target 存在, Patient→Recommendation 正確, Recommendation→Drug/Evidence 正確, Decision→Recommendation 正確, Consensus→Decision 正確, Consensus→Opinion→Specialty 正確, Python ID==Go ID, Provenance 完整, Event Payload 來自真實 Domain Model, async subprocess 不阻塞, Worker 不長時間持有 DB lock, stale processing 可恢復, failed events API 可見, Status API 反映 CLI 真實狀態, CI pin KnowGraphGo SHA, Cross-repository Digital Thread 測試通過）
-以下任一未完成則滿足需求=NO、Reviewer 最高 89：Deterministic ID / Relation Integrity / Idempotency / Digital Thread / Cross-language ID parity / Cross-repository integration
-Reviewer 必須 >=95 才可停止。
+以及 Relation：
 
-## 二十二、Git 提交順序
-先 KnowGraphGo：fix(clinical): make graph projection deterministic and idempotent → push origin/main
-取得 SHA → AI-Kill-Cancer CI pin 該 SHA
-AI-Kill-Cancer：fix(phase3d): harden graph identity projection and worker → push origin/master
-禁止 force push / rebase / 修改舊 Commit
+```text
+knowgraph clinical id relation <relation-kind> <from-business-key> <to-business-key>
+```
 
-## 二十三、完成後回報格式
-輸出 KnowGraphGo SHA、AI-Kill-Cancer SHA、Deterministic ID Algorithm、UUID Namespace、Python/Go ID Parity、Entity/Relation Kinds、Orphan Relation Count、Idempotency Results、Digital Thread Paths、Provenance Fields、Migration 022、Worker Correctness、Async Result、Status API、Explain Results、測試結果、CI Run IDs、Reviewer Score
-最終判定：Phase 3D Graph Correctness Hardening：PASS / PARTIAL / FAIL
-Phase 3D Accepted：YES / NO
-Ready for Treatment Plan：YES / NO
+---
 
-只有 Deterministic ID PASS / Relation Integrity PASS / Idempotent Replay PASS / Digital Thread PASS / Provenance PASS / Python/Go ID Parity PASS / Worker Correctness PASS / Cross-repository CI PASS / Reviewer >=95 才允許 YES。
+## Entity CLI 回傳格式
 
-推送後停止。不得自行開始 Treatment Plan。
+例如：
+
+```bash
+knowgraph clinical id patient P001
+```
+
+必須輸出：
+
+```json
+{
+  "kind": "patient",
+  "business_key": "P001",
+  "graph_id": "02fe1d2a-da12-5f27-a5ff-01d5ded671a5"
+}
+```
+
+Relation：
+
+```bash
+knowgraph clinical id relation FOR_PATIENT REC-001 P001
+```
+
+回傳：
+
+```json
+{
+  "kind": "relation",
+  "relation_kind": "FOR_PATIENT",
+  "from_business_key": "REC-001",
+  "to_business_key": "P001",
+  "graph_id": "..."
+}
+```
+
+要求：
+
+```text
+JSON 永遠有效
+錯誤輸出到 stderr
+錯誤時 exit code != 0
+空 ID 正常回傳 validation error
+不得 panic
+```
+
+同步更新 CLI Usage。
+
+---
+
+## CLI 測試
+
+新增 Go CLI tests：
+
+```text
+每一種 Entity Kind
+Relation
+大小寫／空白正規化
+空 key
+未知 kind
+參數不足
+JSON schema
+Exit code
+```
+
+不得只測 `ClinicalIDFactory`。
+
+必須測真正的 CLI handler。
+
+---
+
+# 三、P0-2：統一 Event Payload Schema
+
+目前 AI-Kill-Cancer E2E 傳入：
+
+```text
+recommended_drugs
+evidence_references
+supporting_evidence
+specialist_opinions
+```
+
+但 Go Adapter 主要讀取：
+
+```text
+drug_ids
+evidence_ids
+```
+
+兩邊契約不一致。
+
+必須定義一份正式 Canonical Schema。
+
+建議以 AI-Kill-Cancer 的正式 Domain Payload 為準：
+
+## Recommendation Event
+
+```json
+{
+  "recommendation_id": "REC-001",
+  "patient_id": "P001",
+  "title": "Recommendation",
+  "recommended_drugs": [
+    {
+      "drug_id": "DRUG-001",
+      "drug_name": "Olaparib",
+      "rank": 1,
+      "score": 0.95
+    }
+  ],
+  "evidence_references": [
+    {
+      "evidence_id": "EV-001",
+      "citation": "Study XYZ",
+      "evidence_level": "high",
+      "confidence": 0.9
+    }
+  ]
+}
+```
+
+## Clinical Decision Event
+
+```json
+{
+  "decision_id": "DC-001",
+  "patient_id": "P001",
+  "recommendation_id": "REC-001",
+  "decision_type": "APPROVED",
+  "description": "Clinical decision",
+  "rationale": "Based on evidence",
+  "evidence_references": [
+    {
+      "evidence_id": "EV-001",
+      "citation": "Study XYZ"
+    }
+  ]
+}
+```
+
+## Consensus Event
+
+```json
+{
+  "consensus_id": "CON-001",
+  "patient_id": "P001",
+  "clinical_decision_id": "DC-001",
+  "final_recommendation": "Approve Olaparib",
+  "consensus_status": "strong_consensus",
+  "consensus_score": 0.92,
+  "supporting_evidence": [
+    {
+      "evidence_id": "EV-001"
+    }
+  ],
+  "specialist_opinions": [
+    {
+      "opinion_id": "OP-001",
+      "specialist": "Dr. Smith",
+      "specialty": "medical_oncology",
+      "content": "Agree"
+    }
+  ],
+  "participating_specialties": [
+    "medical_oncology"
+  ]
+}
+```
+
+---
+
+## Go Adapter 要求
+
+Go Adapter 必須直接解析這些正式欄位：
+
+```text
+recommended_drugs[].drug_id
+evidence_references[].evidence_id
+supporting_evidence[].evidence_id
+specialist_opinions[]
+```
+
+可以保留舊欄位作向後相容：
+
+```text
+drug_ids
+evidence_ids
+```
+
+但正式 E2E 必須使用 Canonical Schema。
+
+不得只修改 E2E 腳本去迎合舊 Adapter，卻不符合 AI-Kill-Cancer 真實 Event Service。
+
+---
+
+## Schema 文件
+
+新增：
+
+```text
+docs/clinical-graph-event-schema-v1.md
+```
+
+至少定義：
+
+```text
+event envelope
+patient payload
+recommendation payload
+clinical decision payload
+consensus payload
+normalization
+required fields
+optional fields
+sensitive fields forbidden
+```
+
+Python Event Service、Go Adapter 與 E2E fixture 必須以同一 schema 為準。
+
+---
+
+# 四、P1-1：Path 測試必須驗證真實內容
+
+目前 E2E 只做：
+
+```python
+stdout, rc = query_path(...)
+assert rc == 0
+```
+
+這不足。
+
+必須改成 JSON Query，解析實際內容。
+
+如果 KnowGraphGo Query CLI 目前不支援 JSON，補上：
+
+```text
+--json query path
+```
+
+或使用既有 JSON 輸出契約。
+
+至少驗證：
+
+```text
+path found = true
+nodes 非空
+edges 非空
+起點 ID 正確
+終點 ID 正確
+Relation Kind 正確
+```
+
+---
+
+## 路徑方向
+
+正式 Graph Relation 是：
+
+```text
+Recommendation → Patient
+ClinicalDecision → Recommendation
+Consensus → ClinicalDecision
+```
+
+因此 E2E 查詢必須使用正確方向，或明確確認 Query 是無向。
+
+建議直接驗證實際 Relation：
+
+```text
+Recommendation ─FOR_PATIENT→ Patient
+ClinicalDecision ─BASED_ON→ Recommendation
+Consensus ─DERIVED_FROM→ ClinicalDecision
+```
+
+不要用名稱相反但語義不清楚的：
+
+```text
+Patient → Recommendation
+Recommendation → Decision
+Decision → Consensus
+```
+
+除非 Query API 明確回傳反向 traversal，且測試驗證 direction。
+
+---
+
+## Path Test 至少確認
+
+```text
+Recommendation → Patient：
+包含 FOR_PATIENT
+
+ClinicalDecision → Recommendation：
+包含 BASED_ON
+
+Consensus → ClinicalDecision：
+包含 DERIVED_FROM
+```
+
+以及：
+
+```text
+Recommendation → Drug：
+包含 RECOMMENDS
+
+Recommendation → Evidence：
+包含 SUPPORTED_BY
+
+Consensus → Opinion：
+包含 HAS_OPINION
+
+Opinion → Specialty：
+包含 PROVIDED_BY_SPECIALTY
+```
+
+不能只確認任意 Path 存在。
+
+---
+
+# 五、P1-2：Count Query 失敗必須直接 Fail
+
+目前 `query_count()` 失敗時回傳：
+
+```json
+{
+  "entities": 0,
+  "relations": 0
+}
+```
+
+這會導致兩次查詢都失敗時：
+
+```text
+0 == 0
+```
+
+錯誤判定冪等 PASS。
+
+必須改成：
+
+```text
+check command non-zero
+→ raise / exit test failure
+
+JSON parse failure
+→ raise / exit test failure
+
+必要欄位不存在
+→ raise / exit test failure
+```
+
+並驗證：
+
+```text
+entities > 0
+relations > 0
+```
+
+---
+
+## Replay 驗收
+
+第一次 apply 後：
+
+```text
+entity_count > 0
+relation_count > 0
+```
+
+第二次 replay 後：
+
+```text
+entity_count 完全相同
+relation_count 完全相同
+```
+
+此外必須檢查 CLI apply 結果：
+
+第一次：
+
+```text
+created > 0
+```
+
+第二次：
+
+```text
+created = 0
+updated > 0
+```
+
+若 Importer 回傳欄位可取得，應直接 assert。
+
+---
+
+# 六、Stub Preservation 真實驗證
+
+目前 Go unit test 有 Stub 測試，但 Cross-repository E2E 也必須驗證。
+
+流程：
+
+```text
+patient.created
+→ display_name = ANON
+→ sex = F
+→ age_range = 40-50
+→ cancer_type = BRCA
+
+recommendation.created
+→ 會附帶 Patient stub
+
+再查 Patient Entity
+```
+
+必須確認：
+
+```text
+display_name 仍是 ANON
+sex 仍是 F
+age_range 仍是 40-50
+cancer_type 仍是 BRCA
+```
+
+不得只驗證 Entity Count 不變。
+
+---
+
+# 七、Relation Provenance E2E 驗證
+
+至少從 SQLite Graph 查回一條 Relation，確認 Properties 包含：
+
+```text
+source_system
+event_id
+event_type
+aggregate_type
+aggregate_id
+correlation_id（若有）
+causation_id（若有）
+occurred_at
+```
+
+驗證：
+
+```text
+Recommendation → Patient
+或
+Consensus → Decision
+```
+
+不得只依 Go unit test。
+
+---
+
+# 八、CI 修正順序
+
+先完成 KnowGraphGo：
+
+```text
+clinical id CLI
+Canonical Payload Adapter
+CLI tests
+Adapter tests
+```
+
+建立 Commit：
+
+```text
+fix(clinical): add id cli and canonical event schema
+```
+
+推送到：
+
+```text
+origin/main
+```
+
+取得完整 SHA。
+
+然後 AI-Kill-Cancer：
+
+```text
+更新 CI pin 到新的 KnowGraphGo SHA
+修正 E2E Script
+修正 parity tests
+新增 schema 文件／fixtures
+```
+
+建立 Commit：
+
+```text
+fix(phase3d): complete cross repository acceptance verification
+```
+
+推送到：
+
+```text
+origin/master
+```
+
+---
+
+# 九、GitHub Actions 必須真正執行
+
+最新版 AI-Kill-Cancer CI 必須成功執行：
+
+```text
+CI-01 Build Go CLI
+CI-01 Go CLI id tests
+CI-01 Python == Go CLI parity
+CI-02 SQLite init
+CI-02 Apply four canonical events
+CI-02 Query actual paths
+CI-02 Idempotent replay
+CI-02 Stub preservation
+CI-02 Relation provenance
+CI-03 Go adapter tests
+Backend tests
+Frontend tests
+Postgres tests
+```
+
+不得：
+
+```text
+skip
+xfail
+|| true
+continue-on-error
+只看 exit code 不看輸出
+```
+
+---
+
+# 十、禁止事項
+
+不得：
+
+```text
+新增 Treatment Plan
+新增其他 API
+改 Outbox 架構
+改 Recommendation／Decision／Consensus 核心
+改 Migration 017～022
+降低 CI 標準
+刪除失敗測試
+忽略錯誤
+```
+
+不得再修改或提交：
+
+```text
+AGENTS.md
+```
+
+---
+
+# 十一、Reviewer Gate
+
+以下全部 PASS 才可完成：
+
+```text
+[ ] `clinical id` CLI 真實存在
+[ ] Python == Go CLI ID parity
+[ ] Canonical Event Schema 一致
+[ ] Drug Entity / Relation 真實建立
+[ ] Evidence Entity / Relation 真實建立
+[ ] Consensus Opinion / Specialty 真實建立
+[ ] Path JSON 內容正確
+[ ] Relation Kind 正確
+[ ] Count Query 無零值假 PASS
+[ ] Replay Count 不增加
+[ ] Stub 不覆蓋完整 Patient
+[ ] Relation Provenance 可從 Store 查回
+[ ] GitHub Actions 全綠
+```
+
+任一項：
+
+```text
+FAIL
+PARTIAL
+PENDING
+```
+
+則：
+
+```text
+滿足需求 = NO
+Reviewer 最高 89
+Phase 3D = PARTIAL
+Ready for Treatment Plan = NO
+```
+
+Reviewer 必須：
+
+```text
+>=95
+```
+
+才可結案。
+
+---
+
+# 十二、完成後只回報
+
+```text
+KnowGraphGo Final Commit SHA
+AI-Kill-Cancer Final Commit SHA
+
+Clinical ID CLI
+Supported ID Kinds
+Relation ID CLI
+
+Canonical Schema Version
+Recommendation Payload Mapping
+Decision Payload Mapping
+Consensus Payload Mapping
+
+Python / Go CLI Parity Tests
+Go CLI Tests
+
+E2E SQLite DB
+Canonical Events Applied
+Entity Count First Apply
+Relation Count First Apply
+Entity Count Replay
+Relation Count Replay
+
+Recommendation → Patient
+Recommendation → Drug
+Recommendation → Evidence
+Decision → Recommendation
+Consensus → Decision
+Consensus → Opinion
+Opinion → Specialty
+
+Stub Preservation
+Relation Provenance Fields
+
+KnowGraphGo Tests
+AI-Kill-Cancer Backend Tests
+Frontend Tests
+Postgres Tests
+Cross-repository E2E Tests
+
+KnowGraphGo CI Run ID
+AI-Kill-Cancer CI Run ID
+CI Conclusions
+
+Failed Required Steps
+Skipped Required Steps
+
+Git Status
+Push Results
+Reviewer Score
+```
+
+最後輸出：
+
+```text
+Phase 3D Final Acceptance：
+PASS / PARTIAL / FAIL
+
+Phase 3D Accepted：
+YES / NO
+
+Ready for ChatGPT GitHub Review：
+YES / NO
+
+Ready for Treatment Plan：
+YES / NO
+```
+
+只有所有驗收與 CI 全綠、Reviewer ≥95，才允許：
+
+```text
+Phase 3D Accepted：YES
+Ready for Treatment Plan：YES
+```
+
+推送後停止。
+
+不得自行開始 Treatment Plan。
