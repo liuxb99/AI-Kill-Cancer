@@ -193,7 +193,7 @@ class TestTumorBoardRestartRecovery:
         ``clinical_decision_id`` (business identifiers).
         """
         import uuid
-        from datetime import UTC, datetime
+        from datetime import datetime
 
         # Convert async URL to sync URL for the same file
         sync_url = db_url.replace("sqlite+aiosqlite:///", "sqlite:///").replace("postgresql+asyncpg://", "postgresql://")
@@ -206,8 +206,8 @@ class TestTumorBoardRestartRecovery:
                 display_name="TB-Restart-Patient",
                 sex=SexEnum.F,
                 consent_status=ConsentStatusEnum.GRANTED,
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
             )
             session.add(patient)
 
@@ -218,8 +218,8 @@ class TestTumorBoardRestartRecovery:
                 patient_id=patient_id,
                 engine_version="1.0.0",
                 status="completed",
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
             )
             session.add(recommendation)
             session.flush()  # ensure recommendation.id is populated
@@ -234,8 +234,8 @@ class TestTumorBoardRestartRecovery:
                 reason="Test reason for restart recovery test",
                 confidence="high",
                 status="active",
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
             )
             session.add(clinical_decision)
 
