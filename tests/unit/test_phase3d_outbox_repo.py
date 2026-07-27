@@ -152,7 +152,7 @@ class TestOutboxRepository:
         await db_session.commit()
         evt = await repo.get_by_event_id(event_id)
         assert evt is not None
-        assert evt.status == "failed" or evt.status == "dead_letter"
+        assert evt.status in ("failed", "dead_letter")
         assert evt.attempt_count >= 1
         assert "test error" in (evt.last_error or "")
 

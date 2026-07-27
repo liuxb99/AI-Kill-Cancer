@@ -1,6 +1,7 @@
 """Phase 3D — Graph Projection Worker Tests."""
 
 import uuid
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -54,6 +55,7 @@ class TestWorkerBasic:
             event_type="patient.created",
             schema_version=1,
             payload={"patient_id": "p-1", "display_name": "Test"},
+            occurred_at=datetime.now(timezone.utc),
         )
         await db_session.commit()
 
@@ -88,6 +90,7 @@ class TestWorkerBasic:
             event_type="recommendation.created",
             schema_version=1,
             payload={},
+            occurred_at=datetime.now(timezone.utc),
         )
         await db_session.commit()
 

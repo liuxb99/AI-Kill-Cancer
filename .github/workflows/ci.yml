@@ -264,6 +264,42 @@ jobs:
           rm -f test_migration_ci.db test_migration_ci.db-wal test_migration_ci.db-shm
           alembic -c migrations/alembic.ini upgrade head
 
+      # ============================================================
+      # CI-01: Cross-language ID Parity
+      # ============================================================
+      - name: CI-01 Checkout KnowGraphGo (fixed SHA)
+        uses: actions/checkout@v4
+        with:
+          repository: liuxb99/KnowGraphGo
+          path: KnowGraphGo
+          ref: d6fa05a7d13ec3d51473c737ab4ebe3482ac2950
+
+      - name: CI-01 Build Go CLI
+        working-directory: KnowGraphGo
+        run: go build -o knowgraph.exe ./cmd/knowgraph/
+
+      - name: CI-01 Run Go golden test
+        working-directory: KnowGraphGo
+        run: go test ./adapter/... -run TestGoldenIDOutput -v
+
+      - name: CI-01 Run Python ID parity test
+        run: python -m pytest tests/test_phase3d_id_parity.py -v --tb=short
+
+      # ============================================================
+      # CI-02: Cross-repository E2E Digital Thread
+      # ============================================================
+      - name: CI-02 Cross-repository E2E Digital Thread
+        env:
+          KNOWGRAPH_CLI: KnowGraphGo/knowgraph.exe
+        run: python scripts/cross_repo_e2e_test.py
+
+      # ============================================================
+      # CI-03~CI-05: Go adapter tests (Stub + Provenance + No Panic)
+      # ============================================================
+      - name: CI-03~CI-05 Go adapter tests
+        working-directory: KnowGraphGo
+        run: go test ./adapter/... -v
+
   frontend:
     runs-on: ubuntu-latest
     steps:

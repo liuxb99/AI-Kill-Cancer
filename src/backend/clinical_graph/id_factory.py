@@ -72,7 +72,7 @@ class ClinicalGraphIDFactory:
         canonical key 格式:
             clinical:relation:{kind}:{normalized_from}:{normalized_to}
         """
-        canonical = f"clinical:relation:{kind}:{_normalize(from_key)}:{_normalize(to_key)}"
+        canonical = f"clinical:relation:{_normalize(kind)}:{_normalize(from_key)}:{_normalize(to_key)}"
         return str(uuid.uuid5(CLINICAL_NAMESPACE, canonical))
 
 
