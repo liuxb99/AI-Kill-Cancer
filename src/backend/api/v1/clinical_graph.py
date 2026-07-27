@@ -25,30 +25,96 @@ async def get_graph_status(
     统计 ClinicalGraphOutbox 表中各类状态的事件数量，
     反映知识图谱投影的整体健康度。
     """
-    repo = ClinicalGraphOutboxRepository(db)
-    # 按 status 字段分组统计
-    stmt = (
-        select(
-            ClinicalGraphOutboxModel.status,
-            func.count(ClinicalGraphOutboxModel.id).label("count"),
-        )
-        .group_by(ClinicalGraphOutboxModel.status)
-    )
-    result = await db.execute(stmt)
-    rows = result.all()
+    from src.backend.clinical_graph.client import ClinicalGraphClient
 
-    status_counts: Dict[str, int] = {row.status: row.count for row in rows}
-    total = sum(status_counts.values())
+    repo = ClinicalGraphOutboxRepository(db)
+    counts = await repo.get_status_counts()
+    total = sum(counts.values())
+
+    dead_letter = counts.get("dead_letter", 0)
+    failed = counts.get("failed", 0)
+    pending = counts.get("pending", 0)
+    processing = counts.get("processing", 0)
+    completed = counts.get("completed", 0)
+
+    # 检查 CLI 可用性
+    cli_available = False
+    cli_check_error = None
+    verify_result = None
+    try:
+        client = ClinicalGraphClient()
+        result = await client._run_cli(["--help"])
+        cli_available = result.get("success", False)
+        if cli_available:
+            verify = await client._run_cli(["clinical", "verify"])
+            verify_result = "pass" if verify.get("success") else "fail"
+    except Exception as e:
+        cli_check_error = str(e)
+
+    # 查 last completed projection time
+    last_completed = None
+    try:
+        stmt = (
+            select(ClinicalGraphOutboxModel.processed_at)
+            .where(ClinicalGraphOutboxModel.status == "completed")
+            .order_by(ClinicalGraphOutboxModel.processed_at.desc())
+            .limit(1)
+        )
+        result = await db.execute(stmt)
+        row = result.scalar_one_or_none()
+        if row:
+            last_completed = row.isoformat() if hasattr(row, 'isoformat') else str(row)
+    except Exception:
+        pass
+
+    # 查 stale processing count
+    stale_count = 0
+    try:
+        stale_count = await repo.release_stale(timeout_minutes=30)
+    except Exception:
+        pass
+
+    # 查 oldest pending event age
+    oldest_pending_age = None
+    try:
+        stmt = (
+            select(ClinicalGraphOutboxModel.created_at)
+            .where(ClinicalGraphOutboxModel.status.in_(["pending", "failed"]))
+            .order_by(ClinicalGraphOutboxModel.created_at.asc())
+            .limit(1)
+        )
+        result = await db.execute(stmt)
+        row = result.scalar_one_or_none()
+        if row:
+            from datetime import datetime
+            oldest_pending_age = (datetime.utcnow() - row).total_seconds()
+    except Exception:
+        pass
+
+    # 决定整体状态
+    if not cli_available:
+        overall_status = "unavailable"
+    elif dead_letter > 0 or stale_count > 0:
+        overall_status = "degraded"
+    else:
+        overall_status = "operational"
 
     return {
-        "status": "operational",
+        "status": overall_status,
         "total_events": total,
-        "status_counts": status_counts,
-        "failed": status_counts.get("failed", 0) + status_counts.get("dead_letter", 0),
-        "pending": status_counts.get("pending", 0),
-        "processing": status_counts.get("processing", 0),
-        "completed": status_counts.get("completed", 0),
-        "dead_letter": status_counts.get("dead_letter", 0),
+        "status_counts": counts,
+        "failed": failed,
+        "pending": pending,
+        "processing": processing,
+        "completed": completed,
+        "dead_letter": dead_letter,
+        "cli_available": cli_available,
+        "cli_error": cli_check_error,
+        "verify_result": verify_result,
+        "last_completed_projection_time": last_completed,
+        "stale_processing_count": stale_count,
+        "oldest_pending_event_age_seconds": oldest_pending_age,
+        "degraded_reason": _get_degraded_reason(counts, cli_available, stale_count, dead_letter),
     }
 
 
@@ -117,14 +183,18 @@ async def get_patient_thread(
     """
     try:
         from src.backend.clinical_graph.client import ClinicalGraphClient
+        from src.backend.clinical_graph.id_factory import ClinicalGraphIDFactory
 
         client = ClinicalGraphClient()
-        result = await client.query_related(patient_id, depth=3)
-        if result.get("success"):
+        graph_id = ClinicalGraphIDFactory.patient_id(patient_id)
+        result = await client.query_related(graph_id, depth=3)
+        entities = result.get("entities", [])
+        relations = result.get("relations", [])
+        if result.get("success") and (entities or relations):
             return {
                 "patient_id": patient_id,
-                "entities": result.get("entities", []),
-                "relations": result.get("relations", []),
+                "entities": entities,
+                "relations": relations,
                 "projection_status": "connected",
             }
         return {
@@ -159,17 +229,22 @@ async def get_recommendation_explain(
     """
     try:
         from src.backend.clinical_graph.client import ClinicalGraphClient
+        from src.backend.clinical_graph.id_factory import ClinicalGraphIDFactory
 
         client = ClinicalGraphClient()
-        related = await client.query_related(recommendation_id, depth=2)
-        explain = await client.explain_relation(recommendation_id)
-        if related.get("success") or explain.get("success"):
+        graph_id = ClinicalGraphIDFactory.recommendation_id(recommendation_id)
+        related = await client.query_related(graph_id, depth=3)
+
+        entities = related.get("entities", [])
+        relations = related.get("relations", [])
+
+        if entities:
             return {
                 "recommendation_id": recommendation_id,
-                "entities": related.get("entities", []),
-                "relations": related.get("relations", []),
-                "provenance": explain.get("provenance", explain.get("evidence", [])),
-                "explanation": explain.get("explanation", explain.get("message")),
+                "entities": entities,
+                "relations": relations,
+                "provenance": related.get("provenance", []),
+                "explanation": _build_explain_text(entities, relations, "recommendation"),
                 "projection_status": "connected",
             }
         return {
@@ -179,19 +254,16 @@ async def get_recommendation_explain(
             "provenance": [],
             "explanation": None,
             "projection_status": "projection_pending",
-            "message": related.get("error") or explain.get("error") or "graph data not yet projected",
+            "message": "no graph data found",
         }
     except Exception:
-        logger = __import__("logging").getLogger(__name__)
-        logger.exception("recommendation_explain query failed for %s", recommendation_id)
+        import logging
+        logging.getLogger(__name__).exception("recommendation_explain failed for %s", recommendation_id)
         return {
             "recommendation_id": recommendation_id,
-            "entities": [],
-            "relations": [],
-            "provenance": [],
-            "explanation": None,
+            "entities": [], "relations": [], "provenance": [], "explanation": None,
             "projection_status": "projection_pending",
-            "message": "KnowGraphGo CLI not available or query failed",
+            "message": "KnowGraphGo CLI not available",
         }
 
 
@@ -208,17 +280,22 @@ async def get_consensus_explain(
     """
     try:
         from src.backend.clinical_graph.client import ClinicalGraphClient
+        from src.backend.clinical_graph.id_factory import ClinicalGraphIDFactory
 
         client = ClinicalGraphClient()
-        related = await client.query_related(consensus_id, depth=2)
-        explain = await client.explain_relation(consensus_id)
-        if related.get("success") or explain.get("success"):
+        graph_id = ClinicalGraphIDFactory.consensus_id(consensus_id)
+        related = await client.query_related(graph_id, depth=3)
+
+        entities = related.get("entities", [])
+        relations = related.get("relations", [])
+
+        if entities:
             return {
                 "consensus_id": consensus_id,
-                "entities": related.get("entities", []),
-                "relations": related.get("relations", []),
-                "provenance": explain.get("provenance", explain.get("evidence", [])),
-                "explanation": explain.get("explanation", explain.get("message")),
+                "entities": entities,
+                "relations": relations,
+                "provenance": related.get("provenance", []),
+                "explanation": _build_explain_text(entities, relations, "consensus"),
                 "projection_status": "connected",
             }
         return {
@@ -228,17 +305,59 @@ async def get_consensus_explain(
             "provenance": [],
             "explanation": None,
             "projection_status": "projection_pending",
-            "message": related.get("error") or explain.get("error") or "graph data not yet projected",
+            "message": "no graph data found",
         }
     except Exception:
-        logger = __import__("logging").getLogger(__name__)
-        logger.exception("consensus_explain query failed for %s", consensus_id)
+        import logging
+        logging.getLogger(__name__).exception("consensus_explain failed for %s", consensus_id)
         return {
             "consensus_id": consensus_id,
-            "entities": [],
-            "relations": [],
-            "provenance": [],
-            "explanation": None,
+            "entities": [], "relations": [], "provenance": [], "explanation": None,
             "projection_status": "projection_pending",
-            "message": "KnowGraphGo CLI not available or query failed",
+            "message": "KnowGraphGo CLI not available",
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Helper functions
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _get_degraded_reason(counts: dict, cli_available: bool, stale_count: int = 0, dead_letter: int = 0) -> str | None:
+    """返回服务降级的原因描述。"""
+    if not cli_available:
+        return "KnowGraphGo CLI is not available"
+    dead_letter = dead_letter or counts.get("dead_letter", 0)
+    reasons = []
+    if dead_letter > 0:
+        reasons.append(f"{dead_letter} dead-letter events")
+    if stale_count > 0:
+        reasons.append(f"{stale_count} stale processing events recovered")
+    if counts.get("failed", 0) > 0:
+        reasons.append(f"{counts['failed']} failed events")
+    if not reasons:
+        return None
+    return "; ".join(reasons)
+
+
+def _build_explain_text(entities: list, relations: list, kind: str) -> str:
+    """從 entities/relations 建構可讀的解釋文字。"""
+    if kind == "recommendation":
+        drugs = [e.get("name", "") for e in entities if e.get("kind") == "drug"]
+        evidence_count = sum(1 for e in entities if e.get("kind") == "evidence")
+        parts = [f"Found {len(entities)} related entities and {len(relations)} relations."]
+        if drugs:
+            parts.append(f"Recommended drugs: {', '.join(drugs)}.")
+        if evidence_count:
+            parts.append(f"Supported by {evidence_count} evidence items.")
+        return " ".join(parts)
+    elif kind == "consensus":
+        opinions = [e.get("name", "") for e in entities if e.get("kind") == "specialist_opinion"]
+        specialties = [e.get("name", "") for e in entities if e.get("kind") == "specialty"]
+        parts = [f"Found {len(entities)} related entities and {len(relations)} relations."]
+        if opinions:
+            parts.append(f"Specialist opinions: {len(opinions)}.")
+        if specialties:
+            parts.append(f"Participating specialties: {', '.join(specialties)}.")
+        return " ".join(parts)
+    return f"Found {len(entities)} entities and {len(relations)} relations."

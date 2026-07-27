@@ -48,6 +48,7 @@ from src.backend.schemas.clinical_graph_event import (
     GraphAggregateType,
     GraphEventType,
 )
+from src.backend.clinical_graph.id_factory import ClinicalGraphIDFactory
 from src.backend.services.clinical_graph_event_service import (
     ClinicalGraphEventService,
 )
@@ -398,19 +399,37 @@ class TumorBoardConsensusService:
 
             # ── Write outbox event (same transaction) ──────────────────
             if self._graph_event_service is not None:
-                minimal_payload = {
+                # 從 result (ConsensusResult) 中提取資訊
+                specialist_opinions = []
+                if hasattr(request, 'specialist_opinions'):
+                    for op_idx, opinion in enumerate(request.specialist_opinions):
+                        specialist_opinions.append({
+                            "opinion_id": ClinicalGraphIDFactory.opinion_id(
+                                f"{getattr(opinion, 'specialty', '') or 'unknown'}"
+                                f":{getattr(opinion, 'participant_id', '') or str(op_idx)}"
+                                f":{op_idx}"
+                            ),
+                            "specialty": getattr(opinion, 'specialty', '') or "",
+                            "opinion_type": getattr(opinion, 'opinion_type', '') or "",
+                            "support_level": getattr(opinion, 'support_level', '') or "",
+                        })
+
+                payload = {
                     "consensus_id": consensus_id,
                     "patient_id": str(patient_uuid) if patient_uuid else "",
-                    "recommendation_id": request.recommendation_id,
                     "clinical_decision_id": request.clinical_decision_id,
-                    "consensus_status": result.consensus_status.value,
+                    "final_recommendation": result.final_recommendation,
+                    "consensus_status": result.consensus_status.value if hasattr(result.consensus_status, 'value') else str(result.consensus_status),
+                    "consensus_score": result.consensus_score,
+                    "supporting_evidence": [],
+                    "specialist_opinions": specialist_opinions,
                     "participating_specialties": result.participating_specialties,
                 }
                 await self._graph_event_service.create_event(
                     aggregate_type=GraphAggregateType.TUMOR_BOARD_CONSENSUS,
                     aggregate_id=consensus_id,
                     event_type=GraphEventType.TUMOR_BOARD_CONSENSUS_CREATED,
-                    payload=minimal_payload,
+                    payload=payload,
                 )
 
             await self._db.commit()

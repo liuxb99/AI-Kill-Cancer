@@ -373,18 +373,22 @@ class ClinicalDecisionService:
 
             # ── Write outbox event (same transaction) ──────────────────
             if self._graph_event_service is not None:
-                minimal_payload = {
+                payload = {
                     "decision_id": decision_id,
                     "patient_id": str(patient_uuid),
                     "recommendation_id": rec_id_str,
                     "decision_type": result.decision_type,
+                    "rationale": result.reason,
+                    "evidence_references": result.evidence_summary if hasattr(result, 'evidence_summary') else {},
+                    "contraindications": getattr(result, 'contraindications', []),
+                    "alternatives": getattr(result, 'alternatives', []),
                     "confidence": result.confidence,
                 }
                 await self._graph_event_service.create_event(
                     aggregate_type=GraphAggregateType.CLINICAL_DECISION,
                     aggregate_id=decision_id,
                     event_type=GraphEventType.CLINICAL_DECISION_CREATED,
-                    payload=minimal_payload,
+                    payload=payload,
                 )
 
             await self._db.commit()

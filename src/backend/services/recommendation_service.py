@@ -276,17 +276,41 @@ class RecommendationService:
 
             # ── Write outbox event (same transaction) ──────────────────
             if self._graph_event_service is not None:
-                minimal_payload = {
+                # 取得 recommendations 中的 drug 資訊
+                recommended_drugs = []
+                for rec in response.get("recommendations", []):
+                    if isinstance(rec, dict):
+                        recommended_drugs.append({
+                            "drug_name": rec.get("drug_name", ""),
+                            "rank": rec.get("rank", 0),
+                            "overall_score": rec.get("overall_score", 0.0),
+                        })
+
+                # 从 recommendations 提取证据引用（分数级别的证据摘要）
+                evidence_refs = []
+                for rec in response.get("recommendations", []):
+                    if isinstance(rec, dict):
+                        evidence_refs.append({
+                            "drug_name": rec.get("drug_name", ""),
+                            "evidence_score": rec.get("evidence_score", 0.0),
+                            "sensitivity_score": rec.get("sensitivity_score", 0.0),
+                            "resistance_score": rec.get("resistance_score", 0.0),
+                            "conflict_score": rec.get("conflict_score", 0.0),
+                        })
+
+                payload = {
                     "recommendation_id": recommendation_id,
-                    "title": context.diagnosis or "",
                     "patient_id": patient_id,
-                    "status": "completed",
+                    "recommended_drugs": recommended_drugs,
+                    "evidence_references": evidence_refs,
+                    "rank": 0,
+                    "score": 0.0,
                 }
                 await self._graph_event_service.create_event(
                     aggregate_type=GraphAggregateType.RECOMMENDATION,
                     aggregate_id=recommendation_id,
                     event_type=GraphEventType.RECOMMENDATION_CREATED,
-                    payload=minimal_payload,
+                    payload=payload,
                     actor_id=user_id,
                 )
 

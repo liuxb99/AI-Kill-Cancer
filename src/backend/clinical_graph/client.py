@@ -1,8 +1,8 @@
 """ClinicalGraphClient — Python 侧通过 subprocess 调用 KnowGraphGo CLI。"""
 
+import asyncio
 import json
 import logging
-import subprocess
 from typing import Any, Dict, List, Optional
 
 from src.backend.schemas.clinical_graph_event import ClinicalGraphEvent
@@ -23,12 +23,12 @@ class ClinicalGraphClient:
     async def apply_event(self, event: ClinicalGraphEvent) -> Dict[str, Any]:
         """应用单个事件到知识图谱。"""
         event_json = event.model_dump_json()
-        return await self._run_cli(["clinical", "apply"], input_data=event_json)
+        return await self._run_cli(["clinical", "apply"], input_data=event_json.encode())
 
     async def apply_events_batch(self, events: List[ClinicalGraphEvent]) -> Dict[str, Any]:
         """批量重建知识图谱。"""
         events_json = json.dumps([json.loads(e.model_dump_json()) for e in events])
-        return await self._run_cli(["clinical", "rebuild"], input_data=events_json)
+        return await self._run_cli(["clinical", "rebuild"], input_data=events_json.encode())
 
     # ── 查询方法 ──────────────────────────────────────────────
 
@@ -50,35 +50,43 @@ class ClinicalGraphClient:
 
     # ── CLI 执行 ────────────────────────────────────────────
 
-    async def _run_cli(self, args: List[str], input_data: str = "") -> Dict[str, Any]:
-        """运行 CLI 命令。"""
+    async def _run_cli(self, args: List[str], input_data: Optional[bytes] = None) -> Dict[str, Any]:
+        """运行 CLI 命令（非阻塞 asyncio）。"""
         try:
-            result = subprocess.run(
-                [self._cli_path] + args,
-                input=input_data,
-                capture_output=True,
-                text=True,
-                timeout=self._timeout,
+            proc = await asyncio.create_subprocess_exec(
+                self._cli_path, *args,
+                stdin=asyncio.subprocess.PIPE if input_data is not None else None,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            if result.returncode != 0:
-                error_msg = result.stderr.strip() or f"CLI exited with code {result.returncode}"
-                logger.error("CLI error: %s", error_msg)
-                return {"success": False, "error": error_msg}
-            if result.stdout.strip():
-                try:
-                    return json.loads(result.stdout)
-                except json.JSONDecodeError:
-                    return {"success": True, "message": result.stdout.strip()}
-            return {"success": True}
-        except subprocess.TimeoutExpired:
-            logger.error("CLI timeout after %ds", self._timeout)
-            return {"success": False, "error": f"timeout after {self._timeout}s"}
         except FileNotFoundError:
             logger.error("CLI not found: %s", self._cli_path)
             return {"success": False, "error": f"CLI not found: {self._cli_path}"}
+
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(input=input_data), timeout=self._timeout
+            )
+        except asyncio.TimeoutError:
+            logger.error("CLI timeout after %ds", self._timeout)
+            proc.kill()
+            await proc.wait()
+            return {"success": False, "error": f"timeout after {self._timeout}s"}
         except Exception as e:
             logger.exception("CLI run failed")
             return {"success": False, "error": str(e)}
+
+        if proc.returncode != 0:
+            error_msg = stderr.decode().strip() or f"CLI exited with code {proc.returncode}"
+            logger.error("CLI error: %s", error_msg)
+            return {"success": False, "error": error_msg}
+
+        if stdout.strip():
+            try:
+                return json.loads(stdout.decode())
+            except json.JSONDecodeError:
+                return {"success": True, "message": stdout.decode().strip()}
+        return {"success": True}
 
 
 __all__ = ["ClinicalGraphClient"]

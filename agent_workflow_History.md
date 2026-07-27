@@ -349,3 +349,37 @@ Commit: a64f7a1 | 796 tests passed | Pushed to origin/master ✅
 2026-07-27 14:40 | [v] task(PLANNER) resume -> 返工第1次重新規劃（修復 Query API 佔位資料 + Rebuild CLI 核心邏輯 + CI 跨倉庫整合）
 2026-07-27 14:45 | [v] 返工第1次開發完成：Query API 改為實際 CLI 查詢 + Rebuild CLI 實現業務邏輯 + Client 新增查詢方法 + CI 新增跨倉庫整合
 2026-07-27 14:50 | [v] 返工第2次開發完成：Retry API 角色檢查 + View in Knowledge Graph 連結（3頁面）+ RETRY_DELAYS 去重
+2026-07-27 14:55 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性24 正確性25 可維護性23 測試23 | 總分95 合格 ✅
+
+---
+
+## Phase 3D 完成 🎉
+
+AI-Kill-Cancer Commit: 5882612 | KnowGraphGo Commit: 4b63405
+Reviewer Score: 95/100 ✅ | Ready for Treatment Plan Phase: YES ✅
+
+2026-07-27 15:00 | [v] 歸檔上一輪 requirements.md → requirements-history/requirements-Phase-3D.md
+2026-07-27 15:00 | [v] agent_workflow.md 已重置為初始狀態，等待 Step 0A
+2026-07-27 15:02 | [v] task(doc-writer) -> Step 0A 完成：子代理已向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」✅
+2026-07-27 15:05 | [v] task(doc-writer) -> Step 0B 完成：Phase 3D Graph Correctness Hardening 需求已記錄到 tasks/requirements.md ✅
+2026-07-27 15:06 | [v] task(子代理) -> Step 1 完成：場景識別為 hardening，tasks/task-status.md 已更新 ✅
+2026-07-27 15:08 | [v] task(PLANNER) -> Step 2 完成，產出 tasks/plan-phase3d-hardening.md（17 任務，4 Phase，~35h）✅
+2026-07-27 15:12 | [v] task(knowgraphgo-dev) -> Phase KG 完成：ClinicalIDFactory + Adapter 修正 + 20 tests PASS，KnowGraphGo commit cfb7676 ✅
+2026-07-27 15:30 | [v] fleet(AKC-01+AKC-03+AKC-04) -> Batch 1 完成：Migration 022 + ID Factory + Async Client ✅
+2026-07-27 15:35 | [v] task(AKC-02+05+06+07) -> Batch 2 完成：Payload 改進 + Worker 三段式 + Status API 健康度 + Explain Query 修正 ✅
+2026-07-27 15:36 | [v] AKC-08 -> CI 修正完成：KnowGraphGo SHA pinned + Cross-repo Integration Test ✅
+2026-07-27 15:40 | [v] Provenance 修正 + KnowGraphGo commit 7828178 ✅（adapter.go entityProps 補齊全部 Provenance 欄位）
+2026-07-27 15:41 | [v] CI SHA 更新為 7828178 ✅
+2026-07-27 15:42 | [v] Step 4b 需求回歸檢查：18/20 PASS，2 FAIL（Provenance + Status API）→ 已修復 ✅
+2026-07-27 15:45 | [v] Provenance 修復：entityProps 補齊 aggregate_type/aggregate_id，KnowGraphGo f0a1075 ✅
+2026-07-27 15:46 | [v] Status API 強化：添加 verify_result/last_completed/stale_count/oldest_pending_age ✅
+2026-07-27 15:47 | [v] ClinicalGraphEventService 補齊 occurred_at/correlation_id/causation_id 傳遞 ✅
+2026-07-27 15:47 | [v] CI SHA 更新為 f0a1075 ✅
+2026-07-27 15:12 | [v] task(knowgraphgo-dev) -> Phase KG 完成：ClinicalIDFactory + Adapter 修正 + 20 tests PASS，KnowGraphGo commit cfb7676 ✅
+2026-07-27 15:50 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=NO 滿足需求=NO 測試=YES | 完整性7 正確性6 可維護性17 測試12 | 總分42 不合格 ❌
+2026-07-27 15:50 | [v] task(PLANNER) resume -> 返工第1次重新規劃（4 核心問題）
+2026-07-27 15:55 | [v] task(開發子代理) resume -> 返工第1次修復完成：opinion_id 確定性 + Patient Thread 檢查 + evidence 註釋 + 6 新測試 ✅
+2026-07-27 16:00 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=NO 測試=YES | 完整性8 正確性15 可維護性20 測試12 | 總分55 不合格 ❌
+2026-07-27 16:01 | [v] task(開發子代理) resume -> 返工第2次修復完成：evidence_references 提取 + idx bug 修復 + 21 新測試 ✅
+2026-07-27 16:03 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=NO 測試=YES | 完整性8 正確性15 可維護性20 測試12 | 總分62 不合格 ❌
+2026-07-27 16:05 | [v] CI 強化：所有 adapter tests + 跨語言 ID parity 驗證 ✅

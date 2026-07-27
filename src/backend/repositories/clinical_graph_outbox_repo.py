@@ -42,13 +42,13 @@ class ClinicalGraphOutboxRepository:
         return result.scalar_one_or_none()
 
     async def claim_pending(self, max_batch: int = 10) -> Sequence[ClinicalGraphOutboxModel]:
-        """Claim 待处理事件（使用 FOR UPDATE SKIP LOCKED）。"""
+        """Claim 待处理事件（含 pending/failed，使用 FOR UPDATE SKIP LOCKED）。"""
         now = datetime.utcnow()
         stmt: Select = (
             select(ClinicalGraphOutboxModel)
             .where(
                 and_(
-                    ClinicalGraphOutboxModel.status == "pending",
+                    ClinicalGraphOutboxModel.status.in_(["pending", "failed"]),
                     ClinicalGraphOutboxModel.available_at <= now,
                 )
             )
@@ -60,6 +60,8 @@ class ClinicalGraphOutboxRepository:
         rows = result.scalars().all()
         for row in rows:
             row.status = "processing"
+            row.claim_token = str(uuid.uuid4())
+            row.processing_started_at = now
         return rows
 
     async def mark_completed(self, event_id: str) -> None:
@@ -82,7 +84,7 @@ class ClinicalGraphOutboxRepository:
         if DEFAULT_RETRY_POLICY.is_dead_letter(new_attempt):
             new_status = "dead_letter"
         else:
-            new_status = "pending"
+            new_status = "failed"
         stmt = (
             update(ClinicalGraphOutboxModel)
             .where(ClinicalGraphOutboxModel.event_id == event_id)
@@ -91,6 +93,7 @@ class ClinicalGraphOutboxRepository:
                 attempt_count=new_attempt,
                 last_error=error[:1024],
                 available_at=_next_available_at(new_attempt),
+                last_failed_at=now,
                 updated_at=now,
             )
         )
@@ -109,6 +112,58 @@ class ClinicalGraphOutboxRepository:
             )
         )
         await self._db.execute(stmt)
+
+    async def release_stale(self, timeout_minutes: int = 30) -> int:
+        """释放卡在 processing 超过指定分钟的陈旧事件，重设为 pending。"""
+        now = datetime.utcnow()
+        deadline = now - timedelta(minutes=timeout_minutes)
+        stmt = (
+            select(ClinicalGraphOutboxModel)
+            .where(
+                and_(
+                    ClinicalGraphOutboxModel.status == "processing",
+                    ClinicalGraphOutboxModel.processing_started_at < deadline,
+                )
+            )
+            .with_for_update(skip_locked=True)
+        )
+        result = await self._db.execute(stmt)
+        rows = result.scalars().all()
+        for row in rows:
+            row.status = "pending"
+            row.claim_token = None
+            row.processing_started_at = None
+        return len(rows)
+
+    async def get_failed_events(self, limit: int = 50) -> Sequence[ClinicalGraphOutboxModel]:
+        """查询 failed / dead_letter 事件。"""
+        stmt = (
+            select(ClinicalGraphOutboxModel)
+            .where(
+                ClinicalGraphOutboxModel.status.in_(["failed", "dead_letter"])
+            )
+            .order_by(ClinicalGraphOutboxModel.updated_at.desc())
+            .limit(limit)
+        )
+        result = await self._db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_status_counts(self) -> dict:
+        """返回各状态的事件计数。"""
+        from sqlalchemy import func
+
+        stmt = (
+            select(
+                ClinicalGraphOutboxModel.status,
+                func.count().label("count"),
+            )
+            .group_by(ClinicalGraphOutboxModel.status)
+        )
+        result = await self._db.execute(stmt)
+        counts: dict[str, int] = {}
+        for row in result.all():
+            counts[row.status] = row.count
+        return counts
 
     async def list_failed(self, limit: int = 50) -> Sequence[ClinicalGraphOutboxModel]:
         """列出失败/死信事件。"""
