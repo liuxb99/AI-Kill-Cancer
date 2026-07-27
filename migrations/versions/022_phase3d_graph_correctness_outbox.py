@@ -25,10 +25,23 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def _has_column(table: str, column: str) -> bool:
-    """检查表中是否已存在某列（PRAGMA table_info 方式，支援 SQLite）。"""
+    """跨資料庫檢查表中是否已存在某列（支援 SQLite 和 PostgreSQL）。"""
     conn = op.get_bind()
-    rows = conn.execute(sa.text(f"PRAGMA table_info({table})")).fetchall()
-    return any(row[1] == column for row in rows)
+    dialect = conn.dialect.name
+    if dialect == "sqlite":
+        rows = conn.execute(sa.text(f"PRAGMA table_info({table})")).fetchall()
+        return any(row[1] == column for row in rows)
+    elif dialect == "postgresql":
+        rows = conn.execute(
+            sa.text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = :table AND column_name = :column"
+            ),
+            {"table": table, "column": column},
+        ).fetchall()
+        return len(rows) > 0
+    else:
+        return False
 
 
 def upgrade() -> None:

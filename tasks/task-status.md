@@ -1,52 +1,45 @@
 # Task Status
 
 ## 場景
-cross-repo-acceptance-fix
+- 場景類型：acceptance-fix（自定義場景）
+- 任務ID：Phase-3D-Final-Acceptance-Fix-R2
+- 創建時間：2026-07-27 22:05
 
-## 場景說明
-跨倉庫（KnowGraphGo × AI-Kill-Cancer）修正 Phase 3D Final Acceptance 的四個驗收缺口
+### 選擇理由
+
+本任務跨越 CI/CD 配置修復、E2E 測試強化、Go 後端開發三個領域，標準場景（devops、hardening）均無法涵蓋全部所需角色，故採用自定義場景 `acceptance-fix`。
+
+| 需求 | 性質 | 所需角色 |
+|------|------|---------|
+| P0-1 Postgres Integration Gate | CI 配置修復 + DB migration 相容性修復 | devops, backend-logic |
+| P0-2 Stub Preservation | E2E 測試強化（四次驗證五欄位） | test-writer |
+| P0-3 Relation Provenance | 新增 Relation Query + 八欄位驗證 | knowgraphgo-dev, test-writer |
+| P0-4 KnowGraphGo Checkout | CI 固定 SHA | devops |
+
+### 比對記錄
+
+| 場景 | 匹配度 | 說明 |
+|------|--------|------|
+| feature-dev | ❌ 低 | 需要 api-designer/frontend-logic 等角色，本任務不需要 |
+| bug-fix | ❌ 低 | 缺少 devops、test-writer 角色 |
+| devops | ⚠️ 中 | 有 devops 角色但缺少 test-writer，無法處理 P0-2/P0-3 |
+| hardening | ⚠️ 中 | 有 test-writer 但缺少 devops 和 knowgraphgo-dev |
+| **acceptance-fix（自定義）** | ✅ 高 | 可靈活涵蓋所有必要角色 |
 
 ## 角色分派
-- **planner**: 規劃執行計劃
-- **general-manager**: 總經理，流程管控、子代理調度、協調兩個倉庫
-- **backend-logic**: 實作 KnowGraphGo Clinical CLI `clinical id` 指令及 Adapter Canonical Payload 映射
-- **unit-tester**: 撰寫 Go CLI Tests 與 Adapter Tests
-- **integration-tester**: 撰寫跨倉庫 E2E 測試、ID Parity 測試、Replay 驗證、Stub Preservation 驗證
-- **doc-writer**: 撰寫 `docs/clinical-graph-event-schema-v1.md` Canonical Schema 文件
-- **reviewer**: 評分驗證（需 >= 95 分才可結案）
+| 角色 | 負責人 | 任務 |
+|------|--------|------|
+| PLANNER | planner | 制定執行計劃 |
+| devops | devops | 修復 CI 配置（P0-1、P0-4） |
+| backend-logic | backend-logic | 修復 Postgres/Databse migration 相容性（P0-1.2） |
+| test-writer | test-writer | 強化 E2E 測試（P0-2、P0-3 測試部分） |
+| knowgraphgo-dev | knowgraphgo-dev | Go 端新增 Relation Query（P0-3） |
+| REVIEWER | reviewer | 評分驗證 |
 
-## 當前階段
-Step 1 — 場景識別與角色分派
-
-## 範圍限制
-- ❌ 不得新增功能（不得新增 Treatment Plan 或其他 API）
-- ❌ 不得重構 Outbox
-- ❌ 不得修改已驗收的 Clinical Domain 功能（Recommendation／Decision／Consensus 核心）
-- ❌ 不得開始 Treatment Plan
-- ❌ 不得修改或提交 AGENTS.md
-- ❌ 不得修改 Migration 017～022
-- ❌ 不得降低 CI 標準
-
-## 驗收標準
-1. ✅ `clinical id` CLI 真實存在
-2. ✅ Python == Go CLI ID parity
-3. ✅ Canonical Event Schema 一致
-4. ✅ Drug Entity / Relation 真實建立
-5. ✅ Evidence Entity / Relation 真實建立
-6. ✅ Consensus Opinion / Specialty 真實建立
-7. ✅ Path JSON 內容正確
-8. ✅ Relation Kind 正確
-9. ✅ Count Query 無零值假 PASS
-10. ✅ Replay Count 不增加
-11. ✅ Stub 不覆蓋完整 Patient
-12. ✅ Relation Provenance 可從 Store 查回
-13. ✅ GitHub Actions 全綠
-
----
-
-## 執行清單
-
-### Step 1：場景識別與角色分派 ✅（已完成）
-- [x] 識別場景
-- [x] 分派角色
-- [x] 寫入 task-status.md
+## 任務清單
+| ID | 優先級 | 描述 | 負責角色 | 狀態 |
+|----|--------|------|----------|------|
+| P0-1 | P0 | Postgres Integration Gate — 移除 continue-on-error 並修復 Migration/Postgres 相容性 | devops + backend-logic | pending |
+| P0-2 | P0 | Stub Preservation — E2E 測試強化，四次驗證五個欄位一致 | test-writer | pending |
+| P0-3 | P0 | Relation Provenance — 新增真正 Relation Query，驗證八個欄位 | knowgraphgo-dev + test-writer | pending |
+| P0-4 | P0 | KnowGraphGo Checkout — CI 固定 SHA 6d2b20a6，不得 checkout main | devops | pending |

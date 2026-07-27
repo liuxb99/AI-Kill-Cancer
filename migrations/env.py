@@ -1,10 +1,9 @@
 import os
-
-import asyncio
+import re
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import create_engine
 
 from src.backend.database.models import Base
 from src.backend.domain import (
@@ -59,14 +58,17 @@ def do_run_migrations(connection):
         context.run_migrations()
 
 
-async def run_migrations_online():
-    connectable = create_async_engine(config.get_main_option("sqlalchemy.url"))
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
+def run_migrations_online():
+    url = config.get_main_option("sqlalchemy.url")
+    # Strip async driver suffix (+asyncpg, +aiosqlite, +aiomysql, +aioodbc, +asyncmy) to get sync variant
+    sync_url = re.sub(r"\+asyncpg|\+aiosqlite|\+aiomysql|\+aioodbc|\+asyncmy", "", url)
+    connectable = create_engine(sync_url)
+    with connectable.connect() as connection:
+        do_run_migrations(connection)
+    connectable.dispose()
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.run(run_migrations_online())
+    run_migrations_online()

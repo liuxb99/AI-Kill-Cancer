@@ -61,8 +61,8 @@ jobs:
           git init KnowGraphGo
           cd KnowGraphGo
           git remote add origin https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git
-          git fetch origin main --depth=1
-          git checkout FETCH_HEAD
+          git fetch --depth=1 origin 6d2b20a68ba6ea25841e142918e186fb4beece0d
+          git checkout 6d2b20a68ba6ea25841e142918e186fb4beece0d
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -198,8 +198,8 @@ jobs:
           git init KnowGraphGo
           cd KnowGraphGo
           git remote add origin https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git
-          git fetch origin main --depth=1
-          git checkout FETCH_HEAD
+          git fetch --depth=1 origin 6d2b20a68ba6ea25841e142918e186fb4beece0d
+          git checkout 6d2b20a68ba6ea25841e142918e186fb4beece0d
 
       - name: CI-01 Build Go CLI
         working-directory: KnowGraphGo
@@ -229,14 +229,12 @@ jobs:
 
       # Phase 2: Postgres Integration Gate
       - name: Postgres Integration Gate - Alembic upgrade on Postgres
-        continue-on-error: true
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
           PYTHONPATH: .
         run: alembic -c migrations/alembic.ini upgrade head
 
       - name: Postgres Integration Gate - Run Tests on Postgres
-        continue-on-error: true
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
         run: |
@@ -254,7 +252,6 @@ jobs:
           exit $EXIT
 
       - name: Postgres Integration Gate - Alembic downgrade & re-upgrade
-        continue-on-error: true
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
           PYTHONPATH: .

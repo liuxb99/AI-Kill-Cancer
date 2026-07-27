@@ -198,6 +198,61 @@ def assert_eq(actual, expected, label):
     return ok
 
 
+def verify_patient_properties(cli_path, db_path, patient_id,
+                              expected_values=None, label="patient"):
+    """Verify patient properties match expected stub values after each event apply.
+
+    Args:
+        cli_path: Path to CLI binary
+        db_path: Path to SQLite DB
+        patient_id: Patient ID to look up
+        expected_values: Dict of expected property values.
+            Defaults to display_name=ANON, sex=F, age_range=40-50,
+            cancer_type=BRCA, source_system=EHR.
+        label: Context label for output messages.
+
+    Returns:
+        True if all properties match, False otherwise.
+    """
+    if expected_values is None:
+        expected_values = {
+            "display_name": "ANON",
+            "sex": "F",
+            "age_range": "40-50",
+            "cancer_type": "BRCA",
+            "source_system": "EHR",
+        }
+
+    try:
+        patient_entity = get_entity_properties(
+            cli_path, db_path, "patient_id", patient_id
+        )
+        if not patient_entity:
+            print(f"  FAIL: Patient entity not found ({label})")
+            return False
+
+        props = patient_entity.get("properties", {})
+        parts = f"  Patient properties ({label}):"
+        for k in expected_values:
+            parts += f" {k}={props.get(k)}"
+        print(parts)
+
+        all_ok = True
+        for key, expected in expected_values.items():
+            actual = props.get(key)
+            ok = actual == expected
+            if ok:
+                print(f"  \u2713 {key}: {actual}")
+            else:
+                print(f"  \u2717 {key}: expected {expected}, got {actual}")
+            all_ok &= ok
+
+        return all_ok
+    except RuntimeError as e:
+        print(f"  FAILED: {e}")
+        return False
+
+
 # ── Main ─────────────────────────────────────────────────────────────
 
 def main():
@@ -242,30 +297,12 @@ def main():
         all_pass &= assert_found(ok1, "patient.created entities > 0")
         results["pat_ok"] = ok1
 
-        # Stub Preservation: verify recommendation stub didn't overwrite patient
-        print("\n─── Stub Preservation Check (after recommendation) ───")
-        try:
-            patient_entity = get_entity_properties(
-                cli_path, db_path, "patient_id", patient_id
-            )
-            if patient_entity:
-                props = patient_entity.get("properties", {})
-                print(f"  Patient properties: display_name={props.get('display_name')}, sex={props.get('sex')}, age_range={props.get('age_range')}, cancer_type={props.get('cancer_type')}")
-                stub_checks = [
-                    assert_eq(props.get("display_name"), "ANON", "display_name (still ANON)"),
-                    assert_eq(props.get("sex"), "F", "sex"),
-                    assert_eq(props.get("age_range"), "40-50", "age_range"),
-                    assert_eq(props.get("cancer_type"), "BRCA", "cancer_type"),
-                ]
-                stub_ok = all(stub_checks)
-            else:
-                print("  FAIL: Patient entity not found")
-                stub_ok = False
-        except RuntimeError as e:
-            print(f"  FAILED: {e}")
-            stub_ok = False
-        all_pass &= assert_found(stub_ok, "Stub preservation")
-        results["stub_ok"] = stub_ok
+        # Stub preservation: verify after patient.created
+        stub_ok1 = verify_patient_properties(
+            cli_path, db_path, patient_id, label="after patient.created"
+        )
+        all_pass &= assert_found(stub_ok1, "Stub preservation (after patient.created)")
+        results["stub_after_patient"] = stub_ok1
 
         print("\n─── Step 2: Apply recommendation.created ───")
         evt_recommendation = create_event_json(
@@ -290,6 +327,13 @@ def main():
         all_pass &= assert_found(ok2, "recommendation.created entities > 0")
         results["rec_ok"] = ok2
 
+        # Stub preservation: verify after recommendation.created
+        stub_ok2 = verify_patient_properties(
+            cli_path, db_path, patient_id, label="after recommendation.created"
+        )
+        all_pass &= assert_found(stub_ok2, "Stub preservation (after recommendation.created)")
+        results["stub_after_rec"] = stub_ok2
+
         print("\n─── Step 3: Apply clinical_decision.created ───")
         evt_decision = create_event_json(
             "clinical_decision", "clinical_decision.created", decision_id, {
@@ -310,6 +354,13 @@ def main():
         print(f"  apply output: {json.dumps(result3, ensure_ascii=False)[:300]}")
         ok3 = result3.get("entities", 0) > 0
         all_pass &= assert_found(ok3, "clinical_decision.created entities > 0")
+
+        # Stub preservation: verify after clinical_decision.created
+        stub_ok3 = verify_patient_properties(
+            cli_path, db_path, patient_id, label="after clinical_decision.created"
+        )
+        all_pass &= assert_found(stub_ok3, "Stub preservation (after clinical_decision.created)")
+        results["stub_after_decision"] = stub_ok3
 
         print("\n─── Step 4: Apply tumor_board_consensus.created ───")
         evt_consensus = create_event_json(
@@ -341,6 +392,13 @@ def main():
         print(f"  apply output: {json.dumps(result4, ensure_ascii=False)[:300]}")
         ok4 = result4.get("entities", 0) > 0
         all_pass &= assert_found(ok4, "tumor_board_consensus.created entities > 0")
+
+        # Stub preservation: verify after tumor_board_consensus.created
+        stub_ok4 = verify_patient_properties(
+            cli_path, db_path, patient_id, label="after tumor_board_consensus.created"
+        )
+        all_pass &= assert_found(stub_ok4, "Stub preservation (after tumor_board_consensus.created)")
+        results["stub_after_consensus"] = stub_ok4
 
         all_events_ok = all([ok1, ok2, ok3, ok4])
         print(f"\n>>> All events applied: {'PASS' if all_events_ok else 'FAIL'}")
@@ -651,36 +709,61 @@ def main():
             print(f"  FOR_PATIENT relation graph ID: {rel_gid}")
 
             if rel_gid:
-                # Try to get relation properties via clinical id command
-                # (which may return metadata including provenance)
-                rel_data = run_cli_json([
-                    cli_path, "--dsn", db_path, "clinical", "id",
-                    "relation", "FOR_PATIENT", rec_id, patient_id,
+                # Use edge get --json to get full relation data including provenance
+                edge_data = run_cli_json([
+                    cli_path, "--dsn", db_path, "edge", "get", str(rel_gid), "--json",
                 ])
-                print(f"  relation metadata: {json.dumps(rel_data, ensure_ascii=False)[:400]}")
+                print(f"  Edge data: {json.dumps(edge_data, ensure_ascii=False)[:600]}")
 
-                # Also try to query via query prop with the graph_id
-                # This may return entity/relation details including provenance
-                try:
-                    prop_data = run_cli_json([
-                        cli_path, "--dsn", db_path, "--json", "query", "prop",
-                        f"graph_id={rel_gid}",
-                    ])
-                    print(f"  relation properties query: {json.dumps(prop_data, ensure_ascii=False)[:400]}")
-                except (RuntimeError, json.JSONDecodeError) as e:
-                    print(f"  (prop query not available: {e})")
+                # Extract properties from edge data
+                properties = edge_data.get("properties", {})
+                if not properties:
+                    properties = edge_data  # fallback
 
-                # Check that we at least got the relation graph_id
-                prov_ok = rel_gid is not None
-                all_pass &= assert_found(prov_ok, "Relation graph ID obtained")
+                # Validate 8 provenance fields
+                prov_ok = True
+                print("  Validating 8 provenance fields:")
+
+                # 1. event_id — dynamic, check prefix
+                event_id = properties.get("event_id")
+                if event_id and str(event_id).startswith("evt-"):
+                    print(f"  \u2713 event_id: {event_id}")
+                else:
+                    print(f"  \u2717 event_id: expected evt-* prefix, got {event_id}")
+                    prov_ok = False
+
+                # 2-8. expected provenance values from the creating event
+                field_checks = {
+                    "event_type": "recommendation.created",
+                    "aggregate_type": "recommendation",
+                    "aggregate_id": rec_id,
+                    "correlation_id": f"corr-{patient_id}",
+                    "causation_id": None,
+                    "occurred_at": "2026-07-27T00:00:00Z",
+                    "source_system": "EHR",
+                }
+
+                for key, expected in field_checks.items():
+                    actual = properties.get(key)
+                    if actual == expected:
+                        print(f"  \u2713 {key}: {actual}")
+                    else:
+                        print(f"  \u2717 {key}: expected {expected}, got {actual}")
+                        prov_ok = False
+
+                all_pass &= assert_found(prov_ok, "Relation provenance fields match")
+                results["provenance_ok"] = prov_ok
             else:
                 print("  SKIP: relation graph ID not available")
                 prov_ok = False
+                results["provenance_ok"] = False
         except RuntimeError as e:
             print(f"  FAILED: {e}")
             prov_ok = False
+            results["provenance_ok"] = False
         all_pass &= assert_found(prov_ok, "Relation provenance check completed")
-        results["provenance_ok"] = prov_ok
+        if "provenance_ok" not in results:
+            results["provenance_ok"] = prov_ok
 
         # ──────────────────────────────────────────────────────────
         # DRUG / EVIDENCE ENTITY EXISTENCE
