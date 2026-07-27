@@ -740,7 +740,7 @@ def main():
                     "correlation_id": f"corr-{patient_id}",
                     "causation_id": None,
                     "occurred_at": "2026-07-27T00:00:00Z",
-                    "source_system": "EHR",
+                    "source_system": "AI-Kill-Cancer",
                 }
 
                 for key, expected in field_checks.items():
