@@ -101,7 +101,7 @@ class TestTumorBoardRestartRecovery:
 
     def _create_patient(self, client: TestClient) -> str:
         """Create a patient via API and return its UUID string."""
-        from datetime import UTC, datetime
+        from datetime import datetime
 
         resp = client.post(
             "/api/v1/patients",
@@ -110,7 +110,7 @@ class TestTumorBoardRestartRecovery:
                 "sex": "F",
                 "consent_status": "granted",
                 "date_of_birth": "1980-01-01",
-                "created_at": datetime.now(UTC).isoformat(),
+                "created_at": datetime.utcnow().isoformat(),
             },
         )
         assert resp.status_code in (200, 201), f"Patient creation failed: {resp.text}"
