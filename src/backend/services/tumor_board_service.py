@@ -34,6 +34,7 @@ from src.backend.clinical.tumor_board_engine import (
     SpecialistOpinionInput,
     TumorBoardConsensusInput,
 )
+from src.backend.clinical_graph.id_factory import ClinicalGraphIDFactory
 from src.backend.domain.tumor_board import (
     TumorBoardConsensusModel,
     TumorBoardConsensusTraceModel,
@@ -48,7 +49,6 @@ from src.backend.schemas.clinical_graph_event import (
     GraphAggregateType,
     GraphEventType,
 )
-from src.backend.clinical_graph.id_factory import ClinicalGraphIDFactory
 from src.backend.services.clinical_graph_event_service import (
     ClinicalGraphEventService,
 )

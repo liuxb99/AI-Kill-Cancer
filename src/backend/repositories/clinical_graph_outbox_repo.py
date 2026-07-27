@@ -2,19 +2,18 @@
 
 import uuid
 from datetime import datetime, timedelta
-from typing import List, Optional, Sequence
+from typing import Optional, Sequence
 
-from sqlalchemy import and_, select, text, update
+from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
-from src.backend.domain.clinical_graph_outbox import ClinicalGraphOutboxModel
 from src.backend.clinical_graph.retry_policy import DEFAULT_RETRY_POLICY
+from src.backend.domain.clinical_graph_outbox import ClinicalGraphOutboxModel
 
 
 def _next_available_at(attempt_count: int) -> datetime:
     """根据尝试次数计算下次可用时间。"""
-    idx = min(attempt_count, DEFAULT_RETRY_POLICY.max_delays - 1)
     return DEFAULT_RETRY_POLICY.next_available_at(attempt_count)
 
 

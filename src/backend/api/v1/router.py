@@ -6,9 +6,9 @@ from fastapi import APIRouter
 from src.backend.api.v1.analyses import router as analyses_router
 from src.backend.api.v1.case_acl import router as case_acl_router
 from src.backend.api.v1.cases import router as cases_router
-from src.backend.api.v1.clinical_graph import router as clinical_graph_router
 from src.backend.api.v1.clinical import router as clinical_router
 from src.backend.api.v1.clinical_decision import router as clinical_decision_router
+from src.backend.api.v1.clinical_graph import router as clinical_graph_router
 from src.backend.api.v1.evidence import router as evidence_router
 from src.backend.api.v1.knowledge import router as knowledge_router
 from src.backend.api.v1.patients import router as patients_router

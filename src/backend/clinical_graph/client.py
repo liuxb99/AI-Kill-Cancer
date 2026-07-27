@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class ClinicalGraphClient:
     """KnowGraphGo CLI 适配器客户端。
-    
+
     通过 subprocess 调用 knowgraph CLI，使用 stdin 传递 JSON 事件。
     """
 

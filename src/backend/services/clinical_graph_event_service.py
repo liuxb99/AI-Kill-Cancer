@@ -32,7 +32,7 @@ class ClinicalGraphEventService:
         causation_id: Optional[str] = None,
     ) -> None:
         """创建 outbox 事件。
-        
+
         在同一 db session 中创建，由调用方的 Service 控制 commit/rollback。
         """
         now = datetime.utcnow()

@@ -1,27 +1,26 @@
 """Clinical Graph Projection Worker — 将 Outbox 事件投影到 KnowGraphGo。"""
 
-import json
 import logging
 from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.backend.clinical_graph.client import ClinicalGraphClient
+from src.backend.clinical_graph.retry_policy import DEFAULT_RETRY_POLICY, GraphProjectionRetryPolicy
 from src.backend.repositories.clinical_graph_outbox_repo import ClinicalGraphOutboxRepository
 from src.backend.schemas.clinical_graph_event import (
     ClinicalGraphEvent,
     GraphAggregateType,
     GraphEventType,
 )
-from src.backend.clinical_graph.client import ClinicalGraphClient
-from src.backend.clinical_graph.retry_policy import DEFAULT_RETRY_POLICY, GraphProjectionRetryPolicy
 
 logger = logging.getLogger(__name__)
 
 
 class ClinicalGraphProjectionWorker:
     """将 Outbox 事件投影到 KnowGraphGo。
-    
+
     单次执行流程：
     1. claim pending events
     2. 逐条调用 Adapter
@@ -45,7 +44,7 @@ class ClinicalGraphProjectionWorker:
 
     async def run_once(self) -> int:
         """执行一次投影。返回处理的事件数。
-        
+
         采用三段式事务：
         Phase 1: Claim Transaction — 声明事件后立即提交，释放 DB lock
         Phase 2: External Work — 调用 CLI，不持有 DB lock

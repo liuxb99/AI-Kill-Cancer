@@ -2,24 +2,21 @@
 
 import argparse
 import asyncio
-import json
 import logging
 import sys
-from datetime import datetime
 from typing import List
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from src.backend.domain.clinical_graph_outbox import ClinicalGraphOutboxModel
-from src.backend.domain.recommendation import RecommendationModel
+from src.backend.clinical_graph.client import ClinicalGraphClient
 from src.backend.domain.clinical_decision import ClinicalDecisionModel
+from src.backend.domain.recommendation import RecommendationModel
 from src.backend.domain.tumor_board import TumorBoardConsensusModel
 from src.backend.schemas.clinical_graph_event import (
     ClinicalGraphEvent,
     GraphAggregateType,
     GraphEventType,
 )
-from src.backend.clinical_graph.client import ClinicalGraphClient
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +35,7 @@ async def rebuild(
         events: List[ClinicalGraphEvent] = []
 
         # 1. Query recommendations
-        from sqlalchemy import select, or_
+        from sqlalchemy import select
 
         query = select(RecommendationModel)
         if patient_id:
