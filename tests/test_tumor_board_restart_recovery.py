@@ -196,7 +196,7 @@ class TestTumorBoardRestartRecovery:
         from datetime import UTC, datetime
 
         # Convert async URL to sync URL for the same file
-        sync_url = db_url.replace("sqlite+aiosqlite:///", "sqlite:///")
+        sync_url = db_url.replace("sqlite+aiosqlite:///", "sqlite:///").replace("postgresql+asyncpg://", "postgresql://")
         engine = create_engine(sync_url)
 
         with Session(engine) as session:

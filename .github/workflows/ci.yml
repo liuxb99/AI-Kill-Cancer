@@ -36,7 +36,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r src/backend/requirements-api.txt
-          pip install pytest pytest-cov ruff mypy numpy httpx pytest-asyncio anyio
+          pip install pytest pytest-cov ruff mypy numpy httpx pytest-asyncio anyio psycopg2-binary
 
       # Phase 2: Lint with ruff (covers src/ and tests/ including new Phase 2 files)
       - name: Lint with ruff
