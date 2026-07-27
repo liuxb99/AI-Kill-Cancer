@@ -49,7 +49,7 @@ jobs:
       # Phase 3D: Run Phase 3D Outbox tests
       - name: Phase 3D Outbox Tests
         env:
-          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
         run: pytest -v --tb=short tests/unit/test_phase3d_*.py
 
       # Phase 3D: KnowGraphGo Integration
