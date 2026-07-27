@@ -392,6 +392,33 @@ def main():
             results["idempotent_ok"] = False
 
         # ──────────────────────────────────────────────────────────
+        # STUB PRESERVATION VERIFICATION
+        # ──────────────────────────────────────────────────────────
+        print("\n─── Stub Preservation Verification ───")
+        try:
+            patient_entity = get_entity_properties(
+                cli_path, db_path, "patient_id", patient_id
+            )
+            if patient_entity is None:
+                print("  FAIL: Patient entity not found")
+                stub_ok = False
+            else:
+                props = patient_entity.get("properties", {})
+                print(f"  Patient properties: {json.dumps(props, ensure_ascii=False)[:300]}")
+                stub_checks = [
+                    assert_eq(props.get("display_name"), "ANON", "display_name (still ANON)"),
+                    assert_eq(props.get("sex"), "F", "sex"),
+                    assert_eq(props.get("age_range"), "40-50", "age_range"),
+                    assert_eq(props.get("cancer_type"), "BRCA", "cancer_type"),
+                ]
+                stub_ok = all(stub_checks)
+        except RuntimeError as e:
+            print(f"  FAILED: {e}")
+            stub_ok = False
+        all_pass &= assert_found(stub_ok, "Stub preservation")
+        results["stub_ok"] = stub_ok
+
+        # ──────────────────────────────────────────────────────────
         # Step 6: UPDATE UPSERT
         # ──────────────────────────────────────────────────────────
         print("\n─── Step 6: Update Upsert (patient.updated) ───")
@@ -611,33 +638,6 @@ def main():
         paths_ok = all(path_results.values())
         print(f"\n>>> Digital Thread Paths: {'PASS' if paths_ok else 'FAIL'}")
         results["paths_ok"] = paths_ok
-
-        # ──────────────────────────────────────────────────────────
-        # STUB PRESERVATION VERIFICATION
-        # ──────────────────────────────────────────────────────────
-        print("\n─── Stub Preservation Verification ───")
-        try:
-            patient_entity = get_entity_properties(
-                cli_path, db_path, "patient_id", patient_id
-            )
-            if patient_entity is None:
-                print("  FAIL: Patient entity not found")
-                stub_ok = False
-            else:
-                props = patient_entity.get("properties", {})
-                print(f"  Patient properties: {json.dumps(props, ensure_ascii=False)[:300]}")
-                stub_checks = [
-                    assert_eq(props.get("display_name"), "ANON", "display_name (still ANON)"),
-                    assert_eq(props.get("sex"), "F", "sex"),
-                    assert_eq(props.get("age_range"), "40-50", "age_range"),
-                    assert_eq(props.get("cancer_type"), "BRCA", "cancer_type"),
-                ]
-                stub_ok = all(stub_checks)
-        except RuntimeError as e:
-            print(f"  FAILED: {e}")
-            stub_ok = False
-        all_pass &= assert_found(stub_ok, "Stub preservation")
-        results["stub_ok"] = stub_ok
 
         # ──────────────────────────────────────────────────────────
         # RELATION PROVENANCE VERIFICATION
