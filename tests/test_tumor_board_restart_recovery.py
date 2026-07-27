@@ -29,10 +29,12 @@ from src.backend.domain.user import UserModel
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
+_TB_TEST_USER_ID = uuid.uuid4()
+
 def _make_fake_user() -> UserModel:
     """Create a fake UserModel for dependency override of require_auth."""
     return UserModel(
-        id=uuid.uuid4(),
+        id=_TB_TEST_USER_ID,
         username="tb-restart-test-user",
         email="tb-restart-test@example.com",
         password_hash="fake-bcrypt-hash",
@@ -197,6 +199,8 @@ class TestTumorBoardRestartRecovery:
         import uuid
         from datetime import datetime
 
+        from src.backend.domain.user import UserModel as _UserModel
+
         # Convert async URL to sync URL
         sync_url = (
             db_url
@@ -206,6 +210,17 @@ class TestTumorBoardRestartRecovery:
         engine = create_engine(sync_url)
 
         with Session(engine) as session:
+            # Create test user for FK constraint (Postgres)
+            test_user = _UserModel(
+                id=_TB_TEST_USER_ID,
+                display_name="TB Test User",
+                email="tb-test@example.com",
+                password_hash="fake",
+                role=Role.VIEWER,
+                is_active=True,
+            )
+            session.add(test_user)
+
             patient_id = uuid.uuid4()
             patient = PatientModel(
                 id=patient_id,
