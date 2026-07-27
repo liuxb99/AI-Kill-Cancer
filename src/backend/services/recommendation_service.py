@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +47,13 @@ from src.backend.repositories.recommendation_repo import (
     RecommendationRepository,
     TraceRepository,
 )
+from src.backend.schemas.clinical_graph_event import (
+    GraphAggregateType,
+    GraphEventType,
+)
+from src.backend.services.clinical_graph_event_service import (
+    ClinicalGraphEventService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +73,15 @@ class RecommendationService:
         Transaction management (commit / rollback) is handled by this service.
     """
 
-    def __init__(self, db: AsyncSession) -> None:
+    def __init__(
+        self,
+        db: AsyncSession,
+        graph_event_service: Optional[ClinicalGraphEventService] = None,
+    ) -> None:
         self._db = db
         self._recommendation_repo = RecommendationRepository(db)
         self._trace_repo = TraceRepository(db)
+        self._graph_event_service = graph_event_service
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -219,7 +231,7 @@ class RecommendationService:
             except Exception:
                 logger.debug("Failed to serialise trace steps.", exc_info=True)
 
-        created_at = datetime.now(UTC).isoformat()
+        created_at = datetime.now(timezone.utc).isoformat()
 
         response: dict[str, Any] = {
             "recommendation_id": recommendation_id,
@@ -261,6 +273,23 @@ class RecommendationService:
                 user_id=user_id,
                 trace_manager=trace_manager,
             )
+
+            # ── Write outbox event (same transaction) ──────────────────
+            if self._graph_event_service is not None:
+                minimal_payload = {
+                    "recommendation_id": recommendation_id,
+                    "title": context.diagnosis or "",
+                    "patient_id": patient_id,
+                    "status": "completed",
+                }
+                await self._graph_event_service.create_event(
+                    aggregate_type=GraphAggregateType.RECOMMENDATION,
+                    aggregate_id=recommendation_id,
+                    event_type=GraphEventType.RECOMMENDATION_CREATED,
+                    payload=minimal_payload,
+                    actor_id=user_id,
+                )
+
             await self._db.commit()
         except Exception as exc:
             await self._db.rollback()

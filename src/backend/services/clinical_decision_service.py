@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import uuid as _uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -36,6 +36,13 @@ from src.backend.domain.clinical_decision import (
 from src.backend.repositories.clinical_decision_repo import (
     ClinicalDecisionRepository,
     ClinicalDecisionTraceRepository,
+)
+from src.backend.schemas.clinical_graph_event import (
+    GraphAggregateType,
+    GraphEventType,
+)
+from src.backend.services.clinical_graph_event_service import (
+    ClinicalGraphEventService,
 )
 
 logger = logging.getLogger(__name__)
@@ -146,12 +153,14 @@ class ClinicalDecisionService:
         engine: ClinicalDecisionEngine | None = None,
         decision_repo: ClinicalDecisionRepository | None = None,
         trace_repo: ClinicalDecisionTraceRepository | None = None,
+        graph_event_service: ClinicalGraphEventService | None = None,
     ) -> None:
         """Inject db session, engine, and repositories."""
         self._db = db
         self._engine = engine or ClinicalDecisionEngine()
         self._decision_repo = decision_repo or ClinicalDecisionRepository(db)
         self._trace_repo = trace_repo or ClinicalDecisionTraceRepository(db)
+        self._graph_event_service = graph_event_service
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -266,7 +275,7 @@ class ClinicalDecisionService:
 
         # ── Step 3: Build persistence models ──────────────────────────────
         trace_id = _uuid.uuid4().hex
-        created_at = datetime.now(UTC)
+        created_at = datetime.now(timezone.utc)
 
         rec_uuid = recommendation.get("_uuid") or recommendation.get("id")
 
@@ -361,6 +370,22 @@ class ClinicalDecisionService:
 
             for step in trace_steps:
                 await self._trace_repo.create(step)
+
+            # ── Write outbox event (same transaction) ──────────────────
+            if self._graph_event_service is not None:
+                minimal_payload = {
+                    "decision_id": decision_id,
+                    "patient_id": str(patient_uuid),
+                    "recommendation_id": rec_id_str,
+                    "decision_type": result.decision_type,
+                    "confidence": result.confidence,
+                }
+                await self._graph_event_service.create_event(
+                    aggregate_type=GraphAggregateType.CLINICAL_DECISION,
+                    aggregate_id=decision_id,
+                    event_type=GraphEventType.CLINICAL_DECISION_CREATED,
+                    payload=minimal_payload,
+                )
 
             await self._db.commit()
         except Exception as exc:

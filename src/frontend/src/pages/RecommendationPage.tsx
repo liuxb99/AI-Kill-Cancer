@@ -320,6 +320,14 @@ export default function RecommendationPage() {
                     View Clinical Decision &rarr;
                   </button>
                 )}
+                {result.patient_id && (
+                  <a
+                    href={`/clinical-graph?patientId=${result.patient_id}`}
+                    className="inline-flex items-center gap-1 rounded-lg bg-gray-50 text-gray-600 px-3 py-1.5 text-xs font-medium hover:bg-gray-100 transition"
+                  >
+                    View in Knowledge Graph &rarr;
+                  </a>
+                )}
                 <span className="text-xs text-gray-400">
                   {result.recommendation_id
                     ? `ID: ${result.recommendation_id.slice(0, 12)}…`

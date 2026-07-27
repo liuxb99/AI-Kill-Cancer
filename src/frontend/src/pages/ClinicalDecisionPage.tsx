@@ -304,6 +304,14 @@ export default function ClinicalDecisionPage() {
                 <p className="text-sm text-gray-700 font-mono">
                   {decision.patient_id || '—'}
                 </p>
+                {decision.patient_id && (
+                  <a
+                    href={`/clinical-graph?patientId=${decision.patient_id}`}
+                    className="inline-flex items-center gap-1 mt-2 text-xs text-primary-600 hover:text-primary-800"
+                  >
+                    View in Knowledge Graph &rarr;
+                  </a>
+                )}
               </div>
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">

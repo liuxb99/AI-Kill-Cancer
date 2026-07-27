@@ -285,6 +285,12 @@ export default function TumorBoardConsensusPage() {
                   <p className="text-sm text-gray-700 font-mono">
                     {consensus.patient_id}
                   </p>
+                  <a
+                    href={`/clinical-graph?patientId=${consensus.patient_id}`}
+                    className="inline-flex items-center gap-1 mt-2 text-xs text-primary-600 hover:text-primary-800"
+                  >
+                    View in Knowledge Graph &rarr;
+                  </a>
                 </div>
               )}
               {consensus.clinical_decision_id && (

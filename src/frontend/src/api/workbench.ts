@@ -246,6 +246,38 @@ export function getTumorBoardConsensusTrace(consensusId: string): Promise<any[]>
   return request(`/tumor-board-consensus/${consensusId}/trace`)
 }
 
+// ─── Clinical Graph API ─────────────────────────────────────────────────────
+
+/** Fetch patient clinical graph thread */
+export async function fetchPatientGraphThread(patientId: string): Promise<unknown> {
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(`/api/v1/clinical-graph/patient/${encodeURIComponent(patientId)}/thread`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/** Fetch recommendation explanation from knowledge graph */
+export async function fetchRecommendationExplain(recommendationId: string): Promise<unknown> {
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(`/api/v1/clinical-graph/recommendation/${encodeURIComponent(recommendationId)}/explain`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/** Fetch consensus explanation from knowledge graph */
+export async function fetchConsensusExplain(consensusId: string): Promise<unknown> {
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(`/api/v1/clinical-graph/consensus/${encodeURIComponent(consensusId)}/explain`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 // ─── Notes API ──────────────────────────────────────────────────────────────
 
 export interface WorkbenchNote {

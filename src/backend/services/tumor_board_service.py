@@ -44,6 +44,13 @@ from src.backend.repositories.tumor_board_repo import (
     TumorBoardConsensusTraceRepository,
     TumorBoardOpinionRepository,
 )
+from src.backend.schemas.clinical_graph_event import (
+    GraphAggregateType,
+    GraphEventType,
+)
+from src.backend.services.clinical_graph_event_service import (
+    ClinicalGraphEventService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +239,7 @@ class TumorBoardConsensusService:
         consensus_repo: TumorBoardConsensusRepository | None = None,
         opinion_repo: TumorBoardOpinionRepository | None = None,
         trace_repo: TumorBoardConsensusTraceRepository | None = None,
+        graph_event_service: ClinicalGraphEventService | None = None,
     ) -> None:
         """Inject db session, engine, and repositories."""
         self._db = db
@@ -239,6 +247,7 @@ class TumorBoardConsensusService:
         self._consensus_repo = consensus_repo or TumorBoardConsensusRepository(db)
         self._opinion_repo = opinion_repo or TumorBoardOpinionRepository(db)
         self._trace_repo = trace_repo or TumorBoardConsensusTraceRepository(db)
+        self._graph_event_service = graph_event_service
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -386,6 +395,23 @@ class TumorBoardConsensusService:
             for trace_model in trace_models:
                 trace_model.consensus_id = consensus_model.id
             await self._trace_repo.create_many(trace_models)
+
+            # ── Write outbox event (same transaction) ──────────────────
+            if self._graph_event_service is not None:
+                minimal_payload = {
+                    "consensus_id": consensus_id,
+                    "patient_id": str(patient_uuid) if patient_uuid else "",
+                    "recommendation_id": request.recommendation_id,
+                    "clinical_decision_id": request.clinical_decision_id,
+                    "consensus_status": result.consensus_status.value,
+                    "participating_specialties": result.participating_specialties,
+                }
+                await self._graph_event_service.create_event(
+                    aggregate_type=GraphAggregateType.TUMOR_BOARD_CONSENSUS,
+                    aggregate_id=consensus_id,
+                    event_type=GraphEventType.TUMOR_BOARD_CONSENSUS_CREATED,
+                    payload=minimal_payload,
+                )
 
             await self._db.commit()
         except Exception as exc:

@@ -11,6 +11,7 @@ import ClinicalDecisionPage from './pages/ClinicalDecisionPage'
 import ClinicalDecisionListPage from './pages/ClinicalDecisionListPage'
 import TumorBoardConsensusListPage from './pages/TumorBoardConsensusListPage'
 import TumorBoardConsensusPage from './pages/TumorBoardConsensusPage'
+import ClinicalGraphPage from './pages/ClinicalGraphPage'
 import StatusBanner from './components/StatusBanner'
 
 function AppNavbar() {
@@ -27,6 +28,7 @@ function AppNavbar() {
     { label: '知識庫', path: '/knowledge' },
     { label: '工具', path: '/tools' },
     { label: '論文', path: '/research' },
+    { label: '知識圖譜', path: '/clinical-graph' },
   ]
 
   return (
@@ -72,6 +74,7 @@ function App() {
         <Route path="/clinical-decision/:id" element={<ClinicalDecisionPage />} />
         <Route path="/tumor-board" element={<TumorBoardConsensusListPage />} />
         <Route path="/tumor-board/:id" element={<TumorBoardConsensusPage />} />
+        <Route path="/clinical-graph" element={<ClinicalGraphPage />} />
       </Routes>
     </div>
   )
