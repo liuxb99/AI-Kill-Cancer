@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [master, main]
+  workflow_dispatch:
 
 jobs:
   backend:
@@ -82,32 +83,32 @@ jobs:
         run: |
           # Insert test data to verify 020→019 downgrade is blocked when data exists
           python -c "
-import asyncio, os
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy import text
-async def main():
-    engine = create_async_engine(os.environ['DATABASE_URL'])
-    async with engine.connect() as conn:
-        await conn.execute(text(\"INSERT INTO domain_tumor_board_consensus (id, consensus_id, patient_id, consensus_status) VALUES ('ci-test-id', 'ci-test-cid', 'ci-test-pid', 'pending')\"))
-        await conn.commit()
-    await engine.dispose()
-asyncio.run(main())
-"
+          import asyncio, os
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from sqlalchemy import text
+          async def main():
+              engine = create_async_engine(os.environ['DATABASE_URL'])
+              async with engine.connect() as conn:
+                  await conn.execute(text(\"INSERT INTO domain_tumor_board_consensus (id, consensus_id, patient_id, consensus_status) VALUES ('ci-test-id', 'ci-test-cid', 'ci-test-pid', 'pending')\"))
+                  await conn.commit()
+              await engine.dispose()
+          asyncio.run(main())
+          "
           # Verify downgrade is blocked when data exists
           alembic -c migrations/alembic.ini downgrade 019 2>&1 && { echo "ERROR: 020→019 downgrade should have been blocked when data exists"; exit 1; } || echo "OK: 020→019 downgrade blocked as expected (data exists)"
           # Delete test data so empty-table downgrade can proceed
           python -c "
-import asyncio, os
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy import text
-async def main():
-    engine = create_async_engine(os.environ['DATABASE_URL'])
-    async with engine.connect() as conn:
-        await conn.execute(text(\"DELETE FROM domain_tumor_board_consensus WHERE id = 'ci-test-id'\"))
-        await conn.commit()
-    await engine.dispose()
-asyncio.run(main())
-"
+          import asyncio, os
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from sqlalchemy import text
+          async def main():
+              engine = create_async_engine(os.environ['DATABASE_URL'])
+              async with engine.connect() as conn:
+                  await conn.execute(text(\"DELETE FROM domain_tumor_board_consensus WHERE id = 'ci-test-id'\"))
+                  await conn.commit()
+              await engine.dispose()
+          asyncio.run(main())
+          "
           # Now downgrade should succeed (empty tables)
           alembic -c migrations/alembic.ini downgrade 019
           # Full downgrade to 016 and re-upgrade
