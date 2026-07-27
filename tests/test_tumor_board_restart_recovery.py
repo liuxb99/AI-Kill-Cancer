@@ -182,14 +182,14 @@ class TestTumorBoardRestartRecovery:
         ), f"Consensus creation failed: {resp.text}"
         return resp.json()["consensus_id"]
 
-    def _create_prerequisite_data(
-        self, db_url: str, client: TestClient | None = None,
-    ) -> dict[str, str]:
+    def _create_prerequisite_data(self, db_url: str) -> dict[str, str]:
         """Write patient, recommendation, and clinical_decision directly to DB.
 
-        Uses a synchronous SQLAlchemy connection for SQLite, or the API
-        endpoints for Postgres, bypassing the Engine (which requires external
-        evidence API keys).
+        Uses a synchronous SQLAlchemy connection for both SQLite and Postgres,
+        bypassing the Engine (which requires external evidence API keys).
+
+        Manual engine disposal ensures connections are released before
+        the async engine takes over.
 
         Returns dict with ``patient_id``, ``recommendation_id``,
         ``clinical_decision_id`` (business identifiers).
@@ -197,70 +197,62 @@ class TestTumorBoardRestartRecovery:
         import uuid
         from datetime import datetime
 
-        is_postgres = db_url.startswith("postgresql")
+        # Convert async URL to sync URL
+        sync_url = (
+            db_url
+            .replace("sqlite+aiosqlite:///", "sqlite:///")
+            .replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+        )
+        engine = create_engine(sync_url)
 
-        if is_postgres:
-            assert client is not None, "Postgres prereq requires a TestClient"
-            patient_id = self._create_patient(client)
-            rec_id = self._create_recommendation(client, patient_id)
-            cd_id = self._create_clinical_decision(client, patient_id, rec_id)
-            return {
-                "patient_id": patient_id,
-                "recommendation_id": rec_id,
-                "clinical_decision_id": cd_id,
-            }
-        else:
-            # SQLite: sync connection works fine
-            sync_url = db_url.replace("sqlite+aiosqlite:///", "sqlite:///")
-            engine = create_engine(sync_url)
+        with Session(engine) as session:
+            patient_id = uuid.uuid4()
+            patient = PatientModel(
+                id=patient_id,
+                display_name="TB-Restart-Patient",
+                sex=SexEnum.F,
+                consent_status=ConsentStatusEnum.GRANTED,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(patient)
 
-            with Session(engine) as session:
-                patient_id = uuid.uuid4()
-                patient = PatientModel(
-                    id=patient_id,
-                    display_name="TB-Restart-Patient",
-                    sex=SexEnum.F,
-                    consent_status=ConsentStatusEnum.GRANTED,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                )
-                session.add(patient)
+            rec_biz_id = uuid.uuid4().hex
+            recommendation = RecommendationModel(
+                id=uuid.uuid4(),
+                recommendation_id=rec_biz_id,
+                patient_id=patient_id,
+                engine_version="1.0.0",
+                status="completed",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(recommendation)
+            session.flush()  # ensure recommendation.id is populated
 
-                rec_biz_id = uuid.uuid4().hex
-                recommendation = RecommendationModel(
-                    id=uuid.uuid4(),
-                    recommendation_id=rec_biz_id,
-                    patient_id=patient_id,
-                    engine_version="1.0.0",
-                    status="completed",
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                )
-                session.add(recommendation)
-                session.flush()
+            cd_biz_id = uuid.uuid4().hex
+            clinical_decision = ClinicalDecisionModel(
+                id=uuid.uuid4(),
+                decision_id=cd_biz_id,
+                patient_id=patient_id,
+                recommendation_id=recommendation.id,
+                decision_type="treatment",
+                reason="Test reason for restart recovery test",
+                confidence="high",
+                status="active",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(clinical_decision)
 
-                cd_biz_id = uuid.uuid4().hex
-                clinical_decision = ClinicalDecisionModel(
-                    id=uuid.uuid4(),
-                    decision_id=cd_biz_id,
-                    patient_id=patient_id,
-                    recommendation_id=recommendation.id,
-                    decision_type="treatment",
-                    reason="Test reason for restart recovery test",
-                    confidence="high",
-                    status="active",
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                )
-                session.add(clinical_decision)
+            session.commit()
+        engine.dispose()
 
-                session.commit()
-
-                return {
-                    "patient_id": str(patient_id),
-                    "recommendation_id": rec_biz_id,
-                    "clinical_decision_id": cd_biz_id,
-                }
+        return {
+            "patient_id": str(patient_id),
+            "recommendation_id": rec_biz_id,
+            "clinical_decision_id": cd_biz_id,
+        }
 
     def test_end_to_end_restart_recovery(self, db_url: str) -> None:
         """
@@ -281,7 +273,7 @@ class TestTumorBoardRestartRecovery:
         app1 = self._create_app_with_auth_override()
         with TestClient(app1) as client1:
             # ── Write prerequisite data directly to DB (bypass Engine) ──
-            prereq = self._create_prerequisite_data(db_url, client=client1)
+            prereq = self._create_prerequisite_data(db_url)
             patient_id = prereq["patient_id"]
             rec_id = prereq["recommendation_id"]
             cd_id = prereq["clinical_decision_id"]
