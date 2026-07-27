@@ -31,6 +31,11 @@ from src.backend.database.models import Base
 @pytest.fixture
 async def db_session():
     """In-memory SQLite database session for service tests."""
+    # Ensure all models are loaded before create_all
+    from src.backend.domain.patient import PatientModel  # noqa: F401
+    from src.backend.domain.recommendation import RecommendationModel  # noqa: F401
+    from src.backend.domain.clinical_decision import ClinicalDecisionModel  # noqa: F401
+
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -564,6 +569,9 @@ class TestFailureRollback:
         engine = MagicMock(spec=ConsensusEngine)
         engine.calculate.return_value = _make_engine_result()
 
+        # Capture IDs before any mock to avoid lazy-load issues
+        patient_id = patient_in_db.id
+
         # Make commit raise using mock
         from unittest.mock import patch
 
@@ -582,7 +590,7 @@ class TestFailureRollback:
         )
 
         repo = TumorBoardConsensusRepository(db_session)
-        all_consensuses = await repo.list_by_patient_id(patient_in_db.id)
+        all_consensuses = await repo.list_by_patient_id(patient_id)
         assert all_consensuses == []
 
     async def test_opinion_persistence_failure_rollback(

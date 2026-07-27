@@ -20,6 +20,11 @@ from src.backend.database.models import Base
 @pytest.fixture
 async def db_session():
     """Create an in-memory SQLite database for testing SQLAlchemy models."""
+    # Ensure all models are loaded before create_all
+    from src.backend.domain.patient import PatientModel  # noqa: F401
+    from src.backend.domain.recommendation import RecommendationModel  # noqa: F401
+    from src.backend.domain.clinical_decision import ClinicalDecisionModel  # noqa: F401
+
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -136,7 +141,7 @@ class TestTumorBoardConsensusModel:
         await db_session.commit()
         await db_session.refresh(consensus)
 
-        assert consensus.consensus_status == "unanimous"  # default
+        assert consensus.consensus_status == "pending"  # default from server_default
         assert consensus.consensus_score is None
         assert consensus.final_recommendation is None
         assert consensus.dissenting_opinions is None
