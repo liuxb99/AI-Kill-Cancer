@@ -711,7 +711,7 @@ def main():
             if rel_gid:
                 # Use edge get --json to get full relation data including provenance
                 edge_data = run_cli_json([
-                    cli_path, "--dsn", db_path, "edge", "get", str(rel_gid), "--json",
+                    cli_path, "--dsn", db_path, "--json", "edge", "get", str(rel_gid),
                 ])
                 print(f"  Edge data: {json.dumps(edge_data, ensure_ascii=False)[:600]}")
 
