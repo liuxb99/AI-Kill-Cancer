@@ -84,7 +84,7 @@ def run_cli_json(cli_args, input_data=None, timeout=30):
 def apply_event(cli_path, db_path, event_data):
     """Apply a clinical event and return parsed JSON result."""
     data = run_cli_json(
-        [cli_path, "--dsn", db_path, "clinical", "apply"],
+        [cli_path, "--dsn", db_path, "--json", "clinical", "apply"],
         input_data=json.dumps(event_data),
     )
     return data  # expected: {"status":"applied","entities":N,"relations":N}
