@@ -9,7 +9,7 @@ and the reasoning trace that led to the final consensus.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
@@ -39,8 +39,8 @@ class TumorBoardConsensusModel(DBBase):
     required_follow_up = Column(JSON, nullable=True)
     participating_specialties = Column(JSON, nullable=True)
     created_by = Column(CompatUUID, ForeignKey("domain_users.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     opinions = relationship(
         "TumorBoardOpinionModel",
@@ -84,7 +84,7 @@ class TumorBoardOpinionModel(DBBase):
     preferred_option = Column(Text, nullable=True)
     alternative_option = Column(Text, nullable=True)
     requires_more_information = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     consensus = relationship("TumorBoardConsensusModel", back_populates="opinions", lazy="selectin")
 
@@ -114,7 +114,7 @@ class TumorBoardConsensusTraceModel(DBBase):
     step_type = Column(String(64), nullable=False)
     input_summary = Column(JSON, nullable=True)
     output_summary = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     consensus = relationship("TumorBoardConsensusModel", back_populates="traces", lazy="selectin")
 
