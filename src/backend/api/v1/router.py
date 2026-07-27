@@ -5,10 +5,9 @@ from fastapi import APIRouter
 
 from src.backend.api.v1.analyses import router as analyses_router
 from src.backend.api.v1.case_acl import router as case_acl_router
-from src.backend.api.v1.clinical_decision import router as clinical_decision_router
-from src.backend.api.v1.tumor_board_consensus import router as tumor_board_consensus_router
 from src.backend.api.v1.cases import router as cases_router
 from src.backend.api.v1.clinical import router as clinical_router
+from src.backend.api.v1.clinical_decision import router as clinical_decision_router
 from src.backend.api.v1.evidence import router as evidence_router
 from src.backend.api.v1.knowledge import router as knowledge_router
 from src.backend.api.v1.patients import router as patients_router
@@ -18,6 +17,7 @@ from src.backend.api.v1.recommendation import router as recommendation_router
 from src.backend.api.v1.reports import router as reports_router
 from src.backend.api.v1.sequencing import router as sequencing_router
 from src.backend.api.v1.specimens import router as specimens_router
+from src.backend.api.v1.tumor_board_consensus import router as tumor_board_consensus_router
 from src.backend.api.v1.upload_vcf import router as upload_vcf_router
 from src.backend.api.v1.uploads import router as uploads_router
 from src.backend.api.v1.variants import router as variants_router

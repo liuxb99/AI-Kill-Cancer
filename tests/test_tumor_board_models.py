@@ -8,8 +8,6 @@ cascade delete, unique constraints, and JSON round-trip.
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -21,9 +19,9 @@ from src.backend.database.models import Base
 async def db_session():
     """Create an in-memory SQLite database for testing SQLAlchemy models."""
     # Ensure all models are loaded before create_all
+    from src.backend.domain.clinical_decision import ClinicalDecisionModel  # noqa: F401
     from src.backend.domain.patient import PatientModel  # noqa: F401
     from src.backend.domain.recommendation import RecommendationModel  # noqa: F401
-    from src.backend.domain.clinical_decision import ClinicalDecisionModel  # noqa: F401
 
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     async with engine.begin() as conn:

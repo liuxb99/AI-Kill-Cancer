@@ -215,8 +215,6 @@ class ClinicalDecisionEngine:
                 "one entry carrying a 'drug_name' key."
             )
 
-        top_drug_entry = self._get_top_drug_entry(rec_dict)
-
         # ── Step 2: Classify decision type ───────────────────────────────
         decision_type = self._rule_set.determine_decision_type(
             recommendation=rec_dict,
@@ -239,6 +237,7 @@ class ClinicalDecisionEngine:
             patient=patient,
             variants=v_list,
             recommendation=rec_dict,
+            evidence=ev_list,
         )
 
         # ── Step 6: Build evidence summary ───────────────────────────────

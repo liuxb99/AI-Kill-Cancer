@@ -25,8 +25,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from src.backend.config import settings
 from src.backend.main import create_app
 from src.backend.services.tumor_board_service import (
-    ConsensusResponse,
     ConsensusListResponse,
+    ConsensusResponse,
 )
 
 
@@ -54,7 +54,7 @@ def _make_mock_response(
     consensus_status: str = "unanimous",
 ) -> ConsensusResponse:
     """Build a synthetic ConsensusResponse for mocking."""
-    from datetime import datetime, UTC
+    from datetime import UTC, datetime
 
     return ConsensusResponse(
         consensus_id=consensus_id or "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
@@ -81,7 +81,7 @@ def _make_mock_list_response(
     consensus_status: str = "unanimous",
 ) -> ConsensusListResponse:
     """Build a synthetic ConsensusListResponse."""
-    from datetime import datetime, UTC
+    from datetime import UTC, datetime
 
     return ConsensusListResponse(
         consensus_id=consensus_id,

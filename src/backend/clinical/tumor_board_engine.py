@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-from src.backend.domain.enums import ConsensusStatus, Position
 from src.backend.clinical.consensus_rules import DEFAULT_RULES, ConsensusRuleSet
-
+from src.backend.domain.enums import ConsensusStatus
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DTOs
@@ -759,13 +758,13 @@ class ConsensusEngine:
             )
         if status == ConsensusStatus.INSUFFICIENT_INFORMATION:
             return (
-                f"Insufficient specialist opinions to form a consensus "
-                f"(minimum required: 2)."
+                "Insufficient specialist opinions to form a consensus "
+                "(minimum required: 2)."
             )
         if status == ConsensusStatus.DEFERRED:
             return (
-                f"Decision deferred: one or more specialists require "
-                f"additional information before voting."
+                "Decision deferred: one or more specialists require "
+                "additional information before voting."
             )
         return (
             f"Consensus status: {status.value} "

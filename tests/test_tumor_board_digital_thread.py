@@ -10,23 +10,21 @@ Covers:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.backend.database.models import Base
+from src.backend.domain.clinical_decision import ClinicalDecisionModel
 from src.backend.domain.enums import ConsentStatusEnum, SexEnum
 from src.backend.domain.patient import PatientModel
 from src.backend.domain.recommendation import RecommendationModel
-from src.backend.domain.clinical_decision import ClinicalDecisionModel
 from src.backend.domain.tumor_board import (
     TumorBoardConsensusModel,
     TumorBoardConsensusTraceModel,
     TumorBoardOpinionModel,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Fixtures

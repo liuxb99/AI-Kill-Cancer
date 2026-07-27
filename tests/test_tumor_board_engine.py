@@ -17,7 +17,6 @@ from src.backend.clinical.tumor_board_engine import (
 )
 from src.backend.domain.enums import ConsensusStatus
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Fixtures
 # ═══════════════════════════════════════════════════════════════════════════════

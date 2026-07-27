@@ -191,8 +191,9 @@ export function compareCases(caseIds: string[]): Promise<CaseComparisonResult> {
 export interface SpecialistOpinion {
   specialty: string
   position: string
-  confidence: string
+  confidence: number
   rationale: string
+  participant_id?: string
 }
 
 export interface TumorBoardConsensus {

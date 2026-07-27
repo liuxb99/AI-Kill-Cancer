@@ -295,6 +295,7 @@ class DecisionRuleSet:
         patient: dict | Any,
         variants: list[dict],
         recommendation: dict,
+        evidence: list[dict] | None = None,
     ) -> list[dict]:
         """Detect contraindications for the recommended drugs.
 
@@ -346,22 +347,22 @@ class DecisionRuleSet:
                 })
 
         # 2. Evidence-based contraindication signals
-        ev_drugs = recommendation.get("recommendations") or recommendation.get("drugs_ranked") or []
-        for ev in evidence:
-            ev_drug = ev.get("drug_name") or ""
-            direction = (ev.get("evidence_direction") or
+        if evidence:
+            for ev in evidence:
+                ev_drug = ev.get("drug_name") or ""
+                direction = (ev.get("evidence_direction") or
                          ev.get("direction") or "")
-            if ev_drug == top_drug and direction in ("resistance", "contraindicated"):
-                contraindications.append({
-                    "drug": top_drug,
-                    "type": "evidence_contraindication",
-                    "detail": (
-                        f"Evidence from {ev.get('source', 'unknown')} indicates "
-                        f"{direction} for {top_drug}."
-                    ),
-                    "severity": "medium",
-                })
-                break  # one evidence-level entry per drug is enough
+                if ev_drug == top_drug and direction in ("resistance", "contraindicated"):
+                    contraindications.append({
+                        "drug": top_drug,
+                        "type": "evidence_contraindication",
+                        "detail": (
+                            f"Evidence from {ev.get('source', 'unknown')} indicates "
+                            f"{direction} for {top_drug}."
+                        ),
+                        "severity": "medium",
+                    })
+                    break  # one evidence-level entry per drug is enough
 
         # 3. Patient allergies (if patient data is available)
         allergies: list[str] = []

@@ -22,6 +22,13 @@ from src.backend.domain.clinical_decision import (
     ClinicalDecisionModel,
     ClinicalDecisionTraceModel,
 )
+from src.backend.domain.enums import (
+    ConsentStatusEnum,
+    EvidenceDirectionEnum,
+    EvidenceLevelEnum,
+    EvidenceTypeEnum,
+    SexEnum,
+)
 from src.backend.domain.evidence import EvidenceModel
 from src.backend.domain.patient import PatientModel
 from src.backend.domain.recommendation import (
@@ -29,12 +36,6 @@ from src.backend.domain.recommendation import (
     RecommendationTraceModel,
     RecommendationTraceStepModel,
 )
-from src.backend.domain.enums import (
-    EvidenceDirectionEnum,
-    EvidenceLevelEnum,
-    EvidenceTypeEnum,
-)
-from src.backend.domain.enums import ConsentStatusEnum, SexEnum
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────
 

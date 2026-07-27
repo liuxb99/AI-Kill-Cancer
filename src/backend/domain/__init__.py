@@ -36,11 +36,11 @@ from src.backend.domain.case_acl import (
     CasePermissionCheck,
     CaseRole,
 )
-from src.backend.domain.clinical_trial import ClinicalTrialModel
 from src.backend.domain.clinical_decision import (
     ClinicalDecisionModel,
     ClinicalDecisionTraceModel,
 )
+from src.backend.domain.clinical_trial import ClinicalTrialModel
 from src.backend.domain.consent import (
     ConsentCreate,
     ConsentModel,
@@ -64,8 +64,12 @@ from src.backend.domain.enums import (
     AuditActionEnum,
     CancerTypeEnum,
     CandidateCategoryEnum,
+    ConfidenceLevelEnum,
+    ConsensusStatus,
     ConsentStatusEnum,
     ConsentTypeEnum,
+    DecisionStatusEnum,
+    DecisionTypeEnum,
     DriverStatusEnum,
     EvidenceDirectionEnum,
     EvidenceLevelEnum,
@@ -74,9 +78,11 @@ from src.backend.domain.enums import (
     NormalizationStatusEnum,
     OncogenicityEnum,
     Permission,
+    Position,
     RecommendationStatusEnum,
     Role,
     SexEnum,
+    SpecialtyType,
     SpecimenTypeEnum,
     TraceStepStatusEnum,
     UploadStatusEnum,
@@ -84,12 +90,6 @@ from src.backend.domain.enums import (
     VariantOriginEnum,
     VariantTypeEnum,
     ZygosityEnum,
-    ConfidenceLevelEnum,
-    ConsensusStatus,
-    DecisionStatusEnum,
-    DecisionTypeEnum,
-    Position,
-    SpecialtyType,
 )
 from src.backend.domain.evidence import (
     EvidenceCreate,
@@ -129,15 +129,15 @@ from src.backend.domain.specimen import (
     SpecimenResponse,
     SpecimenUpdate,
 )
-from src.backend.domain.uploaded_file import (
-    UploadedFileCreate,
-    UploadedFileModel,
-    UploadedFileResponse,
-)
 from src.backend.domain.tumor_board import (
     TumorBoardConsensusModel,
     TumorBoardConsensusTraceModel,
     TumorBoardOpinionModel,
+)
+from src.backend.domain.uploaded_file import (
+    UploadedFileCreate,
+    UploadedFileModel,
+    UploadedFileResponse,
 )
 from src.backend.domain.user import (
     LoginRequest,

@@ -423,16 +423,17 @@ class TestCreateDecision:
         mock_engine,
     ):
         """H1.2: Using a recommendation that belongs to another patient should raise ValueError."""
+        from sqlalchemy import select
+
+        from src.backend.domain.clinical_decision import (
+            ClinicalDecisionModel,
+            ClinicalDecisionTraceModel,
+        )
         from src.backend.domain.patient import PatientModel
         from src.backend.domain.recommendation import RecommendationModel
         from src.backend.services.clinical_decision_service import (
             ClinicalDecisionService,
         )
-        from src.backend.domain.clinical_decision import (
-            ClinicalDecisionModel,
-            ClinicalDecisionTraceModel,
-        )
-        from sqlalchemy import select
 
         # Create Patient B (a different patient than patient_in_db)
         patient_b_id = uuid.UUID("660e8400-e29b-41d4-a716-446655440001")
@@ -496,11 +497,12 @@ class TestCreateDecision:
         mock_engine,
     ):
         """H2.2: created_by should be persisted and stored in the DB."""
+        from sqlalchemy import select
+
+        from src.backend.domain.clinical_decision import ClinicalDecisionModel
         from src.backend.services.clinical_decision_service import (
             ClinicalDecisionService,
         )
-        from src.backend.domain.clinical_decision import ClinicalDecisionModel
-        from sqlalchemy import select
 
         created_by_uuid = uuid.UUID("770e8400-e29b-41d4-a716-446655440002")
 
@@ -532,8 +534,8 @@ class TestCreateDecision:
         mock_engine,
     ):
         """H3.2: context.patient should NOT override core DB patient fields (sex, birth_year, etc.)."""
-        from src.backend.domain.patient import PatientModel
         from src.backend.domain.enums import SexEnum
+        from src.backend.domain.patient import PatientModel
         from src.backend.domain.recommendation import RecommendationModel
         from src.backend.services.clinical_decision_service import (
             ClinicalDecisionService,
@@ -603,13 +605,14 @@ class TestCreateDecision:
         mock_engine,
     ):
         """H5.2: Verify all 5 trace steps are created with correct step_type and order."""
-        from src.backend.services.clinical_decision_service import (
-            ClinicalDecisionService,
-        )
+        from sqlalchemy import select
+
         from src.backend.domain.clinical_decision import (
             ClinicalDecisionTraceModel,
         )
-        from sqlalchemy import select
+        from src.backend.services.clinical_decision_service import (
+            ClinicalDecisionService,
+        )
 
         service = ClinicalDecisionService(db=db_session, engine=mock_engine)
         result = await service.create_decision(

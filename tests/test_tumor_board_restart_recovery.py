@@ -17,7 +17,6 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -27,7 +26,6 @@ from src.backend.domain.enums import ConsentStatusEnum, Role, SexEnum
 from src.backend.domain.patient import PatientModel
 from src.backend.domain.recommendation import RecommendationModel
 from src.backend.domain.user import UserModel
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -103,7 +101,7 @@ class TestTumorBoardRestartRecovery:
 
     def _create_patient(self, client: TestClient) -> str:
         """Create a patient via API and return its UUID string."""
-        from datetime import datetime, UTC
+        from datetime import UTC, datetime
 
         resp = client.post(
             "/api/v1/patients",

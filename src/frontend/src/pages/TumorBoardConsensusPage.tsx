@@ -61,7 +61,13 @@ function statusLabel(status: string): string {
   }
 }
 
-function confidenceBadge(confidence: string): string {
+function confidenceBadge(confidence: number | string): string {
+  // Handle numeric confidence (0.0–1.0 scale for specialist opinions)
+  if (typeof confidence === 'number') {
+    if (confidence >= 0.7) return 'bg-green-100 text-green-800 border-green-200'
+    if (confidence >= 0.4) return 'bg-amber-100 text-amber-800 border-amber-200'
+    return 'bg-red-100 text-red-800 border-red-200'
+  }
   switch (confidence?.toLowerCase()) {
     case 'high':
     case 'very high':

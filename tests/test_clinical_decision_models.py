@@ -210,11 +210,12 @@ class TestClinicalDecisionModel:
 
     async def test_cascade_delete_decision_deletes_traces(self, db_session, patient):
         """Deleting a ClinicalDecisionModel should cascade-delete its traces."""
+        from sqlalchemy import select
+
         from src.backend.domain.clinical_decision import (
             ClinicalDecisionModel,
             ClinicalDecisionTraceModel,
         )
-        from sqlalchemy import select
 
         decision = ClinicalDecisionModel(
             decision_id="cascade-del",

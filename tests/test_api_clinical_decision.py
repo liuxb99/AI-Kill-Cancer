@@ -11,7 +11,7 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.responses import JSONResponse
@@ -49,7 +49,7 @@ def _make_mock_response(
     decision_type: str = "approved",
 ) -> ClinicalDecisionResponse:
     """Build a synthetic ClinicalDecisionResponse for mocking."""
-    from datetime import datetime, UTC
+    from datetime import UTC, datetime
 
     return ClinicalDecisionResponse(
         decision_id=decision_id or "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",

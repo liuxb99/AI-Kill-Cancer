@@ -15,7 +15,7 @@ Covers:
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import select
@@ -32,9 +32,9 @@ from src.backend.database.models import Base
 async def db_session():
     """In-memory SQLite database session for service tests."""
     # Ensure all models are loaded before create_all
+    from src.backend.domain.clinical_decision import ClinicalDecisionModel  # noqa: F401
     from src.backend.domain.patient import PatientModel  # noqa: F401
     from src.backend.domain.recommendation import RecommendationModel  # noqa: F401
-    from src.backend.domain.clinical_decision import ClinicalDecisionModel  # noqa: F401
 
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     async with engine.begin() as conn:
@@ -328,9 +328,9 @@ class TestValidation:
         from src.backend.domain.patient import PatientModel
         from src.backend.domain.recommendation import RecommendationModel
         from src.backend.services.tumor_board_service import (
-            TumorBoardConsensusService,
             CreateConsensusRequest,
             SpecialistOpinionDTO,
+            TumorBoardConsensusService,
         )
 
         # Create a different patient
@@ -389,12 +389,11 @@ class TestValidation:
         clinical_decision_in_db,
     ) -> None:
         """When clinical_decision.recommendation_id != recommendation.id → ValueError."""
+        # Create a different recommendation but for the same patient
+        from src.backend.domain.recommendation import RecommendationModel
         from src.backend.services.tumor_board_service import (
             TumorBoardConsensusService,
         )
-
-        # Create a different recommendation but for the same patient
-        from src.backend.domain.recommendation import RecommendationModel
 
         other_rec = RecommendationModel(
             recommendation_id="rec-mismatch-001",
@@ -436,9 +435,9 @@ class TestValidation:
     ) -> None:
         """Non-existent recommendation_id → ValueError."""
         from src.backend.services.tumor_board_service import (
-            TumorBoardConsensusService,
             CreateConsensusRequest,
             SpecialistOpinionDTO,
+            TumorBoardConsensusService,
         )
 
         request = CreateConsensusRequest(
@@ -466,9 +465,9 @@ class TestValidation:
     ) -> None:
         """Non-existent clinical_decision_id → ValueError."""
         from src.backend.services.tumor_board_service import (
-            TumorBoardConsensusService,
             CreateConsensusRequest,
             SpecialistOpinionDTO,
+            TumorBoardConsensusService,
         )
 
         request = CreateConsensusRequest(
@@ -603,9 +602,7 @@ class TestFailureRollback:
         """When opinion_repo.create_many raises, nothing should persist."""
         from src.backend.clinical.tumor_board_engine import ConsensusEngine
         from src.backend.repositories.tumor_board_repo import (
-            TumorBoardConsensusRepository,
             TumorBoardOpinionRepository,
-            TumorBoardConsensusTraceRepository,
         )
         from src.backend.services.tumor_board_service import (
             TumorBoardConsensusService,
@@ -638,7 +635,6 @@ class TestFailureRollback:
         """When trace_repo.create_many raises, nothing should persist."""
         from src.backend.clinical.tumor_board_engine import ConsensusEngine
         from src.backend.repositories.tumor_board_repo import (
-            TumorBoardOpinionRepository,
             TumorBoardConsensusTraceRepository,
         )
         from src.backend.services.tumor_board_service import (
