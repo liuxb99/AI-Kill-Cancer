@@ -200,7 +200,8 @@ class TestTumorBoardRestartRecovery:
         if is_postgres:
             # Use async engine for Postgres to avoid sync/async datetime mismatch
             import asyncio
-            from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+
+            from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
             async def _write():
                 engine = create_async_engine(db_url)
