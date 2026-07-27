@@ -66,7 +66,7 @@ def upgrade() -> None:
         sa.Column("contraindications", sa.JSON, nullable=True),
         sa.Column("preferred_option", sa.Text, nullable=True),
         sa.Column("alternative_option", sa.Text, nullable=True),
-        sa.Column("requires_more_information", sa.Boolean, nullable=False, server_default=sa.text("0")),
+        sa.Column("requires_more_information", sa.Boolean, nullable=False, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
     )
 
