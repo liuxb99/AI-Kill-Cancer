@@ -213,6 +213,7 @@ class TestTumorBoardRestartRecovery:
             # Create test user for FK constraint (Postgres)
             test_user = _UserModel(
                 id=_TB_TEST_USER_ID,
+                username="tb-restart-test-user",
                 display_name="TB Test User",
                 email="tb-test@example.com",
                 password_hash="fake",
