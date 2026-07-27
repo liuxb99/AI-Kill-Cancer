@@ -464,13 +464,15 @@ def main():
         if rec_gid and patient_gid:
             p1 = query_path(cli_path, db_path, rec_gid, patient_gid)
             p1_ok = True
-            p1_ok &= assert_found(p1.get("found", False), "path found")
-            p1_ok &= assert_found(len(p1.get("nodes", [])) > 0, "nodes non-empty")
-            p1_ok &= assert_found(len(p1.get("edges", [])) > 0, "edges non-empty")
-            p1_ok &= assert_eq(p1["nodes"][0]["id"], rec_gid, "start node id")
-            p1_ok &= assert_eq(p1["nodes"][-1]["id"], patient_gid, "end node id")
-            edge_kind = p1["edges"][0].get("kind", "") or p1["edges"][0].get("label", "")
-            p1_ok &= assert_eq(edge_kind, "FOR_PATIENT", "relation kind")
+            p1_ok &= assert_found(len(p1.get("Paths", [])) > 0, "path found")
+            if p1.get("Paths"):
+                path1 = p1["Paths"][0]
+                p1_ok &= assert_found(len(path1.get("Entities", [])) > 0, "entities non-empty")
+                p1_ok &= assert_found(len(path1.get("Relations", [])) > 0, "relations non-empty")
+                p1_ok &= assert_eq(path1["Entities"][0]["id"], rec_gid, "start node id")
+                p1_ok &= assert_eq(path1["Entities"][-1]["id"], patient_gid, "end node id")
+                rel_kind = path1["Relations"][0].get("kind", "")
+                p1_ok &= assert_eq(rel_kind, "FOR_PATIENT", "relation kind")
             path_results["rec→patient"] = p1_ok
             all_pass &= p1_ok
         else:
@@ -482,13 +484,15 @@ def main():
         if decision_gid and rec_gid:
             p2 = query_path(cli_path, db_path, decision_gid, rec_gid)
             p2_ok = True
-            p2_ok &= assert_found(p2.get("found", False), "path found")
-            p2_ok &= assert_found(len(p2.get("nodes", [])) > 0, "nodes non-empty")
-            p2_ok &= assert_found(len(p2.get("edges", [])) > 0, "edges non-empty")
-            p2_ok &= assert_eq(p2["nodes"][0]["id"], decision_gid, "start node id")
-            p2_ok &= assert_eq(p2["nodes"][-1]["id"], rec_gid, "end node id")
-            edge_kind = p2["edges"][0].get("kind", "") or p2["edges"][0].get("label", "")
-            p2_ok &= assert_eq(edge_kind, "BASED_ON", "relation kind")
+            p2_ok &= assert_found(len(p2.get("Paths", [])) > 0, "path found")
+            if p2.get("Paths"):
+                path2 = p2["Paths"][0]
+                p2_ok &= assert_found(len(path2.get("Entities", [])) > 0, "entities non-empty")
+                p2_ok &= assert_found(len(path2.get("Relations", [])) > 0, "relations non-empty")
+                p2_ok &= assert_eq(path2["Entities"][0]["id"], decision_gid, "start node id")
+                p2_ok &= assert_eq(path2["Entities"][-1]["id"], rec_gid, "end node id")
+                rel_kind = path2["Relations"][0].get("kind", "")
+                p2_ok &= assert_eq(rel_kind, "BASED_ON", "relation kind")
             path_results["decision→rec"] = p2_ok
             all_pass &= p2_ok
         else:
@@ -500,13 +504,15 @@ def main():
         if consensus_gid and decision_gid:
             p3 = query_path(cli_path, db_path, consensus_gid, decision_gid)
             p3_ok = True
-            p3_ok &= assert_found(p3.get("found", False), "path found")
-            p3_ok &= assert_found(len(p3.get("nodes", [])) > 0, "nodes non-empty")
-            p3_ok &= assert_found(len(p3.get("edges", [])) > 0, "edges non-empty")
-            p3_ok &= assert_eq(p3["nodes"][0]["id"], consensus_gid, "start node id")
-            p3_ok &= assert_eq(p3["nodes"][-1]["id"], decision_gid, "end node id")
-            edge_kind = p3["edges"][0].get("kind", "") or p3["edges"][0].get("label", "")
-            p3_ok &= assert_eq(edge_kind, "DERIVED_FROM", "relation kind")
+            p3_ok &= assert_found(len(p3.get("Paths", [])) > 0, "path found")
+            if p3.get("Paths"):
+                path3 = p3["Paths"][0]
+                p3_ok &= assert_found(len(path3.get("Entities", [])) > 0, "entities non-empty")
+                p3_ok &= assert_found(len(path3.get("Relations", [])) > 0, "relations non-empty")
+                p3_ok &= assert_eq(path3["Entities"][0]["id"], consensus_gid, "start node id")
+                p3_ok &= assert_eq(path3["Entities"][-1]["id"], decision_gid, "end node id")
+                rel_kind = path3["Relations"][0].get("kind", "")
+                p3_ok &= assert_eq(rel_kind, "DERIVED_FROM", "relation kind")
             path_results["consensus→decision"] = p3_ok
             all_pass &= p3_ok
         else:
@@ -521,13 +527,15 @@ def main():
         if rec_gid and drug_gid:
             p4 = query_path(cli_path, db_path, rec_gid, drug_gid)
             p4_ok = True
-            p4_ok &= assert_found(p4.get("found", False), "path found")
-            p4_ok &= assert_found(len(p4.get("nodes", [])) > 0, "nodes non-empty")
-            p4_ok &= assert_found(len(p4.get("edges", [])) > 0, "edges non-empty")
-            p4_ok &= assert_eq(p4["nodes"][0]["id"], rec_gid, "start node id")
-            p4_ok &= assert_eq(p4["nodes"][-1]["id"], drug_gid, "end node id")
-            edge_kind = p4["edges"][0].get("kind", "") or p4["edges"][0].get("label", "")
-            p4_ok &= assert_eq(edge_kind, "RECOMMENDS", "relation kind")
+            p4_ok &= assert_found(len(p4.get("Paths", [])) > 0, "path found")
+            if p4.get("Paths"):
+                path4 = p4["Paths"][0]
+                p4_ok &= assert_found(len(path4.get("Entities", [])) > 0, "entities non-empty")
+                p4_ok &= assert_found(len(path4.get("Relations", [])) > 0, "relations non-empty")
+                p4_ok &= assert_eq(path4["Entities"][0]["id"], rec_gid, "start node id")
+                p4_ok &= assert_eq(path4["Entities"][-1]["id"], drug_gid, "end node id")
+                rel_kind = path4["Relations"][0].get("kind", "")
+                p4_ok &= assert_eq(rel_kind, "RECOMMENDS", "relation kind")
             path_results["rec→drug"] = p4_ok
             all_pass &= p4_ok
         else:
@@ -541,13 +549,15 @@ def main():
         if rec_gid and ev_gid:
             p5 = query_path(cli_path, db_path, rec_gid, ev_gid)
             p5_ok = True
-            p5_ok &= assert_found(p5.get("found", False), "path found")
-            p5_ok &= assert_found(len(p5.get("nodes", [])) > 0, "nodes non-empty")
-            p5_ok &= assert_found(len(p5.get("edges", [])) > 0, "edges non-empty")
-            p5_ok &= assert_eq(p5["nodes"][0]["id"], rec_gid, "start node id")
-            p5_ok &= assert_eq(p5["nodes"][-1]["id"], ev_gid, "end node id")
-            edge_kind = p5["edges"][0].get("kind", "") or p5["edges"][0].get("label", "")
-            p5_ok &= assert_eq(edge_kind, "SUPPORTED_BY", "relation kind")
+            p5_ok &= assert_found(len(p5.get("Paths", [])) > 0, "path found")
+            if p5.get("Paths"):
+                path5 = p5["Paths"][0]
+                p5_ok &= assert_found(len(path5.get("Entities", [])) > 0, "entities non-empty")
+                p5_ok &= assert_found(len(path5.get("Relations", [])) > 0, "relations non-empty")
+                p5_ok &= assert_eq(path5["Entities"][0]["id"], rec_gid, "start node id")
+                p5_ok &= assert_eq(path5["Entities"][-1]["id"], ev_gid, "end node id")
+                rel_kind = path5["Relations"][0].get("kind", "")
+                p5_ok &= assert_eq(rel_kind, "SUPPORTED_BY", "relation kind")
             path_results["rec→evidence"] = p5_ok
             all_pass &= p5_ok
         else:
@@ -561,13 +571,15 @@ def main():
         if consensus_gid and op_gid:
             p6 = query_path(cli_path, db_path, consensus_gid, op_gid)
             p6_ok = True
-            p6_ok &= assert_found(p6.get("found", False), "path found")
-            p6_ok &= assert_found(len(p6.get("nodes", [])) > 0, "nodes non-empty")
-            p6_ok &= assert_found(len(p6.get("edges", [])) > 0, "edges non-empty")
-            p6_ok &= assert_eq(p6["nodes"][0]["id"], consensus_gid, "start node id")
-            p6_ok &= assert_eq(p6["nodes"][-1]["id"], op_gid, "end node id")
-            edge_kind = p6["edges"][0].get("kind", "") or p6["edges"][0].get("label", "")
-            p6_ok &= assert_eq(edge_kind, "HAS_OPINION", "relation kind")
+            p6_ok &= assert_found(len(p6.get("Paths", [])) > 0, "path found")
+            if p6.get("Paths"):
+                path6 = p6["Paths"][0]
+                p6_ok &= assert_found(len(path6.get("Entities", [])) > 0, "entities non-empty")
+                p6_ok &= assert_found(len(path6.get("Relations", [])) > 0, "relations non-empty")
+                p6_ok &= assert_eq(path6["Entities"][0]["id"], consensus_gid, "start node id")
+                p6_ok &= assert_eq(path6["Entities"][-1]["id"], op_gid, "end node id")
+                rel_kind = path6["Relations"][0].get("kind", "")
+                p6_ok &= assert_eq(rel_kind, "HAS_OPINION", "relation kind")
             path_results["consensus→opinion"] = p6_ok
             all_pass &= p6_ok
         else:
@@ -581,13 +593,15 @@ def main():
         if op_gid and spec_gid:
             p7 = query_path(cli_path, db_path, op_gid, spec_gid)
             p7_ok = True
-            p7_ok &= assert_found(p7.get("found", False), "path found")
-            p7_ok &= assert_found(len(p7.get("nodes", [])) > 0, "nodes non-empty")
-            p7_ok &= assert_found(len(p7.get("edges", [])) > 0, "edges non-empty")
-            p7_ok &= assert_eq(p7["nodes"][0]["id"], op_gid, "start node id")
-            p7_ok &= assert_eq(p7["nodes"][-1]["id"], spec_gid, "end node id")
-            edge_kind = p7["edges"][0].get("kind", "") or p7["edges"][0].get("label", "")
-            p7_ok &= assert_eq(edge_kind, "PROVIDED_BY_SPECIALTY", "relation kind")
+            p7_ok &= assert_found(len(p7.get("Paths", [])) > 0, "path found")
+            if p7.get("Paths"):
+                path7 = p7["Paths"][0]
+                p7_ok &= assert_found(len(path7.get("Entities", [])) > 0, "entities non-empty")
+                p7_ok &= assert_found(len(path7.get("Relations", [])) > 0, "relations non-empty")
+                p7_ok &= assert_eq(path7["Entities"][0]["id"], op_gid, "start node id")
+                p7_ok &= assert_eq(path7["Entities"][-1]["id"], spec_gid, "end node id")
+                rel_kind = path7["Relations"][0].get("kind", "")
+                p7_ok &= assert_eq(rel_kind, "PROVIDED_BY_SPECIALTY", "relation kind")
             path_results["opinion→specialty"] = p7_ok
             all_pass &= p7_ok
         else:
