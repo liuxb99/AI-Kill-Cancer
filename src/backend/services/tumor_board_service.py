@@ -21,7 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid as _uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
@@ -284,7 +284,7 @@ class TumorBoardConsensusService:
         """
         consensus_id = _uuid.uuid4().hex
         trace_id = _uuid.uuid4().hex
-        created_at = datetime.now(UTC)
+        created_at = datetime.utcnow()
 
         # ── Step 1: P0 — Load & validate data consistency ──────────────
         recommendation = await self._load_recommendation(request.recommendation_id)
