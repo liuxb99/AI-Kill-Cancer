@@ -193,7 +193,7 @@ class TestTumorBoardRestartRecovery:
         ``clinical_decision_id`` (business identifiers).
         """
         import uuid
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         is_postgres = db_url.startswith("postgresql")
 
@@ -212,8 +212,8 @@ class TestTumorBoardRestartRecovery:
                         display_name="TB-Restart-Patient",
                         sex=SexEnum.F,
                         consent_status=ConsentStatusEnum.GRANTED,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
+                        created_at=datetime.now(timezone.utc),
+                        updated_at=datetime.now(timezone.utc),
                     )
                     session.add(patient)
 
@@ -224,8 +224,8 @@ class TestTumorBoardRestartRecovery:
                         patient_id=patient_id,
                         engine_version="1.0.0",
                         status="completed",
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
+                        created_at=datetime.now(timezone.utc),
+                        updated_at=datetime.now(timezone.utc),
                     )
                     session.add(recommendation)
                     await session.flush()
@@ -240,8 +240,8 @@ class TestTumorBoardRestartRecovery:
                         reason="Test reason for restart recovery test",
                         confidence="high",
                         status="active",
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
+                        created_at=datetime.now(timezone.utc),
+                        updated_at=datetime.now(timezone.utc),
                     )
                     session.add(clinical_decision)
 
@@ -267,8 +267,8 @@ class TestTumorBoardRestartRecovery:
                     display_name="TB-Restart-Patient",
                     sex=SexEnum.F,
                     consent_status=ConsentStatusEnum.GRANTED,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
                 )
                 session.add(patient)
 
@@ -279,8 +279,8 @@ class TestTumorBoardRestartRecovery:
                     patient_id=patient_id,
                     engine_version="1.0.0",
                     status="completed",
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
                 )
                 session.add(recommendation)
                 session.flush()
@@ -295,8 +295,8 @@ class TestTumorBoardRestartRecovery:
                     reason="Test reason for restart recovery test",
                     confidence="high",
                     status="active",
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
                 )
                 session.add(clinical_decision)
 
