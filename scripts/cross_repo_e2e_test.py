@@ -240,29 +240,7 @@ def main():
         print(f"  apply output: {json.dumps(result1, ensure_ascii=False)[:300]}")
         ok1 = result1.get("entities", 0) > 0
         all_pass &= assert_found(ok1, "patient.created entities > 0")
-
-        print("\n─── Step 2: Apply recommendation.created ───")
-        evt_recommendation = create_event_json(
-            "recommendation", "recommendation.created", rec_id, {
-                "recommendation_id": rec_id,
-                "patient_id": patient_id,
-                "title": "Recommendation for P001",
-                "recommended_drugs": [
-                    {"drug_id": "DRUG-001", "drug_name": "Olaparib"},
-                ],
-                "evidence_references": [
-                    {"evidence_id": "EV-001", "citation": "Study XYZ"},
-                ],
-                "rank": 1,
-                "score": 0.95,
-            },
-            correlation_id=f"corr-{patient_id}",
-        )
-        result2 = apply_event(cli_path, db_path, evt_recommendation)
-        print(f"  apply output: {json.dumps(result2, ensure_ascii=False)[:300]}")
-        ok2 = result2.get("entities", 0) > 0
-        all_pass &= assert_found(ok2, "recommendation.created entities > 0")
-        results["rec_ok"] = ok2
+        results["pat_ok"] = ok1
 
         # Stub Preservation: verify recommendation stub didn't overwrite patient
         print("\n─── Stub Preservation Check (after recommendation) ───")
@@ -288,6 +266,29 @@ def main():
             stub_ok = False
         all_pass &= assert_found(stub_ok, "Stub preservation")
         results["stub_ok"] = stub_ok
+
+        print("\n─── Step 2: Apply recommendation.created ───")
+        evt_recommendation = create_event_json(
+            "recommendation", "recommendation.created", rec_id, {
+                "recommendation_id": rec_id,
+                "patient_id": patient_id,
+                "title": "Recommendation for P001",
+                "recommended_drugs": [
+                    {"drug_id": "DRUG-001", "drug_name": "Olaparib"},
+                ],
+                "evidence_references": [
+                    {"evidence_id": "EV-001", "citation": "Study XYZ"},
+                ],
+                "rank": 1,
+                "score": 0.95,
+            },
+            correlation_id=f"corr-{patient_id}",
+        )
+        result2 = apply_event(cli_path, db_path, evt_recommendation)
+        print(f"  apply output: {json.dumps(result2, ensure_ascii=False)[:300]}")
+        ok2 = result2.get("entities", 0) > 0
+        all_pass &= assert_found(ok2, "recommendation.created entities > 0")
+        results["rec_ok"] = ok2
 
         print("\n─── Step 3: Apply clinical_decision.created ───")
         evt_decision = create_event_json(
@@ -416,13 +417,6 @@ def main():
         else:
             print("  SKIP idempotent check (count query failed)")
             results["idempotent_ok"] = False
-
-        # ──────────────────────────────────────────────────────────
-        # STUB PRESERVATION VERIFICATION
-        # ──────────────────────────────────────────────────────────
-        print("\n─── Stub Preservation Verification ───")
-        # (验证已移至 recommendation.created 之后立即执行)
-        results["stub_ok"] = stub_ok
 
         # ──────────────────────────────────────────────────────────
         # Step 6: UPDATE UPSERT
