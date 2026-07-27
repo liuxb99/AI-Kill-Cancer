@@ -57,6 +57,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
+          rm -rf KnowGraphGo
           git init KnowGraphGo
           cd KnowGraphGo
           git remote add origin https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git
@@ -193,6 +194,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
+          rm -rf KnowGraphGo
           git init KnowGraphGo
           cd KnowGraphGo
           git remote add origin https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git
