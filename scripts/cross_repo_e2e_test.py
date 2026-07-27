@@ -220,7 +220,7 @@ def verify_patient_properties(cli_path, db_path, patient_id,
             "sex": "F",
             "age_range": "40-50",
             "cancer_type": "BRCA",
-            "source_system": "EHR",
+            "source_system": "AI-Kill-Cancer",
         }
 
     try:
