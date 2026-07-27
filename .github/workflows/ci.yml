@@ -57,10 +57,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
-          git clone --depth=1 https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git KnowGraphGo
+          git init KnowGraphGo
           cd KnowGraphGo
-          git fetch --depth=1 origin d847e419e5e94c39e76a30e4c37b85a86aedce5d
-          git checkout d847e419e5e94c39e76a30e4c37b85a86aedce5d
+          git remote add origin https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git
+          git fetch origin main --depth=1
+          git checkout FETCH_HEAD
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -192,10 +193,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
-          git clone --depth=1 https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git KnowGraphGo
+          git init KnowGraphGo
           cd KnowGraphGo
-          git fetch --depth=1 origin d847e419e5e94c39e76a30e4c37b85a86aedce5d
-          git checkout d847e419e5e94c39e76a30e4c37b85a86aedce5d
+          git remote add origin https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git
+          git fetch origin main --depth=1
+          git checkout FETCH_HEAD
 
       - name: CI-01 Build Go CLI
         working-directory: KnowGraphGo
