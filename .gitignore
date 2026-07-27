@@ -71,3 +71,6 @@ test.db
 # Upload storage (local test artifacts)
 src/uploads/
 !src/uploads/.gitkeep
+
+# AGENTS.md is a local workflow file, not tracked
+AGENTS.md
