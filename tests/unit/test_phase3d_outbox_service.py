@@ -1,13 +1,11 @@
 """Phase 3D — Service Transaction Tests."""
 
-import uuid
 from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.backend.database.models import Base
-
 
 # 确保 ClinicalGraphOutboxModel 的表被注册到 Base.metadata
 from src.backend.domain.clinical_graph_outbox import ClinicalGraphOutboxModel  # noqa: F401
@@ -34,11 +32,11 @@ class TestEventService:
 
     async def test_create_event(self, db_session):
         """创建事件并通过 outbox repo 验证。"""
-        from src.backend.services.clinical_graph_event_service import (
-            ClinicalGraphEventService,
-        )
         from src.backend.repositories.clinical_graph_outbox_repo import (
             ClinicalGraphOutboxRepository,
+        )
+        from src.backend.services.clinical_graph_event_service import (
+            ClinicalGraphEventService,
         )
 
         service = ClinicalGraphEventService(db_session)
@@ -59,11 +57,11 @@ class TestEventService:
 
     async def test_create_recommendation_event(self, db_session):
         """创建 recommendation 事件。"""
-        from src.backend.services.clinical_graph_event_service import (
-            ClinicalGraphEventService,
-        )
         from src.backend.repositories.clinical_graph_outbox_repo import (
             ClinicalGraphOutboxRepository,
+        )
+        from src.backend.services.clinical_graph_event_service import (
+            ClinicalGraphEventService,
         )
 
         service = ClinicalGraphEventService(db_session)
@@ -83,11 +81,11 @@ class TestEventService:
 
     async def test_create_multiple_events(self, db_session):
         """创建多个事件。"""
-        from src.backend.services.clinical_graph_event_service import (
-            ClinicalGraphEventService,
-        )
         from src.backend.repositories.clinical_graph_outbox_repo import (
             ClinicalGraphOutboxRepository,
+        )
+        from src.backend.services.clinical_graph_event_service import (
+            ClinicalGraphEventService,
         )
 
         service = ClinicalGraphEventService(db_session)
@@ -116,11 +114,11 @@ class TestEventService:
 
     async def test_service_injection(self):
         """验证 ClinicalGraphEventService 可注入到 RecommendationService。"""
-        from src.backend.services.recommendation_service import (
-            RecommendationService,
-        )
         from src.backend.services.clinical_graph_event_service import (
             ClinicalGraphEventService,
+        )
+        from src.backend.services.recommendation_service import (
+            RecommendationService,
         )
 
         mock_db = AsyncMock(spec=AsyncSession)

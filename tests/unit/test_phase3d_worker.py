@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -41,8 +41,8 @@ class TestWorkerBasic:
 
     async def test_worker_with_mock_client(self, db_session):
         """Worker 使用 mock client 处理事件。"""
-        from src.backend.clinical_graph.worker import ClinicalGraphProjectionWorker
         from src.backend.clinical_graph.client import ClinicalGraphClient
+        from src.backend.clinical_graph.worker import ClinicalGraphProjectionWorker
         from src.backend.repositories.clinical_graph_outbox_repo import ClinicalGraphOutboxRepository
 
         # 创建待处理事件
@@ -77,8 +77,8 @@ class TestWorkerBasic:
 
     async def test_worker_retry_on_failure(self, db_session):
         """Worker 在失败时增加重试计数。"""
-        from src.backend.clinical_graph.worker import ClinicalGraphProjectionWorker
         from src.backend.clinical_graph.client import ClinicalGraphClient
+        from src.backend.clinical_graph.worker import ClinicalGraphProjectionWorker
         from src.backend.repositories.clinical_graph_outbox_repo import ClinicalGraphOutboxRepository
 
         repo = ClinicalGraphOutboxRepository(db_session)

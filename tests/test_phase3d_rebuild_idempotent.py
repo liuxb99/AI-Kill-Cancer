@@ -6,8 +6,8 @@ without loss, which is a prerequisite for event-sourced rebuild.
 
 from src.backend.schemas.clinical_graph_event import (
     ClinicalGraphEvent,
-    GraphEventType,
     GraphAggregateType,
+    GraphEventType,
 )
 
 

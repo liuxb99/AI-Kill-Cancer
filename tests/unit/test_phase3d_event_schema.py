@@ -1,13 +1,13 @@
 """Phase 3D — Clinical Graph Event Schema Tests."""
 
+
 import pytest
-from datetime import datetime
 
 from src.backend.schemas.clinical_graph_event import (
+    SENSITIVE_FIELDS,
     ClinicalGraphEvent,
     GraphAggregateType,
     GraphEventType,
-    SENSITIVE_FIELDS,
 )
 
 

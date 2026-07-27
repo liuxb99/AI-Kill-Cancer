@@ -1,13 +1,11 @@
 """Phase 3D — Clinical Graph Outbox Repository Tests."""
 
 import uuid
-from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.backend.database.models import Base
-
 
 # 确保 ClinicalGraphOutboxModel 的表被注册到 Base.metadata
 from src.backend.domain.clinical_graph_outbox import ClinicalGraphOutboxModel  # noqa: F401

@@ -4,7 +4,7 @@ Verifies that all required event types and aggregate types exist,
 which is the schema-level prerequisite for end-to-end Digital Thread tracing.
 """
 
-from src.backend.schemas.clinical_graph_event import GraphEventType, GraphAggregateType
+from src.backend.schemas.clinical_graph_event import GraphAggregateType, GraphEventType
 
 
 class TestDigitalThreadSchema:

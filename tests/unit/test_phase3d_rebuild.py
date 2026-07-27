@@ -1,6 +1,5 @@
 """Phase 3D — Graph Rebuild Tests."""
 
-import pytest
 
 
 class TestRebuildCLI:
