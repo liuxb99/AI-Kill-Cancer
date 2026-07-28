@@ -28,33 +28,10 @@ def _is_sqlite() -> bool:
     return bind.dialect.name == "sqlite"
 
 
-def _drop_pg_unique_constraint(table: str, column: str) -> None:
-    """Drop a single-column unique constraint on PostgreSQL with dynamic name lookup."""
-    op.execute(f"""
-        DO $$
-        DECLARE
-            con_name text;
-        BEGIN
-            FOR con_name IN
-                SELECT con.conname
-                FROM pg_constraint con
-                JOIN pg_class rel ON rel.oid = con.conrelid
-                WHERE rel.relname = '{table}'
-                AND con.contype = 'u'
-                AND con.conkey = ARRAY(
-                    SELECT attnum FROM pg_attribute
-                    WHERE attrelid = rel.oid AND attname = '{column}'
-                )
-            LOOP
-                EXECUTE format('ALTER TABLE {table} DROP CONSTRAINT %%I', con_name);
-            END LOOP;
-        END;
-        $$;
-    """)
-
-
 def upgrade() -> None:
-    # ─── domain_treatment_plans ─────────────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════════
+    # domain_treatment_plans
+    # ═══════════════════════════════════════════════════════════════════
     if _is_sqlite():
         with op.batch_alter_table("domain_treatment_plans", recreate="always") as batch_op:
             batch_op.drop_index("ix_domain_treatment_plans_plan_id")
@@ -74,27 +51,24 @@ def upgrade() -> None:
                 ["supersedes_version_id"], ["id"], ondelete="SET NULL",
             )
     else:
-        # PostgreSQL: drop old single-column unique constraint dynamically
-        _drop_pg_unique_constraint("domain_treatment_plans", "plan_id")
-        # Also drop the composite constraint from 023 if it exists (renamed version)
-        op.execute(
-            "ALTER TABLE domain_treatment_plans "
-            "DROP CONSTRAINT IF EXISTS uq_treatment_plan_version"
-        )
-        # Add version link columns
+        # PostgreSQL: drop old unique constraints (ignore if not found)
+        for con_name in [
+            "domain_treatment_plans_plan_id_key",
+            "uq_treatment_plan_version",
+            "uq_plan_id_version",
+        ]:
+            op.execute(f"ALTER TABLE domain_treatment_plans DROP CONSTRAINT IF EXISTS {con_name}")
+
         op.add_column("domain_treatment_plans",
                        sa.Column("previous_version_id", sa.String(36), nullable=True))
         op.add_column("domain_treatment_plans",
                        sa.Column("supersedes_version_id", sa.String(36), nullable=True))
-        # Add indexes
         op.create_index("ix_domain_treatment_plans_prev_ver", "domain_treatment_plans",
                         ["previous_version_id"])
         op.create_index("ix_domain_treatment_plans_sup_ver", "domain_treatment_plans",
                         ["supersedes_version_id"])
-        # Add composite unique
         op.create_unique_constraint("uq_plan_id_version", "domain_treatment_plans",
                                      ["plan_id", "version"])
-        # Add FK constraints
         op.create_foreign_key(
             "fk_prev_version", "domain_treatment_plans", "domain_treatment_plans",
             ["previous_version_id"], ["id"], ondelete="SET NULL",
@@ -104,20 +78,30 @@ def upgrade() -> None:
             ["supersedes_version_id"], ["id"], ondelete="SET NULL",
         )
 
-    # ─── domain_treatment_plan_traces ───────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════════
+    # domain_treatment_plan_traces
+    # ═══════════════════════════════════════════════════════════════════
     if _is_sqlite():
         with op.batch_alter_table("domain_treatment_plan_traces", recreate="always") as batch_op:
             batch_op.drop_index("ix_domain_treatment_plan_traces_trace_id")
             batch_op.alter_column("trace_id", existing_type=sa.String(64), nullable=False)
             batch_op.create_unique_constraint("uq_trace_step", ["trace_id", "step_order"])
     else:
-        _drop_pg_unique_constraint("domain_treatment_plan_traces", "trace_id")
+        for con_name in [
+            "domain_treatment_plan_traces_trace_id_key",
+            "uq_trace_step",
+        ]:
+            op.execute(
+                f"ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT IF EXISTS {con_name}"
+            )
         op.create_unique_constraint("uq_trace_step", "domain_treatment_plan_traces",
                                      ["trace_id", "step_order"])
 
 
 def downgrade() -> None:
-    # ─── domain_treatment_plans ─────────────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════════
+    # domain_treatment_plans
+    # ═══════════════════════════════════════════════════════════════════
     if _is_sqlite():
         with op.batch_alter_table("domain_treatment_plans", recreate="always") as batch_op:
             batch_op.drop_constraint("fk_supersedes_version", type_="foreignkey")
@@ -136,9 +120,11 @@ def downgrade() -> None:
         op.drop_index("ix_domain_treatment_plans_prev_ver", table_name="domain_treatment_plans")
         op.drop_column("domain_treatment_plans", "supersedes_version_id")
         op.drop_column("domain_treatment_plans", "previous_version_id")
-        op.drop_constraint("uq_plan_id_version", "domain_treatment_plans", type_="unique")
+        op.execute("ALTER TABLE domain_treatment_plans DROP CONSTRAINT IF EXISTS uq_plan_id_version")
 
-    # ─── domain_treatment_plan_traces ───────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════════
+    # domain_treatment_plan_traces
+    # ═══════════════════════════════════════════════════════════════════
     if _is_sqlite():
         with op.batch_alter_table("domain_treatment_plan_traces", recreate="always") as batch_op:
             batch_op.drop_constraint("uq_trace_step", type_="unique")
@@ -146,4 +132,8 @@ def downgrade() -> None:
             batch_op.create_index("ix_domain_treatment_plan_traces_trace_id",
                                   ["trace_id"], unique=True)
     else:
-        op.drop_constraint("uq_trace_step", "domain_treatment_plan_traces", type_="unique")
+        op.execute("ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT IF EXISTS uq_trace_step")
+        op.execute(
+            "ALTER TABLE domain_treatment_plan_traces "
+            "ADD CONSTRAINT domain_treatment_plan_traces_trace_id_key UNIQUE (trace_id)"
+        )
