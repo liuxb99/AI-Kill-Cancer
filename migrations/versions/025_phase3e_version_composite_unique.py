@@ -200,5 +200,8 @@ def downgrade() -> None:
                 END IF;
             END $$;
         """)
-        # 重建 019 原有的 uq_trace_step index，让后续 019 downgrade 能正确 drop 它
-        op.execute("CREATE INDEX IF NOT EXISTS uq_trace_step ON domain_treatment_plan_traces (trace_id, step_order)")
+        # 重建 019 原有的 uq_trace_step unique index，让后续 019 downgrade 能正确 drop 它
+        # 使用 op.create_index 以确保与 019 升级创建的完全一致
+        op.create_index("uq_trace_step", "domain_treatment_plan_traces",
+                        ["trace_id", "step_order"], unique=True,
+                        if_not_exists=True)
