@@ -575,3 +575,19 @@ Reviewer Score: 95/100 ✅ | Ready for Treatment Plan Phase: YES ✅
 2026-07-28 10:45 | [v] task(doc-writer) -> Step 9 完成：總結報告產出 tasks/summary-report-phase3e-versioning-final-fix.md ✅
 2026-07-28 10:45 | [v] Step 10 完成：需求歸檔至 requirements-history/requirements-Phase-3E-Versioning-Final-Fix.md ✅ 需求歸零 ✅
 2026-07-28 10:45 | [v] task(REVIEWER) resume -> 遵守流程=YES 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性24 正確性25 可維護性24 測試驗證25 | 總分98 合格 ✅（AGENTS.md 修正後重新評分）
+TIME_PENDING | [v] Step 0：子代理向使用者報到完成（新版 AGENTS.md 首次執行）
+TIME_PENDING | [v] task(doc-writer) -> Step 1 完成：需求已記錄到 tasks/requirements.md
+TIME_PENDING | [v] task(doc-writer) -> Step 2 完成：場景識別為 hardening，tasks/task-status.md 已更新
+TIME_PENDING | [v] task(PLANNER) -> Step 3 完成：計劃產出 tasks/plan-Phase-3E-Final-Hardening.md（4 Phase，12 任務）
+TIME_PENDING | [v] task(backend-logic) -> Batch 1 完成：A-01 PostgreSQL Trace Constraint 修正、A-02 Downgrade 修正、A-03 024 Schema 確認
+TIME_PENDING | [v] task(backend-logic) -> Batch 2 完成：A-04 CI Migration Gate 強化、A-05 Downgrade 環境隔離、B-01 PostgreSQL Robustness、B-02 SQLite 相容性
+TIME_PENDING | [v] task(test-writer) -> Batch 3 完成：C-01~C-05 測試撰寫（5 個新測試檔案 + conftest 更新）
+TIME_PENDING | [v] task(backend-logic) -> 修復 Constraint 命名一致性（downgrade 重建約束名稱對齊 024 Schema）
+TIME_PENDING | [v] Step 6 需求回歸檢查 PASS（全部需求滿足）
+TIME_PENDING | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=NO 測試=YES | 完整性18 正確性18 可維護性17 測試17 | 總分70 不合格
+TIME_PENDING | [v] task(PLANNER) resume -> 返工第1次重新規劃，產出 tasks/plan-Phase-3E-Final-Hardening-R1.md
+TIME_PENDING | [v] task(backend-logic) resume -> 返工第1次重新執行：修正 CI YAML（新增 pytest + 隔離測試）
+TIME_PENDING | [v] Step 6 重新檢查 PASS（返工第1次）
+TIME_PENDING | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性22 正確性25 可維護性22 測試25 | 總分94 合格 ✅
+TIME_PENDING | [v] task(doc-writer) -> Step 9 完成：總結報告產出 tasks/summary-report-phase3e-final-hardening.md
+TIME_PENDING | [v] Step 10 完成：需求歸檔至 requirements-history/requirements-Phase-3E-Final-Hardening.md ✅ 需求歸零 ✅

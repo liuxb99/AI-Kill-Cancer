@@ -63,20 +63,43 @@ def upgrade() -> None:
                        sa.Column("previous_version_id", sa.String(36), nullable=True))
         op.add_column("domain_treatment_plans",
                        sa.Column("supersedes_version_id", sa.String(36), nullable=True))
-        op.create_index("ix_domain_treatment_plans_prev_ver", "domain_treatment_plans",
-                        ["previous_version_id"])
-        op.create_index("ix_domain_treatment_plans_sup_ver", "domain_treatment_plans",
-                        ["supersedes_version_id"])
-        op.create_unique_constraint("uq_plan_id_version", "domain_treatment_plans",
-                                     ["plan_id", "version"])
-        op.create_foreign_key(
-            "fk_prev_version", "domain_treatment_plans", "domain_treatment_plans",
-            ["previous_version_id"], ["id"], ondelete="SET NULL",
-        )
-        op.create_foreign_key(
-            "fk_supersedes_version", "domain_treatment_plans", "domain_treatment_plans",
-            ["supersedes_version_id"], ["id"], ondelete="SET NULL",
-        )
+        op.execute("CREATE INDEX IF NOT EXISTS ix_domain_treatment_plans_prev_ver ON domain_treatment_plans (previous_version_id)")
+        op.execute("CREATE INDEX IF NOT EXISTS ix_domain_treatment_plans_sup_ver ON domain_treatment_plans (supersedes_version_id)")
+        op.execute("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_constraint
+                    WHERE conname = 'uq_plan_id_version'
+                      AND conrelid = 'domain_treatment_plans'::regclass
+                ) THEN
+                    ALTER TABLE domain_treatment_plans ADD CONSTRAINT uq_plan_id_version UNIQUE (plan_id, version);
+                END IF;
+            END $$;
+        """)
+        op.execute("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_constraint
+                    WHERE conname = 'fk_prev_version'
+                      AND conrelid = 'domain_treatment_plans'::regclass
+                ) THEN
+                    ALTER TABLE domain_treatment_plans ADD CONSTRAINT fk_prev_version
+                        FOREIGN KEY (previous_version_id) REFERENCES domain_treatment_plans (id) ON DELETE SET NULL;
+                END IF;
+            END $$;
+        """)
+        op.execute("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_constraint
+                    WHERE conname = 'fk_supersedes_version'
+                      AND conrelid = 'domain_treatment_plans'::regclass
+                ) THEN
+                    ALTER TABLE domain_treatment_plans ADD CONSTRAINT fk_supersedes_version
+                        FOREIGN KEY (supersedes_version_id) REFERENCES domain_treatment_plans (id) ON DELETE SET NULL;
+                END IF;
+            END $$;
+        """)
 
     # ═══════════════════════════════════════════════════════════════════
     # domain_treatment_plan_traces
@@ -87,10 +110,42 @@ def upgrade() -> None:
             batch_op.alter_column("trace_id", existing_type=sa.String(64), nullable=False)
             batch_op.create_unique_constraint("uq_trace_step", ["trace_id", "step_order"])
     else:
-        op.execute("DROP INDEX IF EXISTS uq_trace_step")
-        op.execute("DROP INDEX IF EXISTS ix_domain_treatment_plan_traces_trace_id")
-        op.create_index("uq_trace_step", "domain_treatment_plan_traces",
-                        ["trace_id", "step_order"], unique=True)
+        # 动态查询 pg_catalog.pg_constraint 找出 UNIQUE(trace_id) 的真正 constraint 名称
+        op.execute("""
+            DO $$
+            DECLARE
+                con_name text;
+            BEGIN
+                SELECT con.conname INTO con_name
+                FROM pg_catalog.pg_constraint con
+                JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
+                WHERE rel.relname = 'domain_treatment_plan_traces'
+                  AND con.contype = 'u'
+                  AND con.conkey = (
+                      SELECT array_agg(a.attnum ORDER BY a.attnum)
+                      FROM pg_catalog.pg_attribute a
+                      WHERE a.attrelid = rel.oid
+                        AND a.attname = 'trace_id'
+                  );
+                IF con_name IS NOT NULL THEN
+                    EXECUTE format(
+                        'ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT %I',
+                        con_name
+                    );
+                END IF;
+            END $$;
+        """)
+        op.execute("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_constraint
+                    WHERE conname = 'uq_trace_step'
+                      AND conrelid = 'domain_treatment_plan_traces'::regclass
+                ) THEN
+                    ALTER TABLE domain_treatment_plan_traces ADD CONSTRAINT uq_trace_step UNIQUE (trace_id, step_order);
+                END IF;
+            END $$;
+        """)
 
 
 def downgrade() -> None:
@@ -109,13 +164,25 @@ def downgrade() -> None:
             batch_op.alter_column("plan_id", existing_type=sa.String(64), nullable=False)
             batch_op.create_index("ix_domain_treatment_plans_plan_id", ["plan_id"], unique=True)
     else:
-        op.drop_constraint("fk_supersedes_version", "domain_treatment_plans", type_="foreignkey")
-        op.drop_constraint("fk_prev_version", "domain_treatment_plans", type_="foreignkey")
-        op.drop_index("ix_domain_treatment_plans_sup_ver", table_name="domain_treatment_plans")
-        op.drop_index("ix_domain_treatment_plans_prev_ver", table_name="domain_treatment_plans")
+        op.execute("ALTER TABLE domain_treatment_plans DROP CONSTRAINT IF EXISTS fk_supersedes_version")
+        op.execute("ALTER TABLE domain_treatment_plans DROP CONSTRAINT IF EXISTS fk_prev_version")
+        op.execute("DROP INDEX IF EXISTS ix_domain_treatment_plans_sup_ver")
+        op.execute("DROP INDEX IF EXISTS ix_domain_treatment_plans_prev_ver")
         op.drop_column("domain_treatment_plans", "supersedes_version_id")
         op.drop_column("domain_treatment_plans", "previous_version_id")
         op.execute("ALTER TABLE domain_treatment_plans DROP CONSTRAINT IF EXISTS uq_plan_id_version")
+        # 恢复 024 schema 的 UNIQUE(plan_id)
+        op.execute("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_constraint
+                    WHERE conname = 'domain_treatment_plans_plan_id_key'
+                      AND conrelid = 'domain_treatment_plans'::regclass
+                ) THEN
+                    ALTER TABLE domain_treatment_plans ADD CONSTRAINT domain_treatment_plans_plan_id_key UNIQUE (plan_id);
+                END IF;
+            END $$;
+        """)
 
     # ═══════════════════════════════════════════════════════════════════
     # domain_treatment_plan_traces
@@ -127,8 +194,16 @@ def downgrade() -> None:
             batch_op.create_index("ix_domain_treatment_plan_traces_trace_id",
                                   ["trace_id"], unique=True)
     else:
-        op.execute("DROP INDEX IF EXISTS uq_trace_step")
-        op.execute(
-            "CREATE UNIQUE INDEX ix_domain_treatment_plan_traces_trace_id "
-            "ON domain_treatment_plan_traces (trace_id)"
-        )
+        op.execute("ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT IF EXISTS uq_trace_step")
+        # 恢复 024 schema 的 UNIQUE(trace_id)
+        op.execute("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_constraint
+                    WHERE conname = 'domain_treatment_plan_traces_trace_id_key'
+                      AND conrelid = 'domain_treatment_plan_traces'::regclass
+                ) THEN
+                    ALTER TABLE domain_treatment_plan_traces ADD CONSTRAINT domain_treatment_plan_traces_trace_id_key UNIQUE (trace_id);
+                END IF;
+            END $$;
+        """)

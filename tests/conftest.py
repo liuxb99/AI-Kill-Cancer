@@ -145,3 +145,61 @@ class MockResult:
 class MockScalars:
     def all(self):
         return []
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PostgreSQL Integration Test Fixtures
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def pytest_configure(config):
+    """Register custom markers."""
+    config.addinivalue_line("markers", "pg: marks tests requiring PostgreSQL")
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
+
+
+@pytest.fixture(scope="session")
+def pg_engine():
+    """Session-scoped sync SQLAlchemy engine for PostgreSQL integration tests."""
+    import re
+    from sqlalchemy import create_engine
+
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        pytest.skip("DATABASE_URL environment variable not set — requires PostgreSQL")
+
+    # Strip async driver suffix to get sync variant (same as migrations/env.py)
+    sync_url = re.sub(r"\+asyncpg|\+aiosqlite|\+aiomysql|\+aioodbc|\+asyncmy", "", db_url)
+
+    # Ensure we use psycopg2 for PostgreSQL sync driver
+    if sync_url.startswith("postgresql://") and "+psycopg2" not in sync_url:
+        sync_url = sync_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+    engine = create_engine(sync_url, pool_pre_ping=True)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def pg_connection(pg_engine):
+    """提供 PostgreSQL 同步連接，用於 integration 測試。"""
+    connection = pg_engine.connect()
+    yield connection
+    connection.close()
+
+
+@pytest.fixture
+def alembic_runner(pg_engine):
+    """提供 alembic upgrade/downgrade 執行器。"""
+    from alembic import command
+    from alembic.config import Config
+
+    def _run(operation: str, revision: str):
+        """執行 alembic operation (upgrade/downgrade) 到指定 revision。"""
+        cfg = Config()
+        cfg.set_main_option("script_location", "migrations")
+        # 使用與 pg_engine 相同的同步 URL
+        cfg.set_main_option("sqlalchemy.url", str(pg_engine.url))
+        getattr(command, operation)(cfg, revision)
+
+    return _run
