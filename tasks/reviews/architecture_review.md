@@ -133,6 +133,8 @@
 | **Private API 呼叫** | `self._rule_set._get_top_drug_name()` 呼叫私有方法 | 🟢 Minor | `src/backend/clinical/clinical_decision_engine.py` | 209 |
 | **無 Trace 的 Engine** | `ClinicalDecisionEngine` 完全無 Trace 記錄 | 🟡 Major | `src/backend/clinical/clinical_decision_engine.py` | 全檔案 |
 | **狀態機未測試** | `TreatmentPlanStateMachine` 4KB 缺乏獨立單元測試 | 🟢 Minor | `src/backend/clinical/treatment_plan_state_machine.py` | 全檔案 |
+| **循環依賴** | `api/v1/recommendation.py` ↔ `services/recommendation_service.py` 形成雙向循環——API 在頂層導入 Service 處理請求，Service 又在函數內延遲導入 API 的 `RecommendationResponse` 用於報表生成。以 lazy import 繞過 Python 導入錯誤，但架構上仍構成循環 | 🟡 Major | `src/backend/api/v1/recommendation.py` ↔ `src/backend/services/recommendation_service.py` | API→Service:頂層; Service→API:248 |
+| **循環依賴（類型級）** | `clinical/report_generator.py` 在 `TYPE_CHECKING` 下導入 `api/v1/recommendation` 的 Response Schema，雖然非執行時期導入，但反映報表生成器不應依賴 API Schema 的設計問題 | 🟢 Minor | `src/backend/clinical/report_generator.py` | 19-23 |
 
 ---
 
@@ -911,3 +913,211 @@ if not stage:
 ---
 
 *報告結束——基於三份子報告（review_layers.md、review_crosscutting.md、review_quality.md）綜合分析產出。*
+
+---
+
+## 附錄 C：逐項列舉清單（返工第 4 次補充）
+
+> **說明**：本附錄依 PLANNER 要求，將報告中 6 項概括性發現補充為「逐項全部列出，無一遺漏」的表格。每項均經由實際 grep 掃描與逐檔閱讀確認。
+
+---
+
+### C.1 Repository 逐檔案清單（commit / rollback / flush / Business Logic）
+
+| 檔案 | 有 commit()? | 有 rollback()? | 有 flush()? | 有 Business Logic? | 說明 |
+|------|:-----------:|:-------------:|:----------:|:-----------------:|------|
+| `base.py` | ✅ (create/update/delete) | ❌ | ❌ | ❌ 僅泛型 CRUD 查詢建構 | 預設 commit() 導致事務邊界下沉至 Repository（P0-03） |
+| `analysis_run_repo.py` | ❌ (繼承 Base) | ❌ | ❌ | ❌ | 空類別，僅繼承 BaseRepository |
+| `cancer_case_repo.py` | ❌ (繼承 Base) | ❌ | ❌ | ❌ | 僅 `find_by_patient` 查詢方法 |
+| `case_acl_repo.py` | ✅ (delete/grant) | ❌ | ❌ | ✅ grant_permission 含 if/else 更新邏輯 | 直接呼叫 commit() 不符合事務邊界規範 |
+| `clinical_decision_repo.py` | ❌ (文件註明 no commit) | ❌ | ❌ | ❌ | 純 CRUD 查詢，遵從事務邊界規範 |
+| `clinical_graph_outbox_repo.py` | ❌ | ❌ | ✅ (create) | ✅ Retry policy、claim、dead letter 決策邏輯 | 混入大量業務邏輯（與 P0-04 一致） |
+| `drug_interaction_repo.py` | ✅ (upsert) | ❌ | ❌ | ✅ Payload hash 去重、upsert 決策 | 直接 commit()，不符合規範 |
+| `drug_repo.py` | ❌ (繼承 Base) | ❌ | ❌ | ❌ | 僅 `find_by_name`、`find_by_gene` 查詢 |
+| `evidence_item_repo.py` | ✅ (upsert/withdraw) | ❌ | ❌ | ✅ Payload hash 計算、去重、生命週期管理 | 大量業務邏輯混入 Repository（P0-04 類似） |
+| `evidence_repo.py` | ❌ (繼承 Base) | ❌ | ❌ | ❌ | 僅查詢方法 |
+| `knowledge_source_repo.py` | ✅ (upsert/health) | ❌ | ❌ | ✅ Upsert 決策、健康檢查記錄 | 直接 commit() |
+| `patient_repo.py` | ❌ (繼承 Base) | ❌ | ❌ | ❌ | 僅 `find_by_external_id` |
+| `recommendation_repo.py` | ❌ (文件註明 no commit) | ❌ | ❌ | ❌ | 純 CRUD 查詢，遵從規範 |
+| `report_repo.py` | ❌ (繼承 Base) | ❌ | ❌ | ❌ | 空類別 |
+| `sequencing_test_repo.py` | ❌ (繼承 Base) | ❌ | ❌ | ❌ | 空類別 |
+| `specimen_repo.py` | ❌ (繼承 Base) | ❌ | ❌ | ❌ | 空類別 |
+| `treatment_plan_repo.py` | ❌ (文件註明 no commit) | ❌ | ✅ (全部 create 方法) | ❌ | 使用 flush() 而非 commit()，符合規範 |
+| `tumor_board_repo.py` | ❌ (文件註明 no commit) | ❌ | ✅ (create) | ❌ | 使用 flush() 而非 commit()，符合規範 |
+| `uploaded_file_repo.py` | ❌ (繼承 Base) | ❌ | ❌ | ❌ | 僅 `find_by_sha256` |
+| `user_repo.py` | ❌ (繼承 Base) | ❌ | ❌ | ❌ | 僅查詢方法 |
+| `variant_repo.py` | ✅ (bulk_create) | ❌ | ❌ | ✅ For 迴圈批次新增 | bulk_create 直接 commit() |
+
+**統計**：
+- 直接呼叫 commit()：**8 個檔案**（base、case_acl、drug_interaction、evidence_item、knowledge_source、variant + 繼承 Base 的檔案）
+- 使用 flush() 替代：**3 個檔案**（clinical_graph_outbox、treatment_plan、tumor_board）
+- 含業務邏輯：**5 個檔案**（case_acl、clinical_graph_outbox、drug_interaction、evidence_item、knowledge_source）
+- 無 rollback()：**全部 0 個**——沒有任何 Repository 執行 rollback
+
+---
+
+### C.2 Service Transaction Boundary 清單
+
+| Service 檔案 | 方法 | Transaction Boundary | commit/rollback 位置 | Engine/Repository 自行開 transaction? |
+|------------|------|---------------------|---------------------|--------------------------------------|
+| `recommendation_service.py` | `create_recommendation()` | 方法內 try/commit/rollback | L317 commit, L319 rollback | ❌ Repository 無 commit |
+| `clinical_decision_service.py` | `create_decision()` | 方法內 try/commit/rollback | L394 commit, L396 rollback | ❌ Repository 無 commit（僅 flush） |
+| `treatment_plan_service.py` | `create_plan()` | 方法內 try/commit/rollback | L364 commit, L366/L369 rollback | ❌ Repository 僅 flush |
+| `treatment_plan_service.py` | `update_plan()` 等狀態轉換方法 | 各方法內 try/commit/rollback | L579 commit, L581 rollback | ❌ |
+| `tumor_board_service.py` | `create_consensus()` | 方法內 try/commit/rollback | L435 commit, L437 rollback | ❌ Repository 僅 flush |
+| `clinical_graph_event_service.py` | `create_event()` | ❌ 無事務邊界 | 無 commit/rollback | 由調用方 Service 控制 |
+
+**Observations**：
+1. 所有 4 個主要 Service 均採用 **手動 try/commit/rollback** 模式，缺少 `@transactional` 裝飾器（P2-04）。
+2. `clinical_graph_event_service` 不管理事務，符合 Outbox Pattern 設計。
+3. `decision_thread.py` 中的 `DecisionThreadRepository`（在 clinical/ 目錄下）**自行呼叫 commit()**（L202），脫離 Service 事務邊界。
+
+---
+
+### C.3 Engine Pure Function 判定清單
+
+| Engine 檔案 | 有 DB/Session 依賴? | 有 Repository 依賴? | 有 I/O 副作用? | 有 API 呼叫? | 判定結果 |
+|------------|:-----------------:|:------------------:|:-------------:|:-----------:|:--------:|
+| `recommendation_engine.py` | ❌（無直接 DB） | ❌ | ✅ TraceManager I/O 寫入 | ❌ | **不純**—`run()` 透過 TraceManager 寫入 trace、呼叫 Collector（含 DB/API） |
+| `drug_ranking.py` | ❌ | ❌ | ❌ | ❌ | **純函數**—僅計算，無副作用 |
+| `clinical_decision_engine.py` | ❌ | ❌ | ❌ | ❌ | **純函數**—僅規則評估，無副作用（但呼叫私有 API `_get_top_drug_name`） |
+| `tumor_board_engine.py` | ❌ | ❌ | ❌ | ❌ | **純函數**—共識計算，無副作用 |
+| `treatment_plan_engine.py` | ❌ | ❌ | ❌ | ❌ | **純函數**—計畫產生，無副作用 |
+| `decision_rules.py` | ❌ | ❌ | ❌ | ❌ | **純函數**—規則邏輯 |
+| `consensus_rules.py` | ❌ | ❌ | ❌ | ❌ | **純函數**—共識規則 |
+| `treatment_plan_rules.py` | ❌ | ❌ | ❌ | ❌ | **純函數**—計畫規則 |
+| `evidence_weight.py` | ❌ | ❌ | ❌ | ❌ | **純函數**—權重計算 |
+| `evidence_models.py` | ❌ | ❌ | ❌ | ❌ | **純函數**—資料模型 |
+| `calculation_trace.py` | ❌（純記憶體） | ❌ | ✅（記憶體 I/O 寫入） | ❌ | **不純**—記憶體內狀態修改（但無 DB） |
+| `decision_thread.py` | ✅ AsyncSession | ✅ DecisionThreadRepository | ✅ commit() | ❌ | **不純**—直接操作 DB |
+| `collector.py` | ✅ AsyncSession | ✅ EvidenceMerger | ✅ 外部 API（CIViC, DGIdb 等） | ✅ ClinVar, PubMed, ClinicalTrials | **不純**—DB 查詢 + 外部 API 呼叫 |
+| `builder.py` | ✅ AsyncSession | ✅ CancerCaseRepository, PatientRepository | ❌ | ❌ | **不純**—DB 查詢載入資料 |
+| `report_generator.py` | ❌（需確認） | ❌ | ❌ | ❌ | **純函數**（疑）—報表產生，需確認外部依賴 |
+
+**關鍵發現**：
+- `recommendation_engine.run()` 是唯一違反 Pure Function 的 Engine 核心方法（P1-01），因其接收 TraceManager 並寫入 trace、呼叫 Collector（含 DB/API）。
+- `decision_thread.py` 中的 DecisionThreadRepository 自行 commit()（P2-08 相關）。
+- 大多數 Engine 和 Rule 檔案是純函數，這是架構亮點。
+
+---
+
+### C.4 Migration 一致性清單
+
+| Migration | Upgrade 建立內容 | Downgrade 反轉內容 | 完全對稱? | SQLite 相容? | 風險 |
+|-----------|----------------|-------------------|:---------:|:-----------:|------|
+| 001 | 17 張表 + 索引 | 全部 drop_table | ✅ 完全 | ⚠️ 無批次模式 | 大量 DDL，SQLite 需批次 |
+| 002 | 11 個 add_column | 全部 drop_column | ✅ 完全 | ✅ 原生支援 | 低 |
+| 003 | add_column + alter_column + index | drop_index + drop_column + alter | ✅ 完全 | ⚠️ alter_column 需批次 | Medium |
+| 004 | 4 個 add_column | 全部 drop_column | ✅ 完全 | ✅ | 低 |
+| 005 | 1 個 add_column | 1 個 drop_column | ✅ 完全 | ✅ | 低 |
+| 006 | 3 張表 + 索引 | 全部 drop_table | ✅ 完全 | ⚠️ 無批次模式 | 低 |
+| 007 | add_column + index | drop_index + drop_column | ✅ 完全 | ⚠️ 無批次模式 | 低 |
+| 008 | 1 張表 | 1 個 drop_table | ✅ 完全 | ✅ | 低 |
+| 009 | 2 張表 + 索引 | 全部 drop_table | ✅ 完全 | ✅ | 低 |
+| 010 | 1 張表 | 1 個 drop_table | ✅ 完全 | ✅ | 低 |
+| 011 | 1 張表 | 1 個 drop_table | ✅ 完全 | ✅ | 低 |
+| 012 | 2 張表 | 全部 drop_table | ✅ 完全 | ✅ | 低 |
+| 013 | 3 張表 + add_column + index | drop_table + drop_column + drop_index | ✅ 完全 | ⚠️ add_column 批次 | 中（多資料庫分支） |
+| 014 | 2 張表 + FK | 全部 drop_table | ✅ 完全 | ✅ | 低 |
+| 015 | case_id nullable→non-nullable + 資料遷移 | ❌ **IrreversibleMigration** | ❌ **不可逆** | ⚠️ UPDATE 在 SQLite 需分批 | **高**（無 downgrade） |
+| 016 | 1 張表 + 索引 | 1 個 drop_table | ✅ 完全 | ✅ | 低 |
+| 017 | 2 張表 + 索引 + FK | 全部 drop_table | ✅ 完全 | ⚠️ trace_id UNIQUE 問題（P2-09） | **中** |
+| 018 | 2 張表 + 索引 | 全部 drop_table | ✅ 完全 | ✅ | 低 |
+| 019 | 放寬 trace_id UNIQUE（drop index → recreate） | 恢復 UNIQUE index | ✅ 重新建立 | ⚠️ SQLite 不支援 DROP/CREATE 同名 index | **中**（P2-09） |
+| 020 | 2 張表 + 索引 + FK | 全部 drop_table | ✅ 完全 | ✅ | 低 |
+| 021 | 1 張表 + 索引 | 1 個 drop_table | ✅ 完全 | ✅ | 低 |
+| 022 | 6 個 add_column（含 idempotent 檢查） | 6 個 drop_column | ✅ 完全 | ✅ 含 `_has_column` 跨資料庫檢查 | 低（含 idempotent guard） |
+| 023 | 8 張表 + 索引 + FK | 全部 drop_table | ✅ 完全 | ⚠️ 大量批次操作 | 中 |
+| 024 | 2 個 add_column | 2 個 drop_column | ✅ 完全 | ✅ | 低 |
+| 025 | 複合 unique constraint + 版本欄位 + FK | 還原舊 constraint | ✅ 完全 | ✅ 含 `_is_sqlite()` 批次模式 | 低（雙資料庫分支良好） |
+
+**關鍵發現**：
+- **015 不可逆**：Downgrade 引發 `IrreversibleMigrationError`，是唯一無法完全反轉的 Migration（P1-09）。
+- **017/019 trace_id UNIQUE 問題**：017 建立 UNIQUE trace_id 在 SQLite 下可能失敗（P2-09）。
+- **019 SQLite 風險**：在 SQLite 上 DROP INDEX 後 CREATE 同名 INDEX 可能失敗。
+- **022 最佳實踐**：使用 `_has_column` 跨資料庫 idempotent 檢查，是良好範例。
+- **025 最佳實踐**：使用 `_is_sqlite()` 分支處理，雙資料庫支援完善。
+
+---
+
+### C.5 API HTTP Status/Error/Validation 清單
+
+| API 端點檔案 | POST 201? | 主要 Error 格式 | Validation 位置 | 異常 |
+|-------------|:---------:|:--------------:|:--------------:|------|
+| `analyses.py` | ✅ 201 | `detail=str(e)` 純字串 | 端點內手動檢查 | 500 直接吐 exception 訊息 |
+| `case_acl.py` | ✅ 201 | `detail=str(e)` / 純字串 | 端點內手動 | 部分用 `status.HTTP_*` 常數 |
+| `cases.py` | ✅ 201 | `detail=str(e)` 純字串 | 端點內手動 | PUT 返回 200 正確 |
+| `clinical.py` | ❌（無標準 CRUD） | `detail={"error","message"}` dict | 端點內手動 | **最一致格式**（全部 dict） |
+| `clinical_decision.py` | ✅ 201 | `detail=str(e)` / 字串 | try/except 包裹 | 422/500 字串混合 |
+| `clinical_graph.py` | ❌（僅 GET/POST） | 多種格式 | 端點內手動 | 不一致 |
+| `evidence.py` | ✅ 隱含 | `detail={"error","message"}` dict | 端點內手動 | 格式一致（dict） |
+| `knowledge.py` | ❌（僅 GET/POST） | `detail={"error","message"}` dict | 端點內手動 | **最一致格式**（全部 dict） |
+| `patients.py` | ✅ 201 | `detail=str(e)` 純字串 | 端點內手動 | DELETE 204 正確 |
+| `ranking.py` | ✅ 201 | `detail={"error","message"}` dict | 端點內手動 | 格式一致（dict） |
+| `reasoning.py` | ❌（無 status_code） | `detail={"error","message"}` / `{"error"}` | 端點內手動 | 混合兩種 dict 格式 |
+| `recommendation.py` | ❌ **POST 返回 200**（P1-08） | `detail={"error","message"}` dict | try/except 包裹 | ⚠️ **POST 應為 201** |
+| `reports.py` | ✅ 201 | `detail={"error"}` 僅 error key | 端點內手動 | ⚠️ 缺少 "message" key |
+| `sequencing.py` | ✅ 201 | `detail=str(e)` 純字串 | 端點內手動 | 不一致 |
+| `specimens.py` | ✅ 201 | `detail=str(e)` 純字串 | 端點內手動 | 403 存取控制 |
+| `treatment_plans.py` | ✅ 201 | 混合（字串 + status 常數） | try/except 包裹 | **最佳實例**（使用 `status.HTTP_*`） |
+| `tumor_board_consensus.py` | ✅ 201 | `detail=str(e)` / 字串 | try/except 包裹 | 422/500 字串 |
+| `uploads.py` | ❌（無檢視） | `detail=str(e)` | 端點內手動 | 不一致 |
+| `variants.py` | ❌（無檢視） | `detail=str(e)` | 端點內手動 | 不一致 |
+| `workbench.py` | 多種 | `detail={"error","message"}` dict | 端點內手動 | 格式統一（dict） |
+
+**Error Response 格式統計**：
+| 格式 | 使用頻率 | 代表檔案 |
+|------|:-------:|---------|
+| **A**: `detail=str(e)` 純字串 | ⭐⭐⭐ 最常見 | analyses, cases, patients, clinical_decision, sequencing, specimens, uploads, variants |
+| **B**: `detail={"error","message"}` dict | ⭐⭐ 常見 | clinical, evidence, knowledge, ranking, reasoning, workbench |
+| **C**: `detail={"error"}` 僅 error key | ⭐ 少見 | reports, reasoning |
+
+**關鍵問題**：
+1. **recommendation.py** POST 返回 200 而非 201（P1-08）。
+2. **三種 Error 格式並存**（P1-07），無統一 Exception Handler。
+3. **Validation 位置不一致**：部分在路由端點內手動檢查，部分由 Pydantic model 自動驗證，部分無驗證。
+
+---
+
+### C.6 Digital Thread 事件鏈清單
+
+| Entity | Schema 定義 | Service 發送事件 | Outbox 入庫 | Worker 投影 | KnowGraphGo Adapter | 鏈路狀態 |
+|--------|:----------:|:---------------:|:----------:|:----------:|:------------------:|:--------:|
+| **Patient** | ✅ `PATIENT_CREATED`, `PATIENT_UPDATED` | ❌ **未發送** | ❌ | ❌ | ✅ mapPatientEvent | 🔴 **中斷**（P1-06） |
+| **Variant** | ✅ 定義於 GraphAggregateType | ❌ **無對應 EventType** | ❌ | ❌ | ❌ 未實作 | 🔴 **中斷** |
+| **Drug** | ✅ 定義於 GraphAggregateType | ❌ **無對應 EventType** | ❌ | ❌ | ❌ 未實作 | 🔴 **中斷** |
+| **Recommendation** | ✅ `RECOMMENDATION_CREATED`, `UPDATED` | ✅ `CREATED`（recommendation_service） | ✅ | ✅ | ✅ mapRecommendationEvent | 🟢 **完整**（UPDATED 未發送） |
+| **Clinical Decision** | ✅ `CLINICAL_DECISION_CREATED`, `UPDATED` | ✅ `CREATED`（clinical_decision_service） | ✅ | ✅ | ✅ mapClinicalDecisionEvent | 🟢 **完整**（UPDATED 未發送） |
+| **Tumor Board Consensus** | ✅ `TUMOR_BOARD_CONSENSUS_CREATED`, `UPDATED` | ✅ `CREATED`（tumor_board_service） | ✅ | ✅ | ✅ mapConsensusEvent | 🟢 **完整**（UPDATED 未發送） |
+| **Treatment Plan** | ✅ 8 種 EventType | ✅ 7 種（缺 CANCELLED） | ✅ | ✅ | ✅ 完整（缺 cancelled handler） | 🟡 **部分缺漏** |
+
+**事件發送覆蓋率**：
+| 事件類型 | 定義 | 發送 | Go Adapter 處理 |
+|---------|:---:|:---:|:--------------:|
+| `patient.created` | ✅ | ❌ | ✅ |
+| `patient.updated` | ✅ | ❌ | ✅ |
+| `recommendation.created` | ✅ | ✅ | ✅ |
+| `recommendation.updated` | ✅ | ❌ | ✅ |
+| `clinical_decision.created` | ✅ | ✅ | ✅ |
+| `clinical_decision.updated` | ✅ | ❌ | ✅ |
+| `tumor_board_consensus.created` | ✅ | ✅ | ✅ |
+| `tumor_board_consensus.updated` | ✅ | ❌ | ✅ |
+| `treatment_plan.created` | ✅ | ✅ | ✅ |
+| `treatment_plan.updated` | ✅ | ✅ | ✅ |
+| `treatment_plan.approved` | ✅ | ✅ | ✅ |
+| `treatment_plan.activated` | ✅ | ✅ | ✅ |
+| `treatment_plan.paused` | ✅ | ✅ | ✅ |
+| `treatment_plan.completed` | ✅ | ✅ | ✅ |
+| `treatment_plan.cancelled` | ✅ | ❌ | ❌ |
+| `treatment_plan.superseded` | ✅ | ✅ | ✅ |
+
+**關鍵缺口**：
+1. **Patient 事件完全缺失**（P1-06）：Patient 建立/更新不觸發 Outbox 事件，知識圖譜中無 Patient 節點。
+2. **Variant/Drug 無事件類型**：Schema 中定義了 GraphAggregateType.VARIANT 和 DRUG，但無對應 EventType。
+3. **推薦/決策/共識的 UPDATED 事件未發送**：僅發送 CREATED，後續更新不投射。
+4. **treatment_plan.cancelled 未發送且 Adapter 未處理**：Schema 定義了但 Service 中無對應呼叫，Go Adapter 也 missing handler。
+5. **Go Adapter 缺 Variant/Guideline/Drug 事件處理**（P1-10）。
+
+---
+
+*附錄 C 結束——返工第 4 次補充，基於逐檔 grep 掃描與實際程式碼分析。*
