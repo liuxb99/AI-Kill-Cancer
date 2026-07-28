@@ -269,7 +269,7 @@ jobs:
                   \"\"\"))
                   rows = [r[0] for r in result.fetchall()]
                   print('domain_treatment_plans unique constraints:', rows)
-                  assert 'uq_plan_id_version' in rows, 'Missing uq_plan_id_version'
+                  assert 'uq_plan_id_version' in rows, f'Missing uq_plan_id_version in {rows}'
                   # Verify domain_treatment_plan_traces composite unique constraint
                   result = await conn.execute(text(\"\"\"
                       SELECT con.conname FROM pg_catalog.pg_constraint con
@@ -279,7 +279,7 @@ jobs:
                   \"\"\"))
                   rows = [r[0] for r in result.fetchall()]
                   print('domain_treatment_plan_traces unique constraints:', rows)
-                  assert 'uq_trace_step' in rows, 'Missing uq_trace_step'
+                  assert 'uq_domain_treatment_plan_traces_step' in rows, f'Missing uq_domain_treatment_plan_traces_step in {rows}'
                   # Verify foreign keys exist
                   result = await conn.execute(text(\"\"\"
                       SELECT con.conname FROM pg_catalog.pg_constraint con
