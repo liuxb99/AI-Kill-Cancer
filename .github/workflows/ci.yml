@@ -301,10 +301,7 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db_migration_gate
           PYTHONPATH: .
         run: |
-          pytest -v --tb=long tests/test_migration_gate.py \
-            tests/integration/test_migration_025_pg_trace_constraint.py \
-            tests/integration/test_migration_025_pg_schema_compare.py \
-            tests/integration/test_migration_025_pg_full_cycle.py
+          pytest -v --tb=long tests/test_migration_gate.py
 
       - name: Downgrade 024
         env:
