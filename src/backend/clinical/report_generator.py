@@ -12,6 +12,7 @@ use pure HTML/CSS (``<details>/<summary>``), no JavaScript required.
 from __future__ import annotations
 
 import html as html_lib
+import json
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -648,6 +649,11 @@ details.trace-details[open] summary {
   .clinical-decision-evidence { background: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .clinical-decision-alternatives { background: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .clinical-decision-contraindications .contra-item { background: #fef2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tp-phase-header { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tp-safety-rule.tp-safety-high { background: #fef2f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tp-safety-rule.tp-safety-medium { background: #fffbeb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tp-safety-rule.tp-safety-low { background: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tp-status-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */
@@ -773,6 +779,208 @@ details.trace-details[open] summary {
   line-height: 1.6;
   margin: 0 0 12px;
 }
+
+/* ── Treatment Plan ─────────────────────────────────────────────────── */
+
+.tp-status-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+
+.tp-status-badge.tp-draft {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.tp-status-badge.tp-proposed {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.tp-status-badge.tp-approved {
+  background: #f0fdf4;
+  color: #16a34a;
+  border-color: #bbf7d0;
+}
+
+.tp-status-badge.tp-active {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+
+.tp-status-badge.tp-paused {
+  background: #faf5ff;
+  color: #9333ea;
+  border-color: #e9d5ff;
+}
+
+.tp-status-badge.tp-completed {
+  background: #f0fdfa;
+  color: #0d9488;
+  border-color: #99f6e4;
+}
+
+.tp-status-badge.tp-cancelled {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.tp-goal-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.tp-goal-list li {
+  padding: 4px 0 4px 20px;
+  position: relative;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tp-goal-list li::before {
+  content: "•";
+  position: absolute;
+  left: 4px;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.tp-phase-details {
+  margin-bottom: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tp-phase-header {
+  background: #f1f5f9;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.tp-phase-header:hover {
+  background: #e2e8f0;
+}
+
+.tp-phase-body {
+  padding: 12px 14px;
+  font-size: 13px;
+  border-top: 1px solid var(--color-border);
+}
+
+.tp-item-entry {
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 12px;
+}
+
+.tp-item-entry:last-child {
+  border-bottom: none;
+}
+
+.tp-monitoring-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tp-monitoring-card {
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.tp-monitoring-card .mon-label {
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.tp-monitoring-card .mon-detail {
+  color: var(--color-text-muted);
+}
+
+.tp-safety-rule {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.tp-safety-rule.tp-safety-high {
+  background: #fef2f2;
+  border-left: 4px solid var(--color-danger);
+}
+
+.tp-safety-rule.tp-safety-medium {
+  background: #fffbeb;
+  border-left: 4px solid var(--color-warning);
+}
+
+.tp-safety-rule.tp-safety-low {
+  background: #f0fdf4;
+  border-left: 4px solid var(--color-success);
+}
+
+.tp-safety-severity {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  min-width: 48px;
+}
+
+.tp-safety-high .tp-safety-severity { color: #dc2626; }
+.tp-safety-medium .tp-safety-severity { color: #d97706; }
+.tp-safety-low .tp-safety-severity { color: #16a34a; }
+
+.tp-alt-item {
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.tp-approval-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.tp-approval-info dt {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.tp-approval-info dd {
+  margin: 0;
+  color: var(--color-text);
+}
 """
 
 
@@ -798,6 +1006,7 @@ class ReportGenerator:
         trace_steps: list[dict[str, Any]] | None = None,
         clinical_decision: dict | None = None,
         tumor_board_consensus: dict | None = None,
+        treatment_plan: dict | None = None,
     ) -> str:
         """Produce a complete HTML report page.
 
@@ -857,6 +1066,7 @@ class ReportGenerator:
             self._render_evidence_summary(recommendation, evidence_count),
             self._render_clinical_decision(clinical_decision) if clinical_decision else "",
             self._render_tumor_board_consensus(tumor_board_consensus) if tumor_board_consensus else "",
+            self._render_treatment_plan(treatment_plan) if treatment_plan else "",
             self._render_ranking_table(drugs),
             self._render_reason_breakdown(drugs),
             self._render_warnings(drugs) if has_conflicts_or_resistance else "",
@@ -1432,6 +1642,197 @@ class ReportGenerator:
   {followup_html}
   {"<h3>Final Recommendation</h3><p>" + final_recommendation + "</p>" if final_recommendation else ""}
   {"<h3>Supporting Rationale</h3><p>" + supporting_rationale + "</p>" if supporting_rationale else ""}
+</div>"""
+
+    # ── Section: Treatment Plan ──────────────────────────────────────────
+
+    def _render_treatment_plan(self, tp: dict) -> str:
+        """Render the Treatment Plan section."""
+        if not tp:
+            return ""
+
+        plan_id = html_lib.escape(str(tp.get("plan_id", "")))
+        version = tp.get("version", 1)
+        plan_status = str(tp.get("plan_status", "draft")).lower()
+        plan_intent = html_lib.escape(str(tp.get("plan_intent", "")))
+        treatment_goals: list = tp.get("treatment_goals", []) or []
+        summary = html_lib.escape(str(tp.get("summary", "")))
+        clinical_rationale = html_lib.escape(str(tp.get("clinical_rationale", "")))
+        phases: list = tp.get("phases", []) or []
+        items: list = tp.get("items", []) or []
+        monitoring: list = tp.get("monitoring", []) or []
+        safety_rules: list = tp.get("safety_rules", []) or []
+        alternatives: list = tp.get("alternatives", []) or []
+        is_current = tp.get("is_current", False)
+        previous_plan_id = str(tp.get("previous_plan_id", ""))
+        supersedes_plan_id = str(tp.get("supersedes_plan_id", ""))
+        revision_reason = html_lib.escape(str(tp.get("revision_reason", "")))
+        created_by = html_lib.escape(str(tp.get("created_by", "")))
+        approved_by = html_lib.escape(str(tp.get("approved_by", "")))
+        approved_at = str(tp.get("approved_at", ""))
+        activated_at = str(tp.get("activated_at", ""))
+        review_date = str(tp.get("review_date", ""))
+        created_at = str(tp.get("created_at", ""))
+
+        # ── Status badge ──────────────────────────────────────────────────
+        status_badge_cls = "tp-" + plan_status if plan_status in ("draft", "proposed", "approved", "active", "paused", "completed", "cancelled") else ""
+        status_display = plan_status.capitalize()
+
+        # ── Goals ─────────────────────────────────────────────────────────
+        goals_html = ""
+        if treatment_goals:
+            items_goals = "".join(
+                f"<li>{html_lib.escape(str(g))}</li>\n" for g in treatment_goals
+            )
+            goals_html = f'<ul class="tp-goal-list">{items_goals}</ul>'
+
+        # ── Phases ────────────────────────────────────────────────────────
+        phases_html = ""
+        if phases:
+            phase_items = ""
+            for i, ph in enumerate(phases):
+                ph_name = html_lib.escape(str(ph.get("name", ph.get("phase_type", f"Phase {i+1}"))))
+                ph_desc = html_lib.escape(str(ph.get("description", "")))
+                ph_dur = ph.get("duration_days")
+                ph_dur_str = f" · {ph_dur} days" if ph_dur else ""
+                ph_items = ph.get("items", []) or []
+                ph_items_html = ""
+                if ph_items:
+                    pi_list = "".join(
+                        f'<div class="tp-item-entry">• <strong>{html_lib.escape(str(it.get("name", "")))}</strong>'
+                        f'{" (" + html_lib.escape(str(it.get("item_type", ""))) + ")" if it.get("item_type") else ""}'
+                        f'{" — " + html_lib.escape(str(it.get("description", ""))) if it.get("description") else ""}'
+                        f"</div>\n"
+                        for it in ph_items
+                    )
+                    ph_items_html = f'<div style="margin-top:6px;">{pi_list}</div>'
+
+                phase_items += f"""\
+<details class="tp-phase-details">
+  <summary class="tp-phase-header">{html_lib.escape(ph_name)}{ph_dur_str}</summary>
+  <div class="tp-phase-body">
+    {("<p>" + ph_desc + "</p>") if ph_desc else ""}
+    {ph_items_html}
+  </div>
+</details>"""
+            phases_html = phase_items
+
+        # ── Items (standalone, not in phases) ─────────────────────────────
+        items_html = ""
+        if items:
+            item_list = "".join(
+                f'<div class="tp-item-entry">• <strong>{html_lib.escape(str(it.get("name", "")))}</strong>'
+                f'{" (" + html_lib.escape(str(it.get("item_type", ""))) + ")" if it.get("item_type") else ""}'
+                f'{" — " + html_lib.escape(str(it.get("description", ""))) if it.get("description") else ""}'
+                f"</div>\n"
+                for it in items
+            )
+            items_html = f'<div style="margin-top:8px;">{item_list}</div>'
+
+        # ── Monitoring ────────────────────────────────────────────────────
+        monitoring_html = ""
+        if monitoring:
+            mon_cards = "".join(
+                f"""\
+<div class="tp-monitoring-card">
+  <div class="mon-label">{html_lib.escape(str(m.get("name", m.get("monitoring_type", "Monitoring #" + str(i + 1)))))}</div>
+  {('<div class="mon-detail">Schedule: ' + html_lib.escape(str(m.get("schedule", ""))) + '</div>') if m.get("schedule") else ""}
+  {('<div class="mon-detail">Frequency: ' + html_lib.escape(str(m.get("frequency", ""))) + '</div>') if m.get("frequency") else ""}
+  {('<div class="mon-detail">Interval: ' + html_lib.escape(str(m.get("interval", ""))) + '</div>') if m.get("interval") else ""}
+</div>"""
+                for i, m in enumerate(monitoring)
+            )
+            monitoring_html = f'<div class="tp-monitoring-grid">{mon_cards}</div>'
+
+        # ── Safety Rules ──────────────────────────────────────────────────
+        safety_html = ""
+        if safety_rules:
+            rule_items = ""
+            for rule in safety_rules:
+                severity = str(rule.get("severity", "medium")).lower()
+                sev_class = f"tp-safety-{severity}" if severity in ("high", "medium", "low") else "tp-safety-medium"
+                rule_type = html_lib.escape(str(rule.get("rule_type", "")))
+                condition = rule.get("condition")
+                condition_str = html_lib.escape(json.dumps(condition, indent=2)) if condition else ""
+                action = html_lib.escape(str(rule.get("recommended_action", "")))
+                rule_items += f"""\
+<div class="tp-safety-rule {sev_class}">
+  <span class="tp-safety-severity">{severity.upper()}</span>
+  <div>
+    <strong>{rule_type}</strong>
+    {('<pre style="margin:4px 0 0;font-size:11px;white-space:pre-wrap;">' + condition_str + '</pre>') if condition_str else ""}
+    {('<div style="margin-top:4px;">Action: ' + action + '</div>') if action else ""}
+  </div>
+</div>"""
+            safety_html = rule_items
+
+        # ── Alternatives ──────────────────────────────────────────────────
+        alts_html = ""
+        if alternatives:
+            alt_items = "".join(
+                f'<div class="tp-alt-item">{html_lib.escape(json.dumps(alt, indent=2))}</div>\n'
+                for alt in alternatives
+            )
+            alts_html = f'<div style="margin-top:8px;">{alt_items}</div>'
+
+        # ── Approval Info ─────────────────────────────────────────────────
+        approval_info = ""
+        approval_parts = []
+        if created_by:
+            approval_parts.append(f"<dt>Created By</dt><dd>{created_by}</dd>")
+        if approved_by:
+            approval_parts.append(f"<dt>Approved By</dt><dd>{approved_by}</dd>")
+        if approved_at:
+            approval_parts.append(f"<dt>Approved At</dt><dd>{html_lib.escape(approved_at)}</dd>")
+        if review_date:
+            approval_parts.append(f"<dt>Review Date</dt><dd>{html_lib.escape(review_date)}</dd>")
+        if activated_at:
+            approval_parts.append(f"<dt>Activated At</dt><dd>{html_lib.escape(activated_at)}</dd>")
+        if approval_parts:
+            approval_info = f'<dl class="tp-approval-info">{"".join(approval_parts)}</dl>'
+
+        # ── Version / revision info ───────────────────────────────────────
+        version_info = ""
+        version_parts = [f"Version: {version}"]
+        if is_current:
+            version_parts.append("(Current)")
+        if previous_plan_id:
+            version_parts.append(f"Previous: {previous_plan_id[:12]}…")
+        if supersedes_plan_id:
+            version_parts.append(f"Supersedes: {supersedes_plan_id[:12]}…")
+        version_info = " ".join(version_parts)
+
+        return f"""\
+<div class="card">
+  <h2 class="card-title">📋 Treatment Plan <span class="badge">{version_info}</span></h2>
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+    <span class="tp-status-badge {status_badge_cls}">{status_display}</span>
+    <span style="font-size:13px;color:var(--color-text-muted);">Plan ID: {plan_id[:16]}…</span>
+    {("<span style='font-size:12px;color:var(--color-text-muted);'>Created: " + html_lib.escape(created_at[:10]) + "</span>") if created_at else ""}
+  </div>
+
+  {("<div style='margin-bottom:12px;'><strong style='font-size:13px;'>Intent:</strong> " + plan_intent + "</div>") if plan_intent else ""}
+
+  {("<div style='margin-bottom:12px;'><strong style='font-size:13px;'>Treatment Goals</strong>" + goals_html + "</div>") if goals_html else ""}
+
+  {("<div style='margin-bottom:12px;'><strong style='font-size:13px;'>Summary</strong><p style='font-size:13px;line-height:1.5;margin:4px 0 0;'>" + summary + "</p></div>") if summary else ""}
+
+  {("<div style='margin-bottom:12px;'><strong style='font-size:13px;'>Clinical Rationale</strong><p style='font-size:13px;line-height:1.5;margin:4px 0 0;'>" + clinical_rationale + "</p></div>") if clinical_rationale else ""}
+
+  {("<div style='margin-bottom:12px;'><strong style='font-size:13px;'>Treatment Phases</strong>" + phases_html + "</div>") if phases_html else ""}
+
+  {("<div style='margin-bottom:12px;'><strong style='font-size:13px;'>Treatment Items</strong>" + items_html + "</div>") if items_html else ""}
+
+  {("<div style='margin-bottom:12px;'><strong style='font-size:13px;'>Monitoring Schedule</strong>" + monitoring_html + "</div>") if monitoring_html else ""}
+
+  {("<div style='margin-bottom:12px;'><strong style='font-size:13px;'>Safety Rules</strong>" + safety_html + "</div>") if safety_html else ""}
+
+  {("<div style='margin-bottom:12px;'><strong style='font-size:13px;'>Alternatives</strong>" + alts_html + "</div>") if alts_html else ""}
+
+  {("<div style='margin-bottom:12px;'><strong style='font-size:13px;'>Revision Reason</strong><p style='font-size:13px;margin:4px 0 0;'>" + revision_reason + "</p></div>") if revision_reason else ""}
+
+  {("<div style='margin-bottom:8px;'><strong style='font-size:13px;'>Approval Information</strong>" + approval_info + "</div>") if approval_info else ""}
 </div>"""
 
     # ── Helpers ─────────────────────────────────────────────────────────────

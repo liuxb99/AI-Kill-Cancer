@@ -129,6 +129,14 @@ from src.backend.domain.specimen import (
     SpecimenResponse,
     SpecimenUpdate,
 )
+from src.backend.domain.treatment_plan import (
+    TreatmentPlanModel,
+    TreatmentPhaseModel,
+    TreatmentItemModel,
+    TreatmentMonitoringModel,
+    TreatmentSafetyRuleModel,
+    TreatmentPlanTraceModel,
+)
 from src.backend.domain.tumor_board import (
     TumorBoardConsensusModel,
     TumorBoardConsensusTraceModel,
@@ -231,6 +239,13 @@ __all__ = [
     "TumorBoardConsensusModel",
     "TumorBoardConsensusTraceModel",
     "TumorBoardOpinionModel",
+    # Treatment Plan
+    "TreatmentPlanModel",
+    "TreatmentPhaseModel",
+    "TreatmentItemModel",
+    "TreatmentMonitoringModel",
+    "TreatmentSafetyRuleModel",
+    "TreatmentPlanTraceModel",
     # Pydantic
     "PatientCreate",
     "PatientUpdate",

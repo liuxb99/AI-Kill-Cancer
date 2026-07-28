@@ -18,6 +18,7 @@ from src.backend.api.v1.recommendation import router as recommendation_router
 from src.backend.api.v1.reports import router as reports_router
 from src.backend.api.v1.sequencing import router as sequencing_router
 from src.backend.api.v1.specimens import router as specimens_router
+from src.backend.api.v1.treatment_plans import router as treatment_plans_router
 from src.backend.api.v1.tumor_board_consensus import router as tumor_board_consensus_router
 from src.backend.api.v1.upload_vcf import router as upload_vcf_router
 from src.backend.api.v1.uploads import router as uploads_router
@@ -45,4 +46,5 @@ router.include_router(clinical_router)
 router.include_router(clinical_decision_router)
 router.include_router(case_acl_router)
 router.include_router(tumor_board_consensus_router)
+router.include_router(treatment_plans_router)
 router.include_router(clinical_graph_router)

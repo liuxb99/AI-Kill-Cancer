@@ -12,6 +12,10 @@ import ClinicalDecisionListPage from './pages/ClinicalDecisionListPage'
 import TumorBoardConsensusListPage from './pages/TumorBoardConsensusListPage'
 import TumorBoardConsensusPage from './pages/TumorBoardConsensusPage'
 import ClinicalGraphPage from './pages/ClinicalGraphPage'
+import TreatmentPlanListPage from './pages/TreatmentPlanListPage'
+import TreatmentPlanCreatePage from './pages/TreatmentPlanCreatePage'
+import TreatmentPlanDetailPage from './pages/TreatmentPlanDetailPage'
+import TreatmentPlanRevisionPage from './pages/TreatmentPlanRevisionPage'
 import StatusBanner from './components/StatusBanner'
 
 function AppNavbar() {
@@ -75,6 +79,10 @@ function App() {
         <Route path="/tumor-board" element={<TumorBoardConsensusListPage />} />
         <Route path="/tumor-board/:id" element={<TumorBoardConsensusPage />} />
         <Route path="/clinical-graph" element={<ClinicalGraphPage />} />
+        <Route path="/treatment-plans" element={<TreatmentPlanListPage />} />
+        <Route path="/treatment-plans/new" element={<TreatmentPlanCreatePage />} />
+        <Route path="/treatment-plans/:id" element={<TreatmentPlanDetailPage />} />
+        <Route path="/treatment-plans/:id/revise" element={<TreatmentPlanRevisionPage />} />
       </Routes>
     </div>
   )

@@ -17,6 +17,7 @@ class GraphAggregateType(str, Enum):
     TUMOR_BOARD_CONSENSUS = "tumor_board_consensus"
     SPECIALIST_OPINION = "specialist_opinion"
     DRUG = "drug"
+    TREATMENT_PLAN = "treatment_plan"
 
 
 class GraphEventType(str, Enum):
@@ -28,6 +29,14 @@ class GraphEventType(str, Enum):
     CLINICAL_DECISION_UPDATED = "clinical_decision.updated"
     TUMOR_BOARD_CONSENSUS_CREATED = "tumor_board_consensus.created"
     TUMOR_BOARD_CONSENSUS_UPDATED = "tumor_board_consensus.updated"
+    TREATMENT_PLAN_CREATED = "treatment_plan.created"
+    TREATMENT_PLAN_UPDATED = "treatment_plan.updated"
+    TREATMENT_PLAN_APPROVED = "treatment_plan.approved"
+    TREATMENT_PLAN_ACTIVATED = "treatment_plan.activated"
+    TREATMENT_PLAN_PAUSED = "treatment_plan.paused"
+    TREATMENT_PLAN_COMPLETED = "treatment_plan.completed"
+    TREATMENT_PLAN_CANCELLED = "treatment_plan.cancelled"
+    TREATMENT_PLAN_SUPERSEDED = "treatment_plan.superseded"
 
 
 # 敏感字段列表（不得出现在 payload 中）

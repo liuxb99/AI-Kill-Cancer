@@ -480,6 +480,24 @@ export default function TumorBoardConsensusPage() {
                 <p className="text-sm text-gray-400">無推理軌跡</p>
               )}
             </div>
+
+            {/* ── Create Treatment Plan ─────────────────────────────────────── */}
+            {consensus.consensus_status?.toLowerCase() === 'approved' && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                  後續動作
+                </label>
+                <button
+                  onClick={() => navigate(`/treatment-plans/new?consensus_id=${consensus.consensus_id}`)}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm font-medium"
+                >
+                  Create Treatment Plan &rarr;
+                </button>
+                <p className="text-xs text-gray-400 mt-2">
+                  根據此已核准的 Consensus 建立 Treatment Plan
+                </p>
+              </div>
+            )}
           </>
         )}
       </main>

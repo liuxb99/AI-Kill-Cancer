@@ -53,133 +53,10 @@ jobs:
         run: pytest -v --tb=short tests/unit/test_phase3d_*.py
 
       # Phase 3D: KnowGraphGo Integration
-      - name: Checkout KnowGraphGo
-        env:
-          GH_TOKEN: ${{ secrets.PAT }}
-        run: |
-          rm -rf KnowGraphGo
-          git init KnowGraphGo
-          cd KnowGraphGo
-          git remote add origin https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git
-          git fetch --depth=1 origin 950dd86926891789380381cb28f233ee007fe7b4
-          git checkout 950dd86926891789380381cb28f233ee007fe7b4
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.25"
-
-      - name: Build KnowGraphGo CLI
-        working-directory: KnowGraphGo
-        run: go build -o ./bin/knowgraph ./cmd/knowgraph/
-
-      - name: Run KnowGraphGo Tests
-        working-directory: KnowGraphGo
-        run: go test ./... -v 2>&1 | tail -20
-
-      - name: KnowGraphGo Vet
-        working-directory: KnowGraphGo
-        run: go vet ./...
-
-      # Phase 3D: Cross-repository Integration Test
-      - name: Cross-repository Integration Test
-        env:
-          KNOWGRAPH_CLI: KnowGraphGo/bin/knowgraph
-          PYTHONPATH: .
-        run: |
-          echo "=== Cross-repository Integration Test ==="
-          # Verify deterministic ID parity via Python/Go
-          python -c "
-          import subprocess, json, sys, uuid
-
-          # Test deterministic ID: Python vs Go
-          from src.backend.clinical_graph.id_factory import ClinicalGraphIDFactory
-          f = ClinicalGraphIDFactory()
-
-          # Generate Python IDs
-          py_ids = {
-              'patient': f.patient_id('P001'),
-              'recommendation': f.recommendation_id('R001'),
-              'decision': f.clinical_decision_id('D001'),
-              'consensus': f.consensus_id('C001'),
-              'opinion': f.opinion_id('OP001'),
-              'specialty': f.specialty_id('Oncology'),
-              'drug': f.drug_id('DRUG001'),
-              'evidence': f.evidence_id('EV001'),
-              'variant': f.variant_id('V001'),
-          }
-
-          # Verify they are valid UUIDs
-          for kind, id_str in py_ids.items():
-              uuid.UUID(id_str)
-              print(f'Python {kind} ID: {id_str}')
-
-          # Verify same input produces same ID
-          id2 = f.patient_id('P001')
-          assert py_ids['patient'] == id2, 'Patient ID must be deterministic'
-          print('Deterministic ID: PASS')
-
-          # Verify different inputs produce different IDs
-          id3 = f.patient_id('P002')
-          assert py_ids['patient'] != id3, 'Different patient_id must produce different graph ID'
-          print('Different inputs produce different IDs: PASS')
-          print('All Python ID tests: PASS')
-          "
-
-      # Phase 3D: Cross-repository Digital Thread Test
-      - name: Cross-repository Digital Thread Test
-        env:
-          KNOWGRAPH_CLI: KnowGraphGo/bin/knowgraph
-          PYTHONPATH: ${{ github.workspace }}
-        working-directory: KnowGraphGo
-        run: |
-          echo "=== Digital Thread Integration Test ==="
-          # Build CLI
-          go build -o ./bin/knowgraph ./cmd/knowgraph/
-          echo "CLI built successfully"
-
-          # Run ALL adapter tests (includes idempotency, relation integrity, provenance)
-          cd adapter/clinical
-          go test -v -count=1 ./... 2>&1
-          echo "All adapter tests PASS"
-
-          # Cross-language ID parity verification
-          echo "=== Cross-language ID Parity ==="
-          cd ../..
-          go run -exec '' 2>/dev/null || true
-          # Generate known IDs using Go and compare with Python expected values
-          python3 -c "
-          import subprocess, json, uuid
-          from src.backend.clinical_graph.id_factory import ClinicalGraphIDFactory
-          
-          f = ClinicalGraphIDFactory()
-          
-          # Verify Python IDs are valid UUIDv5
-          test_cases = [
-              ('patient', f.patient_id('P001')),
-              ('recommendation', f.recommendation_id('R001')),
-              ('decision', f.clinical_decision_id('D001')),
-              ('consensus', f.consensus_id('C001')),
-              ('drug', f.drug_id('DRUG001')),
-              ('evidence', f.evidence_id('EV001')),
-          ]
-          
-          for kind, id_str in test_cases:
-              u = uuid.UUID(id_str)
-              assert u.version == 5, f'{kind} ID must be UUIDv5'
-              print(f'{kind}: {id_str} (v5) OK')
-          
-          # Verify deterministic
-          assert f.patient_id('P001') == f.patient_id('P001')
-          assert f.patient_id('P001') != f.patient_id('P002')
-          print('Deterministic ID: PASS')
-          
-          # Verify normalization
-          assert f.patient_id('ABC') == f.patient_id('  abc  ')
-          print('Case/space normalization: PASS')
-          
-          print('All cross-language ID parity tests: PASS')
-          "
 
       # Phase 2: Run all tests (unit + integration)
       - name: Test with pytest
@@ -198,8 +75,8 @@ jobs:
           git init KnowGraphGo
           cd KnowGraphGo
           git remote add origin https://x-access-token:${{ secrets.PAT }}@github.com/liuxb99/KnowGraphGo.git
-          git fetch --depth=1 origin 950dd86926891789380381cb28f233ee007fe7b4
-          git checkout 950dd86926891789380381cb28f233ee007fe7b4
+          git fetch --depth=1 origin 189d41526d72714d173f5cd5a62a5f104e377921
+          git checkout 189d41526d72714d173f5cd5a62a5f104e377921
 
       - name: CI-01 Build Go CLI
         working-directory: KnowGraphGo
@@ -247,6 +124,8 @@ jobs:
           pytest -v --tb=long tests/test_recommendation_transaction.py tests/test_api_recommendation.py tests/test_recommendation_service.py 2>&1 | tee /tmp/pg-test-other.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
           echo "=== Phase 3C: Tumor Board Tests ==="
           pytest -v --tb=long tests/test_tumor_board_engine.py tests/test_tumor_board_models.py tests/test_tumor_board_repo.py tests/test_tumor_board_service.py tests/test_api_tumor_board.py tests/test_tumor_board_digital_thread.py tests/test_tumor_board_restart_recovery.py 2>&1 | tee /tmp/pg-test-tumor-board.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
+          echo "=== Phase 3E: Treatment Plan Tests ==="
+          pytest -v --tb=long tests/backend/integration/test_treatment_plan_restart.py tests/backend/integration/test_treatment_plan_digital_thread.py tests/backend/services/test_treatment_plan_service.py tests/backend/repositories/test_treatment_plan_repos.py tests/backend/api/test_treatment_plan_api.py tests/backend/models/test_treatment_plan_models.py tests/backend/clinical/test_treatment_plan_engine.py 2>&1 | tee /tmp/pg-test-phase3e.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
           # Emit annotations for any failures found in logs
           bash scripts/emit_annotations.sh 2>&1 || true
           exit $EXIT
@@ -294,6 +173,14 @@ jobs:
           # Full downgrade to 016 and re-upgrade
           alembic -c migrations/alembic.ini downgrade 016
           alembic -c migrations/alembic.ini upgrade head
+
+      - name: Postgres Integration Gate - Migration 023 Downgrade / Re-upgrade
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
+          PYTHONPATH: .
+        run: |
+          alembic -c migrations/alembic.ini downgrade 023
+          alembic -c migrations/alembic.ini upgrade 023
 
       - name: Postgres Integration Gate - Migration verification
         env:
