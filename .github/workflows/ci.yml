@@ -319,7 +319,7 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db_migration_gate
           PYTHONPATH: .
-        run: alembic -c migrations/alembic.ini check
+        run: python scripts/ci_migration_verify.py
 
       - name: Drop migration gate database
         if: always()
