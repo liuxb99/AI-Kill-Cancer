@@ -1357,7 +1357,8 @@ class TestMigration025Upgrade:
     @staticmethod
     def _get_unique_constraints_from_sql(db_path, table_name):
         """Return dict mapping constraint name → columns by parsing CREATE TABLE."""
-        import sqlite3, re
+        import re
+        import sqlite3
 
         conn = sqlite3.connect(str(db_path))
         cursor = conn.execute(
@@ -1411,7 +1412,8 @@ class TestMigration025Upgrade:
         command.upgrade(cfg, "023")
 
         # Insert a plan at 023 level
-        import sqlite3, uuid
+        import sqlite3
+        import uuid
 
         conn = sqlite3.connect(str(db_path))
         plan_id_val = uuid.uuid4().hex
@@ -1448,7 +1450,8 @@ class TestMigration025Upgrade:
         command.upgrade(cfg, "024")
         command.upgrade(cfg, "025")
 
-        import sqlite3, uuid
+        import sqlite3
+        import uuid
 
         conn = sqlite3.connect(str(db_path))
         plan_id_val = uuid.uuid4().hex
@@ -1485,7 +1488,8 @@ class TestMigration025Upgrade:
         command.upgrade(cfg, "024")
         command.upgrade(cfg, "025")
 
-        import sqlite3, uuid
+        import sqlite3
+        import uuid
 
         conn = sqlite3.connect(str(db_path))
         plan_id_val = uuid.uuid4().hex
@@ -1527,7 +1531,8 @@ class TestMigration025Upgrade:
         # Downgrade back to 024
         command.downgrade(cfg, "024")
 
-        import sqlite3, uuid
+        import sqlite3
+        import uuid
 
         conn = sqlite3.connect(str(db_path))
 

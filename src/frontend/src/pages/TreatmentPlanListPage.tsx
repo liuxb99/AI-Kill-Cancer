@@ -11,7 +11,7 @@
  * 路由：請在 App.tsx 中加入 <Route path="/treatment-plans" element={<TreatmentPlanListPage />} />
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   listTreatmentPlans,

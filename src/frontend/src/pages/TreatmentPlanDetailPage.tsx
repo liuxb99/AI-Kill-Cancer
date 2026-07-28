@@ -22,7 +22,6 @@ import {
   pausePlan,
   completePlan,
   cancelPlan,
-  revisePlan,
   type TreatmentPlanResponse,
 } from '../api/treatmentPlan'
 
@@ -107,10 +106,10 @@ function formatDateTime(iso: string | null): string {
   }
 }
 
-function renderArrayField(items: Record<string, any>[], emptyText = '無資料'): string {
-  if (!items || items.length === 0) return emptyText
-  return items.map((item, i) => JSON.stringify(item, null, 2)).join('\n---\n')
-}
+// function renderArrayField(items: Record<string, any>[], emptyText = '無資料'): string {
+//   if (!items || items.length === 0) return emptyText
+//   return items.map((item) => JSON.stringify(item, null, 2)).join('\n---\n')
+// }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
@@ -631,7 +630,7 @@ export default function TreatmentPlanDetailPage() {
                 <p className="text-sm text-gray-400">載入中…</p>
               ) : versions && versions.length > 0 ? (
                 <div className="space-y-2">
-                  {versions.map((v, i) => (
+                  {versions.map((v) => (
                     <div
                       key={`${v.plan_id}-v${v.version}`}
                       className="flex items-center justify-between bg-gray-50 rounded-lg p-3 cursor-pointer hover:bg-gray-100 transition"
