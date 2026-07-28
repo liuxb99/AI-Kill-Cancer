@@ -82,11 +82,11 @@ def upgrade() -> None:
         # 5. Add FK constraints (need to wait until batch mode sets up the table;
         #    use direct execute because self-referencing FK needs the table to exist)
         op.create_foreign_key(
-            "fk_prev_version", "domain_treatment_plans",
+            "fk_prev_version", "domain_treatment_plans", "domain_treatment_plans",
             ["previous_version_id"], ["id"], ondelete="SET NULL",
         )
         op.create_foreign_key(
-            "fk_supersedes_version", "domain_treatment_plans",
+            "fk_supersedes_version", "domain_treatment_plans", "domain_treatment_plans",
             ["supersedes_version_id"], ["id"], ondelete="SET NULL",
         )
         # 6. Drop old composite unique from 023 (uq_treatment_plan_version) if it exists
