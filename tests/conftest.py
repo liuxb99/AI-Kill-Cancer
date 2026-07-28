@@ -176,7 +176,7 @@ def pg_engine():
     if sync_url.startswith("postgresql://") and "+psycopg2" not in sync_url:
         sync_url = sync_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
-    engine = create_engine(sync_url, pool_pre_ping=True)
+    engine = create_engine(sync_url, pool_size=10, max_overflow=20, pool_pre_ping=True)
     yield engine
     engine.dispose()
 
