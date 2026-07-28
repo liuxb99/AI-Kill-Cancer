@@ -12,7 +12,7 @@ import sys
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 
 def main():
@@ -49,9 +49,9 @@ def main():
 
         for conname, table in constraints:
             row = conn.execute(
-                f"""SELECT 1 FROM pg_catalog.pg_constraint
+                text(f"""SELECT 1 FROM pg_catalog.pg_constraint
                     WHERE conname = '{conname}'
-                      AND conrelid = '{table}'::regclass"""
+                      AND conrelid = '{table}'::regclass""")
             ).fetchone()
             assert row, f"❌ Constraint {conname} not found on {table}"
             print(f"✅ Constraint {conname} exists on {table}")
