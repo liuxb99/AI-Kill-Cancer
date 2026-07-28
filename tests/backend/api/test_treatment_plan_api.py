@@ -502,6 +502,85 @@ class TestGetPlanVersions:
         resp = client.get(f"{BASE}/{TEST_PLAN_ID}/versions")
         assert resp.status_code == 401
 
+    # ── H-03: Version Chain (API) ───────────────────────────────────────────
+
+    def test_version_chain(self, admin_override_client, admin_auth_headers) -> None:
+        """Simulate version chain via successive revise and get_versions calls."""
+        # Create v1
+        mock_v1 = _make_response(plan_id=TEST_PLAN_ID, version=1)
+
+        with patch(
+            "src.backend.api.v1.treatment_plans.TreatmentPlanService.create_plan",
+            new_callable=AsyncMock,
+            return_value=mock_v1,
+        ):
+            resp_create = admin_override_client.post(
+                BASE,
+                json=TestCreateTreatmentPlan.CREATE_BODY,
+                headers=admin_auth_headers,
+            )
+
+        assert resp_create.status_code == 201
+        assert resp_create.json()["version"] == 1
+
+        # Revise to v2
+        mock_v2 = _make_response(plan_id=TEST_PLAN_ID, version=2)
+
+        with patch(
+            "src.backend.api.v1.treatment_plans.TreatmentPlanService.revise_plan",
+            new_callable=AsyncMock,
+            return_value=mock_v2,
+        ):
+            resp_revise = admin_override_client.post(
+                f"{BASE}/{TEST_PLAN_ID}/revise",
+                json=TestRevisePlan.REVISE_BODY,
+                headers=admin_auth_headers,
+            )
+
+        assert resp_revise.status_code == 200
+        data2 = resp_revise.json()
+        assert data2["version"] == 2
+        assert data2["plan_id"] == TEST_PLAN_ID
+
+        # Revise to v3
+        mock_v3 = _make_response(plan_id=TEST_PLAN_ID, version=3)
+
+        with patch(
+            "src.backend.api.v1.treatment_plans.TreatmentPlanService.revise_plan",
+            new_callable=AsyncMock,
+            return_value=mock_v3,
+        ):
+            resp_revise2 = admin_override_client.post(
+                f"{BASE}/{TEST_PLAN_ID}/revise",
+                json=TestRevisePlan.REVISE_BODY,
+                headers=admin_auth_headers,
+            )
+
+        assert resp_revise2.status_code == 200
+        data3 = resp_revise2.json()
+        assert data3["version"] == 3
+        assert data3["plan_id"] == TEST_PLAN_ID
+
+        # Get versions returns all three
+        with patch(
+            "src.backend.api.v1.treatment_plans.TreatmentPlanService.get_versions",
+            new_callable=AsyncMock,
+            return_value=[mock_v3, mock_v2, mock_v1],
+        ):
+            resp_versions = admin_override_client.get(
+                f"{BASE}/{TEST_PLAN_ID}/versions",
+                headers=admin_auth_headers,
+            )
+
+        assert resp_versions.status_code == 200
+        data_ver = resp_versions.json()
+        assert len(data_ver) == 3
+        assert data_ver[0]["version"] == 3
+        assert data_ver[1]["version"] == 2
+        assert data_ver[2]["version"] == 1
+        for entry in data_ver:
+            assert entry["plan_id"] == TEST_PLAN_ID
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # GET /api/v1/treatment-plans/{plan_id}/trace (A-05)
@@ -810,6 +889,80 @@ class TestRevisePlan:
         data = resp.json()
         assert data["version"] == 2
         assert "draft" in data["plan_status"]
+
+    # ── H-14: Revision Policy (API) ─────────────────────────────────────────
+
+    def test_revise_409_for_draft(self, admin_override_client, admin_auth_headers) -> None:
+        """Revise on a draft plan should return 409."""
+        from src.backend.clinical.treatment_plan_state_machine import IllegalTransitionError
+
+        with patch(
+            "src.backend.api.v1.treatment_plans.TreatmentPlanService.revise_plan",
+            new_callable=AsyncMock,
+            side_effect=IllegalTransitionError(current="draft", target="revise"),
+        ):
+            resp = admin_override_client.post(
+                f"{BASE}/{TEST_PLAN_ID}/revise",
+                json=self.REVISE_BODY,
+                headers=admin_auth_headers,
+            )
+
+        assert resp.status_code == 409
+        assert "Cannot transition" in resp.json()["detail"]
+
+    def test_revise_409_for_cancelled(self, admin_override_client, admin_auth_headers) -> None:
+        """Revise on a cancelled plan should return 409."""
+        from src.backend.clinical.treatment_plan_state_machine import IllegalTransitionError
+
+        with patch(
+            "src.backend.api.v1.treatment_plans.TreatmentPlanService.revise_plan",
+            new_callable=AsyncMock,
+            side_effect=IllegalTransitionError(current="cancelled", target="revise"),
+        ):
+            resp = admin_override_client.post(
+                f"{BASE}/{TEST_PLAN_ID}/revise",
+                json=self.REVISE_BODY,
+                headers=admin_auth_headers,
+            )
+
+        assert resp.status_code == 409
+        assert "Cannot transition" in resp.json()["detail"]
+
+    def test_revise_409_for_completed(self, admin_override_client, admin_auth_headers) -> None:
+        """Revise on a completed plan should return 409."""
+        from src.backend.clinical.treatment_plan_state_machine import IllegalTransitionError
+
+        with patch(
+            "src.backend.api.v1.treatment_plans.TreatmentPlanService.revise_plan",
+            new_callable=AsyncMock,
+            side_effect=IllegalTransitionError(current="completed", target="revise"),
+        ):
+            resp = admin_override_client.post(
+                f"{BASE}/{TEST_PLAN_ID}/revise",
+                json=self.REVISE_BODY,
+                headers=admin_auth_headers,
+            )
+
+        assert resp.status_code == 409
+        assert "Cannot transition" in resp.json()["detail"]
+
+    def test_revise_409_for_superseded(self, admin_override_client, admin_auth_headers) -> None:
+        """Revise on a superseded plan should return 409."""
+        from src.backend.clinical.treatment_plan_state_machine import IllegalTransitionError
+
+        with patch(
+            "src.backend.api.v1.treatment_plans.TreatmentPlanService.revise_plan",
+            new_callable=AsyncMock,
+            side_effect=IllegalTransitionError(current="superseded", target="revise"),
+        ):
+            resp = admin_override_client.post(
+                f"{BASE}/{TEST_PLAN_ID}/revise",
+                json=self.REVISE_BODY,
+                headers=admin_auth_headers,
+            )
+
+        assert resp.status_code == 409
+        assert "Cannot transition" in resp.json()["detail"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

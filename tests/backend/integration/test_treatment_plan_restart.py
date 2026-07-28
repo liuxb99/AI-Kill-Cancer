@@ -73,10 +73,15 @@ async def db_engine():
     yield engine
 
     await engine.dispose()
-    # 清理臨時 DB 文件
+    # 清理臨時 DB 文件及 WAL/SHM 文件
     import os
-    if os.path.exists(file_path):
-        os.unlink(file_path)
+    for suffix in ("", "-wal", "-shm"):
+        path = file_path + suffix
+        if os.path.exists(path):
+            try:
+                os.unlink(path)
+            except PermissionError:
+                pass
 
 
 @pytest.fixture
@@ -180,6 +185,12 @@ class TestTreatmentPlanRestartRecovery:
                 item_type="medication",
                 name="Lenvatinib",
                 description="Primary medication",
+                drug_id="DB09021",
+                procedure_code=None,
+                frequency="once_daily",
+                duration="24 weeks",
+                route="oral",
+                planned_dose_text="24 mg once daily with dose adjustments",
                 priority=1,
                 status="planned",
                 rationale="Top-ranked drug",
@@ -195,6 +206,12 @@ class TestTreatmentPlanRestartRecovery:
                 item_type="procedure",
                 name="Tumor Resection",
                 description="Surgical procedure",
+                drug_id=None,
+                procedure_code="CPT-47120",
+                frequency=None,
+                duration=None,
+                route=None,
+                planned_dose_text=None,
                 priority=2,
                 status="planned",
                 rationale="Standard of care",
@@ -213,8 +230,13 @@ class TestTreatmentPlanRestartRecovery:
                 monitoring_type="laboratory",
                 name="Complete Blood Count",
                 schedule="weekly",
+                target_range={"WBC": "4.0-10.0", "Hb": "12.0-16.0"},
+                warning_threshold={"WBC": "3.0-11.0"},
+                critical_threshold={"WBC": "<2.0 or >15.0"},
+                action_if_abnormal="Notify attending physician and adjust dose",
                 baseline_required=True,
                 repeat_interval="7d",
+                responsible_specialty="hematology",
                 created_at=now,
                 updated_at=now,
             ),
@@ -239,9 +261,10 @@ class TestTreatmentPlanRestartRecovery:
 
         # ── Trace ──────────────────────────────────────────────────────────
         trace_repo = TreatmentPlanTraceRepository(db)
+        trace_id = f"trace-{uuid.uuid4().hex}"
         traces = [
             TreatmentPlanTraceModel(
-                trace_id=f"trace-{uuid.uuid4().hex}",
+                trace_id=trace_id,
                 plan_id=plan_model.id,
                 step_order=0,
                 step_type="load_context",
@@ -250,7 +273,7 @@ class TestTreatmentPlanRestartRecovery:
                 created_at=now,
             ),
             TreatmentPlanTraceModel(
-                trace_id=f"trace-{uuid.uuid4().hex}",
+                trace_id=trace_id,
                 plan_id=plan_model.id,
                 step_order=1,
                 step_type="validate_links",
@@ -359,6 +382,35 @@ class TestTreatmentPlanRestartRecovery:
         for item in restored.items:
             assert item.plan_id == plan_pk, "Item 的 plan_id 必須指向正確的 Plan"
 
+        # 3c-2: 逐欄驗證 Item Engine Output 欄位在 restart 後不遺失
+        for item in restored.items:
+            if item.item_type == "medication":
+                assert item.drug_id == "DB09021", \
+                    f"drug_id mismatch: {item.drug_id}"
+                assert item.procedure_code is None, \
+                    f"procedure_code should be None: {item.procedure_code}"
+                assert item.frequency == "once_daily", \
+                    f"frequency mismatch: {item.frequency}"
+                assert item.duration == "24 weeks", \
+                    f"duration mismatch: {item.duration}"
+                assert item.route == "oral", \
+                    f"route mismatch: {item.route}"
+                assert item.planned_dose_text == "24 mg once daily with dose adjustments", \
+                    f"planned_dose_text mismatch: {item.planned_dose_text}"
+            elif item.item_type == "procedure":
+                assert item.drug_id is None, \
+                    f"drug_id should be None for procedure: {item.drug_id}"
+                assert item.procedure_code == "CPT-47120", \
+                    f"procedure_code mismatch: {item.procedure_code}"
+                assert item.frequency is None, \
+                    f"frequency should be None for procedure: {item.frequency}"
+                assert item.duration is None, \
+                    f"duration should be None for procedure: {item.duration}"
+                assert item.route is None, \
+                    f"route should be None for procedure: {item.route}"
+                assert item.planned_dose_text is None, \
+                    f"planned_dose_text should be None for procedure: {item.planned_dose_text}"
+
         # 3d: 驗證 Monitoring
         assert len(restored.monitoring) == n_monitoring, (
             f"Monitoring 數量必須一致: 預期 {n_monitoring}, 得到 {len(restored.monitoring)}"
@@ -367,6 +419,19 @@ class TestTreatmentPlanRestartRecovery:
             assert mon.plan_id == plan_pk, "Monitoring 的 plan_id 必須指向正確的 Plan"
             assert mon.monitoring_type == "laboratory"
             assert mon.schedule == "weekly"
+
+        # 3d-2: 逐欄驗證 Monitoring 欄位在 restart 後不遺失
+        for mon in restored.monitoring:
+            assert mon.target_range == {"WBC": "4.0-10.0", "Hb": "12.0-16.0"}, \
+                f"target_range mismatch: {mon.target_range}"
+            assert mon.warning_threshold == {"WBC": "3.0-11.0"}, \
+                f"warning_threshold mismatch: {mon.warning_threshold}"
+            assert mon.critical_threshold == {"WBC": "<2.0 or >15.0"}, \
+                f"critical_threshold mismatch: {mon.critical_threshold}"
+            assert mon.action_if_abnormal == "Notify attending physician and adjust dose", \
+                f"action_if_abnormal mismatch: {mon.action_if_abnormal}"
+            assert mon.responsible_specialty == "hematology", \
+                f"responsible_specialty mismatch: {mon.responsible_specialty}"
 
         # 3e: 驗證 Safety Rules
         assert len(restored.safety_rules) == n_safety, (
@@ -380,6 +445,14 @@ class TestTreatmentPlanRestartRecovery:
         assert len(restored.traces) == n_traces, (
             f"Trace 數量必須一致: 預期 {n_traces}, 得到 {len(restored.traces)}"
         )
+        # 所有 trace steps 應共用同一個 trace_id
+        trace_ids_set = {t.trace_id for t in restored.traces}
+        assert len(trace_ids_set) == 1, \
+            f"所有 trace steps 應共用同一個 trace_id: {trace_ids_set}"
+        # step_order 應連續不重複
+        step_orders = sorted(t.step_order for t in restored.traces)
+        assert step_orders == list(range(n_traces)), \
+            f"step_order 應連續不重複: {step_orders}"
         restored_trace_ids = {t.trace_id for t in restored.traces}
         assert restored_trace_ids == set(trace_ids), "trace_ids 必須一致"
         for trace in restored.traces:
@@ -402,6 +475,119 @@ class TestTreatmentPlanRestartRecovery:
         service = TreatmentPlanService(session2)
         result = await service.get_plan("nonexistent-plan-id")
         assert result is None, "不存在的 Plan 應返回 None"
+
+    async def test_monitoring_persistence_columns(
+        self, db_engine, session1, session2,
+    ):
+        """建立 Plan 後直接查 DB 逐欄驗證 Monitoring 欄位已寫入。
+
+        驗證 target_range, warning_threshold, critical_threshold,
+        action_if_abnormal, responsible_specialty 與 Engine Output 一致。
+        """
+        from sqlalchemy import select
+
+        from src.backend.domain.treatment_plan import TreatmentMonitoringModel
+
+        # 使用 _create_full_plan 建立完整資料（含 monitoring 欄位）
+        plan_model, *_ = await self._create_full_plan(session1)
+        await session1.close()
+
+        # 在新 session 中直接查 DB
+        stmt = select(TreatmentMonitoringModel).where(
+            TreatmentMonitoringModel.plan_id == plan_model.id,
+        )
+        result = await session2.execute(stmt)
+        rows = result.scalars().all()
+
+        assert len(rows) >= 1, "必須有至少一個 Monitoring 記錄"
+
+        for row in rows:
+            assert row.target_range == {"WBC": "4.0-10.0", "Hb": "12.0-16.0"}, \
+                f"target_range mismatch: {row.target_range}"
+            assert row.warning_threshold == {"WBC": "3.0-11.0"}, \
+                f"warning_threshold mismatch: {row.warning_threshold}"
+            assert row.critical_threshold == {"WBC": "<2.0 or >15.0"}, \
+                f"critical_threshold mismatch: {row.critical_threshold}"
+            assert row.action_if_abnormal == "Notify attending physician and adjust dose", \
+                f"action_if_abnormal mismatch: {row.action_if_abnormal}"
+            assert row.responsible_specialty == "hematology", \
+                f"responsible_specialty mismatch: {row.responsible_specialty}"
+
+    async def test_trace_correctness(
+        self, db_engine, session1, session2,
+    ):
+        """驗證 Trace 的正確性。
+
+        測試：
+        1. 建立 plan 後所有 trace steps 共用同一個 trace_id
+        2. step_order 連續不重複（0-based）
+        3. UNIQUE(trace_id, step_order) 約束有效（重複 step_order 應報錯）
+        4. Restart 後 trace 資料完整讀回
+        """
+        from sqlalchemy import select
+        from sqlalchemy.exc import IntegrityError
+
+        from src.backend.domain.treatment_plan import TreatmentPlanTraceModel
+        from src.backend.repositories.treatment_plan_repo import (
+            TreatmentPlanTraceRepository,
+        )
+
+        # ── 1. 建立 plan 並取得 trace 資料 ──────────────────────────────
+        (plan_model, *_, trace_ids) = await self._create_full_plan(session1)
+        plan_pk = plan_model.id  # 在 session close 前保存主鍵值
+
+        # 直接查 DB 驗證
+        stmt = (
+            select(TreatmentPlanTraceModel)
+            .where(TreatmentPlanTraceModel.plan_id == plan_model.id)
+            .order_by(TreatmentPlanTraceModel.step_order)
+        )
+        result = await session1.execute(stmt)
+        traces = result.scalars().all()
+
+        assert len(traces) == 2, f"預期 2 個 traces, 得到 {len(traces)}"
+
+        # 所有 trace steps 共用同一個 trace_id
+        trace_ids_found = {t.trace_id for t in traces}
+        assert len(trace_ids_found) == 1, \
+            f"所有 trace steps 應共用同一個 trace_id: {trace_ids_found}"
+
+        # step_order 連續不重複
+        step_orders = [t.step_order for t in traces]
+        assert step_orders == [0, 1], \
+            f"step_order 應連續不重複: {step_orders}"
+
+        # ── 2. UNIQUE(trace_id, step_order) 約束有效 ──────────────────
+        shared_trace_id = traces[0].trace_id
+        duplicate = TreatmentPlanTraceModel(
+            trace_id=shared_trace_id,
+            plan_id=plan_model.id,
+            step_order=0,  # 與第一個 trace 重複
+            step_type="duplicate_test",
+        )
+        repo = TreatmentPlanTraceRepository(session1)
+        with pytest.raises(IntegrityError):
+            await repo.create(duplicate)
+        await session1.rollback()  # 清理壞掉的 session
+
+        # ── 3. Restart 後 trace 資料完整讀回 ──────────────────────────
+        await session1.close()
+        stmt2 = (
+            select(TreatmentPlanTraceModel)
+            .where(TreatmentPlanTraceModel.plan_id == plan_pk)
+            .order_by(TreatmentPlanTraceModel.step_order)
+        )
+        result2 = await session2.execute(stmt2)
+        restored_traces = result2.scalars().all()
+
+        assert len(restored_traces) == 2, \
+            f"Restart 後 trace 數量應一致: 預期 2, 得到 {len(restored_traces)}"
+        assert restored_traces[0].trace_id == shared_trace_id, \
+            "Restart 後 trace_id 應一致"
+        assert restored_traces[1].trace_id == shared_trace_id, \
+            "Restart 後 trace_id 應一致"
+        assert [t.step_order for t in restored_traces] == [0, 1], \
+            f"Restart 後 step_order 應連續: {[t.step_order for t in restored_traces]}"
 
     async def test_restart_recovery_multiple_plans(
         self, db_engine, session1, session2,

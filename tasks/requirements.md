@@ -1,262 +1,157 @@
-# Phase 3D Final Acceptance Fix Round 2
+# Phase 3E Hardening（禁止新增功能，只修 Reviewer 問題）
 
-本輪目標：
+> **核心原則：** 本輪不是新功能開發。禁止新增任何功能。只修 ChatGPT GitHub Review 指出的問題。依 AGENTS.md 完整流程執行。完成後一次回報。
 
-不是讓 CI 綠，而是真正完成 ChatGPT Review 提出的剩餘 P0 問題。
+---
 
-禁止：
+## 修復範圍
 
-- 不得使用 continue-on-error 掩蓋失敗
-- 不得降低測試標準
-- 不得把驗證移到問題發生之前
-- 不得修改測試讓它繞過 Bug
-- 不得只修改 workflow 文件
-- 不得回報 PASS 而沒有客觀證據
+### 允許修改
+- TreatmentPlan
+- Repository
+- Service
+- Migration
+- Tests
+- CI
 
-==================================================
-P0-1
-Postgres Integration Gate
-==================================================
+### 禁止修改
+- API 介面
+- Frontend UI
+- Engine 演算法
+- Graph Schema
 
-目前 CI 將：
+---
 
-Alembic upgrade
-Run Tests on Postgres
-Downgrade/Re-upgrade
+## P0-1 Versioning（最高優先）
 
-全部設為
+**問題：** 目前 Versioning 設計錯誤：revision → new UUID → new plan_id → version+1，導致 GET /versions 只能查到自己。
 
-continue-on-error: true
+**修正要求：**
 
-這是不允許的。
+- Database PK(id) 每個版本不同
+- Business plan_id 所有版本固定
+- version 使用 1, 2, 3... 遞增
+- Migration：移除 plan_id UNIQUE，保留 UNIQUE(plan_id, version)
+- revision：沿用舊 plan_id，version+1，不得產生新的 plan_id
+- 重新補齊：Version tests、Repository tests、API tests
+- 驗證：GET versions 必須一次看到 v1, v2, v3
 
-要求：
+---
 
-1.
+## P0-2 Treatment Item Persistence
 
-移除所有 continue-on-error。
+**問題：** Engine 已產生 drug_id, procedure_code, frequency, duration, route, planned_dose_text，但 Service 沒寫入 DB。
 
-2.
+**修正要求：**
 
-真正修復 Migration 或 Postgres 相容性問題。
+- 全部補齊上述欄位的持久化
+- Restart Recovery 後不得遺失
+- 新增 Persistence tests、Restart tests，逐欄驗證
 
-3.
+---
 
-直到：
+## P0-3 Monitoring Persistence
 
-Alembic upgrade PASS
+**問題：** 遺失 target_range, warning_threshold, critical_threshold, action_if_abnormal, responsible_specialty。
 
-Run Tests PASS
+**修正要求：**
 
-Downgrade PASS
+- 全部補齊上述欄位的持久化
+- 重新補 Restart tests、Digital Thread tests，逐欄驗證
 
-Re-upgrade PASS
+---
 
-全部真正成功。
+## P0-4 Trace
 
-禁止：
+**問題：** 每一步 trace_id 都是新的。
 
-因為 CI Failure 就加入 continue-on-error。
+**修正要求：**
 
-==================================================
-P0-2
-Stub Preservation
-==================================================
+- 改成一個 Plan 共用同一 trace_id
+- 使用 step_order 區分每一步
+- Database：UNIQUE(trace_id, step_order)，不得使用 UNIQUE(trace_id)
+- 重新補 Trace tests、Restart tests
 
-目前 E2E：
+---
 
-patient.created
+## P1-1 Phase Mapping
 
-↓
+**問題：** 所有 Item 都放第一個 Phase。
 
-立即驗證
+**修正要求：**
 
-↓
+- 必須真正依 phase_type 或 Engine Output 分配 Item 到對應 Phase
+- 新增 Phase mapping tests
 
-recommendation.created
+---
 
-這不能證明 Stub 不會覆蓋 Patient。
+## P1-2 Revision Policy
 
-必須改成：
+**問題：** revision 不可任何狀態都能做。
 
-patient.created
+**修正要求：**
 
-↓
+- 建立 RevisionPolicy
+- 至少限制允許的狀態：approved、active、paused
+- 禁止的狀態：draft、cancelled、completed、superseded
+- 非法操作返回 HTTP 409
 
-確認 Patient Properties
+---
 
-↓
+## P1-3 Migration Gate
 
-recommendation.created
+**問題：** CI downgrade 023 upgrade 023 沒有真正測到 023。
 
-↓
+**修正要求：**
 
-再次確認 Patient Properties
+- 改成真正測：head → 022 → 023 → head
+- 有資料時 023 downgrade 必須失敗
+- 空資料時 023 downgrade 必須成功
 
-↓
+---
 
-clinical_decision.created
+## 測試要求
 
-↓
+- Version chain tests
+- Persistence tests
+- Restart Recovery tests
+- Migration tests
+- Trace tests
+- Phase Mapping tests
+- Revision Policy tests
 
-再次確認
+> **注意：** 不得只補 Assertion，必須真正驗證行為。
 
-↓
+---
 
-tumor_board_consensus.created
+## 禁止事項
 
-↓
+- ❌ 新增 Placeholder
+- ❌ 降低測試標準
+- ❌ 修改 Reviewer
+- ❌ 修改需求
+- ❌ 跳過 CI
+- ❌ continue-on-error
+- ❌ 假 PASS
 
-再次確認
+---
 
-要求驗證：
+## Git 完成條件
 
-display_name
+完成後需執行以下步驟：
 
-sex
+1. 全部編譯通過
+2. 全部測試通過
+3. 完整 CI 通過
+4. Git Commit
+5. Git Push
 
-age_range
+**最終回報內容：**
 
-cancer_type
+- Commit SHA
+- GitHub Actions 狀態
+- 新增測試數
+- 修復項目清單
+- 修改檔案清單
 
-source_system
-
-全部保持一致。
-
-如果任何欄位被 Stub 覆蓋：
-
-FAIL。
-
-禁止：
-
-把驗證提前。
-
-禁止：
-
-只驗第一次。
-
-==================================================
-P0-3
-Relation Provenance
-==================================================
-
-目前只是取得 relation graph id。
-
-這不是 Provenance 驗證。
-
-要求：
-
-新增真正 Relation Query。
-
-可以：
-
-query relation
-
-或其他方式。
-
-必須讀出真正 Relation Properties。
-
-驗證：
-
-event_id
-
-event_type
-
-aggregate_type
-
-aggregate_id
-
-correlation_id
-
-causation_id
-
-occurred_at
-
-source_system
-
-全部 assert。
-
-不能只驗 graph_id。
-
-==================================================
-P0-4
-KnowGraphGo Checkout
-==================================================
-
-CI 不得 checkout main。
-
-必須固定：
-
-KnowGraphGo
-
-commit
-
-6d2b20a68ba6ea25841e142918e186fb4beece0d
-
-不得：
-
-git fetch origin main
-
-不得：
-
-checkout FETCH_HEAD
-
-必須固定 SHA。
-
-==================================================
-完成後
-
-執行：
-
-go test ./...
-
-pytest
-
-完整 GitHub Actions
-
-不得人工略過。
-
-==================================================
-最後回報：
-
-1.
-
-KnowGraphGo Commit
-
-2.
-
-AI-Kill-Cancer Commit
-
-3.
-
-GitHub Actions Run ID
-
-4.
-
-Backend 每一步 PASS
-
-5.
-
-Frontend PASS
-
-6.
-
-Postgres Gate PASS（不得 continue-on-error）
-
-7.
-
-Stub Preservation 四次驗證結果
-
-8.
-
-Relation Provenance 八欄位驗證結果
-
-9.
-
-固定 SHA Checkout 證據
-
-10.
-
-REVIEWER 評分
-
-沒有客觀證據不要回報 PASS。
+> **重要：** 不要自己宣告 Accepted，等待 ChatGPT 使用 GitHub Connector 做正式 Review。

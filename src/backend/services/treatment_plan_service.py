@@ -653,8 +653,20 @@ class TreatmentPlanService:
         if current_model is None:
             raise ValueError(f"Treatment plan with id '{plan_id}' not found")
 
+        # RevisionPolicy: only allow revision for approved / active / paused plans
+        allowed_statuses = {
+            PlanStatus.APPROVED,
+            PlanStatus.ACTIVE,
+            PlanStatus.PAUSED,
+        }
+        if current_model.plan_status not in allowed_statuses:
+            raise IllegalTransitionError(
+                current=current_model.plan_status,
+                target="revise",
+            )
+
         # Create the new version
-        new_plan_id = _uuid.uuid4().hex
+        new_plan_id = plan_id
         new_version = current_model.version + 1
         trace_id = _uuid.uuid4().hex
         created_at = datetime.now(timezone.utc)
@@ -803,6 +815,7 @@ class TreatmentPlanService:
         for phase_data in engine_output.phases:
             phase_id = _uuid.uuid4().hex
             phase_model = TreatmentPhaseModel(
+                id=_uuid.uuid4(),  # 显式设置 PK，确保即使在 mock 测试中也有值
                 phase_id=phase_id,
                 plan_id=plan_model.id,
                 phase_order=phase_data.get("order", 0),
@@ -825,9 +838,16 @@ class TreatmentPlanService:
         for idx, item_data in enumerate(engine_output.items):
             # Determine phase assignment based on item type or first phase
             phase_id = None
-            first_phase = next(iter(phase_models), None)
-            if first_phase is not None:
-                phase_id = first_phase.id
+            # Use phase_type from item if available, otherwise item_type
+            item_phase_type = item_data.get("phase_type") or item_data.get("item_type", "")
+            matched_phase = phase_dicts.get(item_phase_type)
+            if matched_phase is not None:
+                phase_id = matched_phase.id
+            else:
+                # Fallback to first phase if no matching phase found
+                first_phase = next(iter(phase_models), None)
+                if first_phase is not None:
+                    phase_id = first_phase.id
 
             item_id = _uuid.uuid4().hex
             item_model = TreatmentItemModel(
@@ -841,6 +861,12 @@ class TreatmentPlanService:
                 priority=item_data.get("priority"),
                 rationale=item_data.get("rationale"),
                 source_recommendation=item_data.get("source_recommendation"),
+                drug_id=item_data.get("drug_id"),
+                procedure_code=item_data.get("procedure_code"),
+                frequency=item_data.get("frequency"),
+                duration=item_data.get("duration"),
+                route=item_data.get("route"),
+                planned_dose_text=item_data.get("planned_dose_text"),
                 status="planned",
                 created_at=created_at,
                 updated_at=created_at,
@@ -865,6 +891,11 @@ class TreatmentPlanService:
                 schedule=m_data.get("schedule"),
                 baseline_required=m_data.get("baseline_required", False),
                 repeat_interval=m_data.get("repeat_interval"),
+                target_range=m_data.get("target_range"),
+                warning_threshold=m_data.get("warning_threshold"),
+                critical_threshold=m_data.get("critical_threshold"),
+                action_if_abnormal=m_data.get("action_if_abnormal"),
+                responsible_specialty=m_data.get("responsible_specialty"),
                 created_at=created_at,
                 updated_at=created_at,
             )
@@ -894,7 +925,7 @@ class TreatmentPlanService:
         # ── Trace ───────────────────────────────────────────────────────
         trace_models: list[TreatmentPlanTraceModel] = []
         for step_data in engine_output.trace:
-            step_trace_id = _uuid.uuid4().hex
+            step_trace_id = trace_id
             trace_model = TreatmentPlanTraceModel(
                 trace_id=step_trace_id,
                 plan_id=plan_model.id,

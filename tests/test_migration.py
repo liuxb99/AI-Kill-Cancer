@@ -1220,3 +1220,111 @@ class TestMigration020:
         for col in expected:
             assert col in columns, f"Column {col} missing from domain_tumor_board_consensus_traces"
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 3E — Batch H: Migration 023 → Treatment Plan Tables
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def alembic_config_023(tmp_path):
+    """Isolated Alembic config for 022→023 migration tests."""
+    db_path = tmp_path / "test_migration_023.db"
+    cfg = Config()
+    cfg.set_main_option("script_location", "migrations")
+    cfg.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{db_path}")
+    return cfg, db_path
+
+
+class TestMigration023:
+    """Tests for Phase 3E migration 023 (treatment plan tables)."""
+
+    # ── head → 022 → 023 → head chain ──────────────────────────────────────
+
+    def test_upgrade_chain_head_to_022_to_023(self, alembic_config_023):
+        """head → 022 → 023 → head migration chain executes correctly."""
+        cfg, db_path = alembic_config_023
+
+        # 1. Upgrade to head (latest, includes 023 → 024)
+        command.upgrade(cfg, "head")
+        assert _table_exists(db_path, "domain_treatment_plans")
+        assert _table_exists(db_path, "domain_treatment_phases")
+        assert _table_exists(db_path, "domain_treatment_items")
+        assert _table_exists(db_path, "domain_treatment_monitoring")
+        assert _table_exists(db_path, "domain_treatment_safety_rules")
+        assert _table_exists(db_path, "domain_treatment_plan_traces")
+
+        # 2. Downgrade to 022 (skips 023 and 024)
+        command.downgrade(cfg, "022")
+        assert _table_exists(db_path, "domain_treatment_plans") is False
+        assert _table_exists(db_path, "domain_treatment_phases") is False
+        assert _table_exists(db_path, "domain_treatment_items") is False
+        assert _table_exists(db_path, "domain_treatment_monitoring") is False
+        assert _table_exists(db_path, "domain_treatment_safety_rules") is False
+        assert _table_exists(db_path, "domain_treatment_plan_traces") is False
+
+        # 3. Upgrade to 023
+        command.upgrade(cfg, "023")
+        assert _table_exists(db_path, "domain_treatment_plans")
+        assert _table_exists(db_path, "domain_treatment_phases")
+        assert _table_exists(db_path, "domain_treatment_items")
+        assert _table_exists(db_path, "domain_treatment_monitoring")
+        assert _table_exists(db_path, "domain_treatment_safety_rules")
+        assert _table_exists(db_path, "domain_treatment_plan_traces")
+
+        # 4. Upgrade to head (024)
+        command.upgrade(cfg, "head")
+        assert _table_exists(db_path, "domain_treatment_plans")
+
+    # ── downgrade with data → IrreversibleMigrationError ──────────────────
+
+    def test_downgrade_023_with_data_raises_irreversible(self, alembic_config_023):
+        """Downgrade from 023 to 022 raises IrreversibleMigrationError when data exists."""
+        cfg, db_path = alembic_config_023
+        command.upgrade(cfg, "023")
+
+        # Insert a row into domain_treatment_plans to make downgrade unsafe
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(
+            "INSERT INTO domain_treatment_plans (id, plan_id, patient_id) "
+            "VALUES ('test-id', 'test-plan-id', 'test-patient-id')"
+        )
+        conn.commit()
+        conn.close()
+
+        with pytest.raises(Exception) as excinfo:
+            command.downgrade(cfg, "022")
+
+        error_msg = str(excinfo.value)
+        assert "Cannot downgrade Migration 023" in error_msg, (
+            f"Error message missing expected text: {error_msg}"
+        )
+
+    # ── downgrade with empty DB succeeds ─────────────────────────────────
+
+    def test_downgrade_023_empty_db_succeeds(self, alembic_config_023):
+        """Downgrade from 023 to 022 succeeds when all tables are empty."""
+        cfg, db_path = alembic_config_023
+        command.upgrade(cfg, "023")
+
+        # Verify all six tables exist before downgrade
+        assert _table_exists(db_path, "domain_treatment_plans")
+        assert _table_exists(db_path, "domain_treatment_phases")
+        assert _table_exists(db_path, "domain_treatment_items")
+        assert _table_exists(db_path, "domain_treatment_monitoring")
+        assert _table_exists(db_path, "domain_treatment_safety_rules")
+        assert _table_exists(db_path, "domain_treatment_plan_traces")
+
+        # Downgrade should succeed (no data in any table)
+        command.downgrade(cfg, "022")
+
+        # Verify all six tables are removed
+        assert _table_exists(db_path, "domain_treatment_plans") is False
+        assert _table_exists(db_path, "domain_treatment_phases") is False
+        assert _table_exists(db_path, "domain_treatment_items") is False
+        assert _table_exists(db_path, "domain_treatment_monitoring") is False
+        assert _table_exists(db_path, "domain_treatment_safety_rules") is False
+        assert _table_exists(db_path, "domain_treatment_plan_traces") is False
+
+

@@ -292,8 +292,13 @@ class TestTreatmentPlanDigitalThread:
                 monitoring_type="laboratory",
                 name="Complete Blood Count",
                 schedule="weekly",
+                target_range={"WBC": "4.0-10.0", "Hb": "12.0-16.0"},
+                warning_threshold={"WBC": "3.0-11.0"},
+                critical_threshold={"WBC": "<2.0 or >15.0"},
+                action_if_abnormal="Notify attending physician and adjust dose",
                 baseline_required=True,
                 repeat_interval="7d",
+                responsible_specialty="hematology",
                 created_at=now,
                 updated_at=now,
             ),
@@ -303,8 +308,13 @@ class TestTreatmentPlanDigitalThread:
                 monitoring_type="imaging",
                 name="CT Scan",
                 schedule="every_3_months",
+                target_range=None,
+                warning_threshold=None,
+                critical_threshold=None,
+                action_if_abnormal="Schedule follow-up with radiology",
                 baseline_required=True,
                 repeat_interval="90d",
+                responsible_specialty="radiology",
                 created_at=now,
                 updated_at=now,
             ),
@@ -339,9 +349,10 @@ class TestTreatmentPlanDigitalThread:
         await db_session.flush()
 
         # ── Trace ─────────────────────────────────────────────────────────
+        trace_id = "trace-dt-tp-001"
         traces = [
             TreatmentPlanTraceModel(
-                trace_id="trace-dt-tp-001",
+                trace_id=trace_id,
                 plan_id=plan.id,
                 step_order=0,
                 step_type="load_context",
@@ -350,7 +361,7 @@ class TestTreatmentPlanDigitalThread:
                 created_at=now,
             ),
             TreatmentPlanTraceModel(
-                trace_id="trace-dt-tp-002",
+                trace_id=trace_id,
                 plan_id=plan.id,
                 step_order=1,
                 step_type="validate_links",
@@ -359,7 +370,7 @@ class TestTreatmentPlanDigitalThread:
                 created_at=now,
             ),
             TreatmentPlanTraceModel(
-                trace_id="trace-dt-tp-003",
+                trace_id=trace_id,
                 plan_id=plan.id,
                 step_order=2,
                 step_type="generate_phases",
@@ -705,3 +716,102 @@ class TestTreatmentPlanDigitalThread:
         assert plan.recommendation_id == rec.id
         assert plan.clinical_decision_id == cd.id
         assert plan.consensus_id == cons.id
+
+    async def test_monitoring_columns_persisted(
+        self,
+        db_session,
+        patient,
+        recommendation,
+        clinical_decision,
+        consensus,
+    ):
+        """Digital Thread 情境：驗證 Monitoring 欄位正確寫入。
+
+        逐欄驗證 target_range, warning_threshold, critical_threshold,
+        action_if_abnormal, responsible_specialty。
+        """
+        from sqlalchemy import select
+
+        plan = await self._create_treatment_plan(
+            db_session, patient, recommendation, clinical_decision, consensus,
+        )
+
+        # 直接查 DB 驗證 Monitoring 欄位
+        stmt = select(TreatmentMonitoringModel).where(
+            TreatmentMonitoringModel.plan_id == plan.id,
+        ).order_by(TreatmentMonitoringModel.monitoring_type)
+        result = await db_session.execute(stmt)
+        rows = result.scalars().all()
+
+        assert len(rows) == 2
+
+        # Laboratory monitoring
+        lab = rows[0] if rows[0].monitoring_type == "laboratory" else rows[1]
+        assert lab.target_range == {"WBC": "4.0-10.0", "Hb": "12.0-16.0"}
+        assert lab.warning_threshold == {"WBC": "3.0-11.0"}
+        assert lab.critical_threshold == {"WBC": "<2.0 or >15.0"}
+        assert lab.action_if_abnormal == "Notify attending physician and adjust dose"
+        assert lab.responsible_specialty == "hematology"
+
+        # Imaging monitoring
+        img = rows[1] if rows[1].monitoring_type == "imaging" else rows[0]
+        assert img.target_range is None
+        assert img.warning_threshold is None
+        assert img.critical_threshold is None
+        assert img.action_if_abnormal == "Schedule follow-up with radiology"
+        assert img.responsible_specialty == "radiology"
+
+    async def test_trace_correctness(
+        self,
+        db_session,
+        patient,
+        recommendation,
+        clinical_decision,
+        consensus,
+    ):
+        """Digital Thread 情境：驗證 Trace 正確性。
+
+        驗證：
+        1. 所有 trace steps 共用同一個 trace_id
+        2. step_order 連續不重複 (0, 1, 2)
+        3. Restart（refresh）後 trace 資料完整讀回
+        """
+        from sqlalchemy import select
+
+        plan = await self._create_treatment_plan(
+            db_session, patient, recommendation, clinical_decision, consensus,
+        )
+
+        # 直接查 DB 驗證 Trace
+        stmt = (
+            select(TreatmentPlanTraceModel)
+            .where(TreatmentPlanTraceModel.plan_id == plan.id)
+            .order_by(TreatmentPlanTraceModel.step_order)
+        )
+        result = await db_session.execute(stmt)
+        traces = result.scalars().all()
+
+        assert len(traces) == 3, f"預期 3 個 traces, 得到 {len(traces)}"
+
+        # 所有 trace steps 共用同一個 trace_id
+        trace_ids_found = {t.trace_id for t in traces}
+        assert len(trace_ids_found) == 1, \
+            f"所有 trace steps 應共用同一個 trace_id: {trace_ids_found}"
+        assert list(trace_ids_found)[0] == "trace-dt-tp-001"
+
+        # step_order 連續不重複
+        step_orders = [t.step_order for t in traces]
+        assert step_orders == [0, 1, 2], \
+            f"step_order 應連續不重複: {step_orders}"
+
+        # step_type 正確
+        assert traces[0].step_type == "load_context"
+        assert traces[1].step_type == "validate_links"
+        assert traces[2].step_type == "generate_phases"
+
+        # 再次查詢（模擬 reload）後資料一致
+        result2 = await db_session.execute(stmt)
+        traces2 = result2.scalars().all()
+        assert len(traces2) == 3
+        assert [t.step_order for t in traces2] == [0, 1, 2]
+        assert {t.trace_id for t in traces2} == {"trace-dt-tp-001"}

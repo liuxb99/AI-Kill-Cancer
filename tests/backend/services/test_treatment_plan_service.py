@@ -469,7 +469,7 @@ class TestRevision:
         req = sample_request()
 
         # plan_repo.get_by_plan_id returns current version
-        current_model = _make_plan_model(plan_id="plan-001", version=1)
+        current_model = _make_plan_model(plan_id="plan-001", version=1, plan_status="approved")
         mock_repos["plan_repo"].get_by_plan_id.return_value = current_model
 
         with (
@@ -492,6 +492,315 @@ class TestRevision:
 
         # Verify commit called
         mock_repos["db"].commit.assert_awaited_once()
+
+    # ── H-03: Version Chain ─────────────────────────────────────────────────
+
+    async def test_version_chain(self, mock_repos):
+        """Version chain: create v1 → revise v2 → revise v3 → get_versions returns 3."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+
+        # ── Step 1: Create v1 ───────────────────────────────────────────
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID), "display_name": "Test"}),
+        ):
+            v1 = await svc.create_plan(req, user_id=str(USER_UUID))
+
+        plan_id = v1.plan_id
+        assert v1.version == 1
+
+        # ── Step 2: Revise to v2 ────────────────────────────────────────
+        v1_model = _make_plan_model(plan_id=plan_id, version=1, plan_status="approved")
+        mock_repos["plan_repo"].get_by_plan_id.return_value = v1_model
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID), "display_name": "Test"}),
+        ):
+            v2 = await svc.revise_plan(plan_id, req, user_id=str(USER_UUID))
+
+        assert v2.plan_id == plan_id
+        assert v2.version == 2
+
+        # ── Step 3: Revise to v3 ────────────────────────────────────────
+        v2_model = _make_plan_model(plan_id=plan_id, version=2, plan_status="approved")
+        mock_repos["plan_repo"].get_by_plan_id.return_value = v2_model
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID), "display_name": "Test"}),
+        ):
+            v3 = await svc.revise_plan(plan_id, req, user_id=str(USER_UUID))
+
+        assert v3.plan_id == plan_id
+        assert v3.version == 3
+
+        # ── Step 4: get_versions returns all three ──────────────────────
+        v1_ver = _make_plan_model(plan_id=plan_id, version=1)
+        v2_ver = _make_plan_model(plan_id=plan_id, version=2)
+        v3_ver = _make_plan_model(plan_id=plan_id, version=3)
+        mock_repos["plan_repo"].list_versions.return_value = [v3_ver, v2_ver, v1_ver]
+
+        results = await svc.get_versions(plan_id)
+        assert len(results) == 3
+        assert results[0].version == 3
+        assert results[1].version == 2
+        assert results[2].version == 1
+        for r in results:
+            assert r.plan_id == plan_id
+
+    # ── H-14: Revision Policy ──────────────────────────────────────────────
+
+    async def test_revision_allowed_for_approved(self, mock_repos):
+        """Revision succeeds for approved plans."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+        plan_model = _make_plan_model(plan_id="plan-rp-001", version=1, plan_status="approved")
+        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID)}),
+        ):
+            result = await svc.revise_plan("plan-rp-001", req, user_id=str(USER_UUID))
+
+        assert result.version == 2
+        mock_repos["db"].commit.assert_awaited_once()
+
+    async def test_revision_allowed_for_active(self, mock_repos):
+        """Revision succeeds for active plans."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+        plan_model = _make_plan_model(plan_id="plan-rp-002", version=1, plan_status="active")
+        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID)}),
+        ):
+            result = await svc.revise_plan("plan-rp-002", req, user_id=str(USER_UUID))
+
+        assert result.version == 2
+        mock_repos["db"].commit.assert_awaited_once()
+
+    async def test_revision_allowed_for_paused(self, mock_repos):
+        """Revision succeeds for paused plans."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+        plan_model = _make_plan_model(plan_id="plan-rp-003", version=1, plan_status="paused")
+        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID)}),
+        ):
+            result = await svc.revise_plan("plan-rp-003", req, user_id=str(USER_UUID))
+
+        assert result.version == 2
+        mock_repos["db"].commit.assert_awaited_once()
+
+    async def test_revision_denied_for_draft(self, mock_repos):
+        """Revision denied for draft plans — raises IllegalTransitionError."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+        plan_model = _make_plan_model(plan_id="plan-rp-004", version=1, plan_status="draft")
+        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID)}),
+        ):
+            with pytest.raises(IllegalTransitionError):
+                await svc.revise_plan("plan-rp-004", req, user_id=str(USER_UUID))
+
+        mock_repos["db"].commit.assert_not_awaited()
+
+    async def test_revision_denied_for_cancelled(self, mock_repos):
+        """Revision denied for cancelled plans — raises IllegalTransitionError."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+        plan_model = _make_plan_model(plan_id="plan-rp-005", version=1, plan_status="cancelled")
+        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID)}),
+        ):
+            with pytest.raises(IllegalTransitionError):
+                await svc.revise_plan("plan-rp-005", req, user_id=str(USER_UUID))
+
+    async def test_revision_denied_for_completed(self, mock_repos):
+        """Revision denied for completed plans — raises IllegalTransitionError."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+        plan_model = _make_plan_model(plan_id="plan-rp-006", version=1, plan_status="completed")
+        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID)}),
+        ):
+            with pytest.raises(IllegalTransitionError):
+                await svc.revise_plan("plan-rp-006", req, user_id=str(USER_UUID))
+
+    async def test_revision_denied_for_superseded(self, mock_repos):
+        """Revision denied for superseded plans — raises IllegalTransitionError."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+        plan_model = _make_plan_model(plan_id="plan-rp-007", version=1, plan_status="superseded")
+        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID)}),
+        ):
+            with pytest.raises(IllegalTransitionError):
+                await svc.revise_plan("plan-rp-007", req, user_id=str(USER_UUID))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase Mapping Tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestPhaseMapping:
+    """Verify items are mapped to the correct phase (H-12)."""
+
+    async def test_items_mapped_to_correct_phase(self, mock_repos):
+        """Each item's phase_id should point to its matching phase, not all to first."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+
+        # Override engine output with 3 phases and items that reference different phases
+        custom_output = _make_engine_output({
+            "phases": [
+                {"phase_type": "preparation", "name": "Preparation", "order": 1, "duration_days": 14},
+                {"phase_type": "primary_treatment", "name": "Primary Treatment", "order": 2, "duration_days": 90},
+                {"phase_type": "maintenance", "name": "Maintenance", "order": 3, "duration_days": 180},
+            ],
+            "items": [
+                {
+                    "item_type": "medication",
+                    "name": "Drug A",
+                    "description": "Preparation drug",
+                    "priority": 1,
+                    "rationale": "Part of preparation",
+                    "source_recommendation": "engine",
+                    "phase_type": "preparation",
+                },
+                {
+                    "item_type": "medication",
+                    "name": "Drug B",
+                    "description": "Primary drug",
+                    "priority": 2,
+                    "rationale": "Part of primary treatment",
+                    "source_recommendation": "engine",
+                    "phase_type": "primary_treatment",
+                },
+                {
+                    "item_type": "radiation",
+                    "name": "Radiation C",
+                    "description": "Maintenance radiation",
+                    "priority": 3,
+                    "rationale": "Part of maintenance",
+                    "source_recommendation": "engine",
+                    "phase_type": "maintenance",
+                },
+            ],
+        })
+        mock_repos["engine"].generate.return_value = custom_output
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID), "display_name": "Test"}),
+        ):
+            await svc.create_plan(req, user_id=str(USER_UUID))
+
+        # Inspect phase models passed to create_many
+        phase_call = mock_repos["phase_repo"].create_many.await_args
+        assert phase_call is not None
+        phase_models = phase_call.args[0] if phase_call.args else phase_call.kwargs.get("models")
+        assert phase_models is not None
+        assert len(phase_models) == 3
+        phase_map = {p.phase_type: p.id for p in phase_models}
+
+        # Inspect item models passed to create_many
+        item_call = mock_repos["item_repo"].create_many.await_args
+        assert item_call is not None
+        item_models = item_call.args[0] if item_call.args else item_call.kwargs.get("models")
+        assert item_models is not None
+        assert len(item_models) == 3
+
+        # Verify each item's phase_id matches its designated phase
+        assert item_models[0].phase_id == phase_map["preparation"]
+        assert item_models[1].phase_id == phase_map["primary_treatment"]
+        assert item_models[2].phase_id == phase_map["maintenance"]
+
+        # Verify they are NOT all pointing to the same phase
+        assert item_models[0].phase_id != item_models[1].phase_id
+        assert item_models[0].phase_id != item_models[2].phase_id
+        assert item_models[1].phase_id != item_models[2].phase_id
+
+    async def test_items_without_phase_type_fallback_to_first_phase(self, mock_repos):
+        """Items without phase_type or matching item_type should fall back to first phase."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+
+        # Use default engine output which has items with no phase_type and
+        # item_type="medication" that doesn't match any phase_type
+        # This tests the fallback to first phase
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID), "display_name": "Test"}),
+        ):
+            await svc.create_plan(req, user_id=str(USER_UUID))
+
+        # Inspect phase models
+        phase_call = mock_repos["phase_repo"].create_many.await_args
+        assert phase_call is not None
+        phase_models = phase_call.args[0] if phase_call.args else phase_call.kwargs.get("models")
+        assert phase_models is not None
+        assert len(phase_models) >= 1
+        first_phase_id = phase_models[0].id
+
+        # Inspect item models
+        item_call = mock_repos["item_repo"].create_many.await_args
+        assert item_call is not None
+        item_models = item_call.args[0] if item_call.args else item_call.kwargs.get("models")
+        assert item_models is not None
+        assert len(item_models) >= 1
+
+        # All items should fall back to first phase
+        for item in item_models:
+            assert item.phase_id == first_phase_id, (
+                f"Item {item.name} should have phase_id={first_phase_id}, got {item.phase_id}"
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

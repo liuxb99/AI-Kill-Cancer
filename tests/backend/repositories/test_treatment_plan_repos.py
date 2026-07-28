@@ -738,6 +738,67 @@ class TestTreatmentItemRepository:
         remaining = await repo.list_by_plan_id(plan.id)
         assert remaining == []
 
+    async def test_create_with_all_fields_and_persistence(self, db_session, patient) -> None:
+        """建立 Item 後直接查 DB 逐欄驗證所有持久化欄位。
+
+        驗證 drug_id, procedure_code, frequency, duration, route,
+        planned_dose_text 已被正確寫入且與 Engine Output 一致。
+        """
+        from sqlalchemy import select
+
+        from src.backend.domain.treatment_plan import TreatmentItemModel
+        from src.backend.repositories.treatment_plan_repo import (
+            TreatmentItemRepository,
+        )
+
+        plan = await self._setup_plan(db_session, patient)
+        repo = TreatmentItemRepository(db_session)
+
+        # ── 使用 engine output 風格的完整欄位建立 Item ──────────────────
+        item = TreatmentItemModel(
+            item_id="tpr-item-persist-all",
+            plan_id=plan.id,
+            item_order=1,
+            item_type="medication",
+            name="Lenvatinib",
+            description="Primary medication for PTC",
+            drug_id="DB09021",                          # DrugBank ID
+            procedure_code=None,                         # 非 procedure 所以為 None
+            frequency="once_daily",
+            duration="24 weeks",
+            route="oral",
+            planned_dose_text="24 mg once daily with dose adjustments",
+            priority=1,
+            status="planned",
+            rationale="Recommended for advanced PTC",
+        )
+        result = await repo.create(item)
+        await db_session.commit()
+
+        # ── 直接查 DB（避開 ORM session cache）逐欄驗證 ────────────────
+        stmt = select(TreatmentItemModel).where(
+            TreatmentItemModel.item_id == "tpr-item-persist-all",
+        )
+        row = (await db_session.execute(stmt)).scalar_one()
+
+        # Engine output 欄位
+        assert row.drug_id == "DB09021", f"drug_id mismatch: {row.drug_id}"
+        assert row.procedure_code is None, f"procedure_code should be None: {row.procedure_code}"
+        assert row.frequency == "once_daily", f"frequency mismatch: {row.frequency}"
+        assert row.duration == "24 weeks", f"duration mismatch: {row.duration}"
+        assert row.route == "oral", f"route mismatch: {row.route}"
+        assert row.planned_dose_text == "24 mg once daily with dose adjustments", \
+            f"planned_dose_text mismatch: {row.planned_dose_text}"
+
+        # 同時驗證基本欄位也未遺失
+        assert row.item_id == "tpr-item-persist-all"
+        assert row.item_order == 1
+        assert row.item_type == "medication"
+        assert row.name == "Lenvatinib"
+        assert row.priority == 1
+        assert row.status == "planned"
+        assert row.rationale == "Recommended for advanced PTC"
+
     async def test_transaction_rollback(self, db_session, patient) -> None:
         """If rolled back, no item data should persist."""
         from src.backend.domain.treatment_plan import TreatmentItemModel

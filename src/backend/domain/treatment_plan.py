@@ -25,11 +25,11 @@ def _uuid() -> uuid.UUID:
 class TreatmentPlanModel(DBBase):
     __tablename__ = "domain_treatment_plans"
     __table_args__ = (
-        UniqueConstraint("plan_id", "version", name="uq_treatment_plan_version"),
+        UniqueConstraint("plan_id", "version", name="uq_plan_id_version"),
     )
 
     id = Column(CompatUUID, primary_key=True, default=_uuid)
-    plan_id = Column(String(64), unique=True, nullable=False, index=True)
+    plan_id = Column(String(64), nullable=False, index=True)
     version = Column(Integer, default=1, nullable=False)
     patient_id = Column(
         CompatUUID,
@@ -295,9 +295,12 @@ class TreatmentSafetyRuleModel(DBBase):
 
 class TreatmentPlanTraceModel(DBBase):
     __tablename__ = "domain_treatment_plan_traces"
+    __table_args__ = (
+        UniqueConstraint("trace_id", "step_order", name="uq_trace_step"),
+    )
 
     id = Column(CompatUUID, primary_key=True, default=_uuid)
-    trace_id = Column(String(64), unique=True, nullable=False, index=True)
+    trace_id = Column(String(64), nullable=False, index=True)
     plan_id = Column(
         CompatUUID,
         ForeignKey("domain_treatment_plans.id", ondelete="CASCADE"),

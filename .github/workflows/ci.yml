@@ -179,8 +179,9 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
           PYTHONPATH: .
         run: |
-          alembic -c migrations/alembic.ini downgrade 023
+          alembic -c migrations/alembic.ini downgrade 022
           alembic -c migrations/alembic.ini upgrade 023
+          alembic -c migrations/alembic.ini upgrade head
 
       - name: Postgres Integration Gate - Migration verification
         env:

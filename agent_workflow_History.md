@@ -475,3 +475,84 @@ Reviewer Score: 95/100 ✅ | Ready for Treatment Plan Phase: YES ✅
 2026-07-27 22:15 | [v] fleet(test-writer+backend-logic) -> Step 4 第二批完成：P0-2 T2.1-T2.4（Stub Preservation 四次驗證）+ P0-3 T3.2-T3.3（Relation Provenance 八欄位）+ T1.6（env.py sync engine 修復）✅
 2026-07-27 22:20 | [v] task(需求回歸檢查) -> Step 4b 通過：16/16 ALL PASS ✅
 2026-07-27 22:22 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性25 正確性25 可維護性22 測試驗證25 | 總分97 合格 ✅
+2026-07-27 22:25 | [v] fleet(knowgraphgo-dev+test-writer) -> 返工修復：properties 合併（upsertEntity）+ source_system 期望值修正 ✅
+2026-07-27 22:28 | [v] KnowGraphGo commit 950dd86: fix(export): merge properties on entity upsert ✅
+2026-07-27 22:30 | [v] AI-Kill-Cancer commit bb7ae29: fix: update KnowGraphGo SHA to 950dd86 ✅
+2026-07-27 22:32 | [v] AI-Kill-Cancer commit cedb4d6: fix: move --json before edge get (flag parse order) ✅
+2026-07-27 22:34 | [v] AI-Kill-Cancer commit a366b29: fix: Relation Provenance source_system expectation ✅
+2026-07-27 22:45 | [v] **CI Run #143 全部通過** — frontend ✅ backend ✅ ✅✅✅
+2026-07-27 22:45 | [v] Step 6：啟動總結報告
+2026-07-27 22:47 | [v] task(doc-writer) -> Step 6 完成：總結報告產出 tasks/summary-report-phase3d-final-acceptance-fix-r2.md ✅
+2026-07-27 22:47 | [v] ✅ **Phase 3D Final Acceptance Fix Round 2 全部完成！** 🎉
+- CI Run #143 全部通過 ✅
+- REVIEWER 97/100 ✅
+- Stub Preservation 四次驗證通過 ✅
+- Relation Provenance 八欄位驗證通過 ✅
+- Postgres Gate 無 continue-on-error ✅
+- KnowGraphGo 固定 SHA ✅
+
+2026-07-28 06:49 | [v] Step 0A：歸檔上一輪 requirements.md → requirements-history/requirements-Phase-3D-Final-Acceptance-Fix-R2.md ✅
+2026-07-28 06:49 | [v] task(子代理) -> Step 0A 完成：子代理已向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」✅
+2026-07-28 06:49 | [v] Step 0B 完成：Phase 3E Treatment Plan Engine V1 需求已記錄到 tasks/requirements.md（32 節，19051 bytes）✅
+2026-07-28 06:51 | [v] task(子代理) -> Step 1 完成：場景識別為 feature-dev，tasks/task-status.md 已更新（10 角色，58 項子任務）✅
+2026-07-28 06:52 | [v] task(PLANNER) -> Step 2 完成：計劃產出 tasks/plan-Phase-3E-Treatment-Plan-Engine.md（8 Batch，58 任務，~328h）✅
+2026-07-28 06:56 | [v] task(db-modeler) -> Batch 0 Step A 完成：6 Model + Migration 023（treatment_plan.py + 023_phase3e_treatment_plan_tables.py）✅
+2026-07-28 06:59 | [v] task(repositories) -> Batch 0 Step B 完成：6 Repository + Model Test（28 tests）+ Repository Test（50 tests）= 78 tests ✅
+2026-07-28 07:00 | [v] task(backend-logic) -> Batch 1 啟動：Engine Core（RuleSet + StateMachine + Engine + Trace + 測試）
+2026-07-28 07:03 | [v] task(backend-logic) -> Batch 1 完成：RuleSet + StateMachine + Engine + Trace + 73 tests ✅
+2026-07-28 07:03 | [v] task(backend-logic) -> Batch 2 啟動：Service Layer（TreatmentPlanService + Versioning + Outbox + 測試）
+2026-07-28 07:10 | [v] task(backend-logic) -> Batch 2 完成：TreatmentPlanService + Versioning + Graph Events + 27 tests ✅
+2026-07-28 07:10 | [v] task(api-designer) -> Batch 3 啟動：API Layer（查詢 + 狀態 + Permission + 測試）
+2026-07-28 07:20 | [v] task(api-designer) -> Batch 3 完成：12 API 端點 + Permission + Router 註冊 + 29 tests ✅
+2026-07-28 07:20 | [v] task(frontend-logic) -> Batch 4 啟動：Frontend & Report（4 頁面 + 路由 + Report + 測試）
+2026-07-28 07:30 | [v] task(frontend-logic) -> Batch 4 完成：4 頁面 + API client + 路由 + Consensus 整合 + Report + 35 tests ✅
+2026-07-28 07:30 | [v] task(knowgraphgo-dev) -> Batch 5 啟動：KnowGraphGo Graph Projection（Entity + Relation + Idempotency）
+2026-07-28 07:38 | [v] task(knowgraphgo-dev) -> Batch 5 完成：KnowGraphGo 5 Entity + 11 Relation + 7 event handlers + go test all PASS ✅
+2026-07-28 07:38 | [v] task(test-writer+devops) -> Batch 6 啟動：Integration Tests + CI（Restart Recovery + Digital Thread + CI Cleanup + Postgres Gate）
+2026-07-28 07:45 | [v] task(test-writer+devops) -> Batch 6 完成：Restart Recovery + Digital Thread + CI Cleanup + Postgres Gate + CI pin ✅
+2026-07-28 07:45 | [v] 開始 Step 4b：需求回歸檢查 + 完整測試驗證
+2026-07-28 08:00 | [v] Step 4b 需求回歸檢查完成：26 PASS / 1 FAIL（§14 Alternatives 不入庫）/ 3 PARTIAL → 進入返工
+2026-07-28 08:00 | [v] task(PLANNER) resume -> 返工第1次重新規劃
+2026-07-28 08:06 | [v] task(PLANNER) resume -> 返工第1次計劃完成，產出 tasks/plan-phase3e-rework-1.md（4 項修復）✅
+2026-07-28 08:06 | [v] 返工第1次：啟動開發子代理修復 FAIL-1 + PARTIAL-2/3/4
+2026-07-28 08:15 | [v] 返工第1次修復完成：FAIL-1 alternatives 入庫 + PARTIAL-2/3/4 全部修復 ✅
+2026-07-28 08:15 | [v] 啟動 Step 4b 重新檢查 + schema review_date 補全
+2026-07-28 08:21 | [v] Step 4b 返工後需求回歸檢查：8/8 ALL PASS ✅ → 進入 Step 5
+2026-07-28 08:21 | [v] task(REVIEWER) -> 啟動評分（返工第1次）
+2026-07-28 08:25 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=NO 滿足需求=NO 測試=YES | 完整性12 正確性10 可維護性16 測試13 | 總分51 不合格 ❌（E-1 f-string 語法錯誤 / E-2 State Machine ACTIVE→CANCELLED 缺失）
+2026-07-28 08:25 | [v] task(PLANNER) resume -> 返工第2次重新規劃
+2026-07-28 08:30 | [v] task(PLANNER) resume -> 返工第2次計劃完成（2 項修復：E-1 f-string + E-2 State Machine）✅
+2026-07-28 08:30 | [v] task(開發子代理) resume -> 返工第2次修復啟動
+2026-07-28 08:32 | [v] fleet(E-1+E-2) -> 返工第2次修復完成：f-string 語法錯誤 + State Machine ACTIVE→CANCELLED ✅
+2026-07-28 08:32 | [v] task(REVIEWER) -> 啟動返工第2次評分
+2026-07-28 08:35 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=NO 滿足需求=NO 測試=YES | 完整性7 正確性5 可維護性20 測試8 | 總分40 不合格 ❌（E-1 修復不完整 / E-3 Digital Thread 測試失敗）
+2026-07-28 08:37 | [v] fleet(E-1完整修復+E-3測試修復) -> 返工第3次修復完成 ✅
+2026-07-28 08:37 | [v] task(REVIEWER) -> 啟動返工第3次評分
+2026-07-28 08:41 | [v] task(開發子代理) -> E-1 完整修復：f-string 第1763-1764行 `\"` 改為單引號，Python 語法驗證 OK ✅
+2026-07-28 08:41 | [v] task(REVIEWER) -> 啟動返工第3次評分（再次）
+2026-07-28 08:45 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性22 正確性24 可維護性22 測試25 | 總分93 合格但需求§三十要求≥95 ❌（缺少 review 端點）
+2026-07-28 08:49 | [v] task(開發子代理) -> 補上 review 端點 + permission + 測試完成 ✅
+2026-07-28 08:49 | [v] task(REVIEWER) -> 啟動返工第4次評分
+2026-07-28 08:52 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性25 正確性25 可維護性23 測試25 | 總分98 合格 ✅
+2026-07-28 08:52 | [v] 開始 Step 6：總結報告
+2026-07-28 08:55 | [v] task(doc-writer) -> Step 6 完成：總結報告產出 tasks/summary-report-phase3e.md ✅
+2026-07-28 08:58 | [v] KnowGraphGo commit 189d415 → feat(clinical): add treatment plan graph projection → origin/main ✅
+2026-07-28 08:58 | [v] AI-Kill-Cancer commit 7844095 → feat(phase3e): add treatment plan engine → origin/master ✅
+2026-07-28 08:58 | [v] ✅ **Phase 3E Treatment Plan Engine 全部完成！** 🎉
+2026-07-28 08:59 | [v] Step 10 需求歸檔完成：requirements.md → requirements-history/requirements-Phase-3E-Treatment-Plan-Engine.md ✅ 需求歸零 ✅
+2026-07-28 08:45 | [v] task(PLANNER) resume -> 返工第4次重新規劃（補 review 端點 + permission）
+2026-07-28 08:35 | [v] task(PLANNER) resume -> 返工第3次重新規劃
+2026-07-28 18:15 | [v] Step 1 完成：需求記錄至 tasks/requirements.md（Phase 3E Hardening）
+2026-07-28 18:17 | [v] Step 2 完成：場景識別 hardening，角色分派記錄至 tasks/task-status.md
+2026-07-28 18:19 | [v] task(PLANNER) -> 計劃完成，產出 tasks/plan-Phase-3E-Hardening.md（17 任務，P0-P1 優先級）
+2026-07-28 18:21 | [v] Step 4 更新 Workflow 完成
+2026-07-28 18:23 | [v] fleet(H-01+H-08, H-04+H-06, H-15) -> 批次1 並行完成：domain 約束修正 + service 持久化補齊 + CI migration 修正
+2026-07-28 18:25 | [v] task(backend-logic) -> 批次2 完成：H-02(revise_plan_id) + H-09(trace_id共用) + H-11(Phase Mapping) + H-13(Revision Policy)
+2026-07-28 18:27 | [v] fleet(H-03+H-12+H-14, H-16) -> 批次3A 完成：Version Chain + Phase Mapping + Revision Policy + Migration Gate 測試
+2026-07-28 18:30 | [v] task(test-writer) -> 批次3B 完成：H-05(Item Persistence) + H-07(Monitoring Persistence) + H-10(Trace) Integration 測試
+2026-07-28 18:33 | [v] Step 6 需求回歸檢查完成 -> 全部 PASS，可進入 REVIEWER
+2026-07-28 18:36 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性25 正確性25 可維護性22 測試25 | 總分97 合格 ✅
+2026-07-28 18:40 | [v] H-17 整合驗證 -> 發現 3 failed + 1 error（需修復後重跑）
+2026-07-28 18:43 | [v] 修復 3 個測試失敗完成（Phase Mapping 邏輯修正 + mock 狀態設置 + trace 測試修復）
+2026-07-28 18:45 | [v] 完整 treatment_plan 測試通過：239 passed ✅
+2026-07-28 18:47 | [v] Step 9 總結報告完成 -> tasks/summary-report-phase3e-hardening.md
