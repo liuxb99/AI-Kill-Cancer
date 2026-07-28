@@ -12,7 +12,7 @@ class TestMigrationGate:
     """驗證 migration 025 的 schema 狀態。"""
 
     def test_composite_unique_constraints_exist(self, pg_connection):
-        """驗證 uq_trace_step (UNIQUE trace_id, step_order) 存在"""
+        """驗證複合 UNIQUE(trace_id, step_order) constraint 存在"""
         rows = pg_connection.execute(text("""
             SELECT con.conname FROM pg_catalog.pg_constraint con
             JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
@@ -20,7 +20,7 @@ class TestMigrationGate:
               AND con.contype = 'u'
         """)).fetchall()
         names = [r[0] for r in rows]
-        assert 'uq_trace_step' in names, f"Missing uq_trace_step in {names}"
+        assert 'uq_domain_treatment_plan_traces_step' in names, f"Missing uq_domain_treatment_plan_traces_step in {names}"
 
     def test_trace_id_unique_removed(self, pg_connection):
         """驗證舊的 UNIQUE(trace_id) 約束已被移除（已取代為複合唯一）"""
