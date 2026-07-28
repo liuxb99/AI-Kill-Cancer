@@ -4,7 +4,7 @@ CI Migration Gate Verification Tests
 CI 中的 upgrade/downgrade 步驟已在測試前完成。
 """
 import pytest
-from sqlalchemy import text, inspect
+from sqlalchemy import text
 
 
 @pytest.mark.pg
