@@ -87,15 +87,10 @@ def upgrade() -> None:
             batch_op.alter_column("trace_id", existing_type=sa.String(64), nullable=False)
             batch_op.create_unique_constraint("uq_trace_step", ["trace_id", "step_order"])
     else:
-        for con_name in [
-            "domain_treatment_plan_traces_trace_id_key",
-            "uq_trace_step",
-        ]:
-            op.execute(
-                f"ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT IF EXISTS {con_name}"
-            )
-        op.create_unique_constraint("uq_trace_step", "domain_treatment_plan_traces",
-                                     ["trace_id", "step_order"])
+        op.execute("DROP INDEX IF EXISTS uq_trace_step")
+        op.execute("DROP INDEX IF EXISTS ix_domain_treatment_plan_traces_trace_id")
+        op.create_index("uq_trace_step", "domain_treatment_plan_traces",
+                        ["trace_id", "step_order"], unique=True)
 
 
 def downgrade() -> None:
@@ -132,8 +127,8 @@ def downgrade() -> None:
             batch_op.create_index("ix_domain_treatment_plan_traces_trace_id",
                                   ["trace_id"], unique=True)
     else:
-        op.execute("ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT IF EXISTS uq_trace_step")
+        op.execute("DROP INDEX IF EXISTS uq_trace_step")
         op.execute(
-            "ALTER TABLE domain_treatment_plan_traces "
-            "ADD CONSTRAINT domain_treatment_plan_traces_trace_id_key UNIQUE (trace_id)"
+            "CREATE UNIQUE INDEX ix_domain_treatment_plan_traces_trace_id "
+            "ON domain_treatment_plan_traces (trace_id)"
         )
