@@ -592,3 +592,24 @@ TIME_PENDING | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YE
 TIME_PENDING | [v] task(doc-writer) -> Step 9 完成：總結報告產出 tasks/summary-report-phase3e-final-hardening.md
 TIME_PENDING | [v] Step 10 完成：需求歸檔至 requirements-history/requirements-Phase-3E-Final-Hardening.md ✅ 需求歸零 ✅
 TIME_PENDING | [v] Git Commit 54d8bd4 + Push to origin/master ✅
+2026-07-28 19:47 | [v] task(doc-writer) -> Step 0A 完成：子代理已向使用者回報「《小乖已閱讀 AGENTS.md，將依規定執行本次任務》」✅
+2026-07-28 19:47 | [v] agent_workflow.md 已重置為初始狀態，等待 Step 1 接收需求
+2026-07-28 19:47 | [v] task(doc-writer) -> Step 1 完成：需求已記錄到 tasks/requirements.md（Architecture Review Phase1~3E）
+2026-07-28 19:47 | [v] task(doc-writer) -> Step 2 完成：tasks/task-status.md 已更新為 architecture-review 場景
+2026-07-28 19:47 | [v] task(PLANNER) -> Step 3 完成：產出 tasks/plan-architecture-review.md（6 階段，13 項 Review）
+2026-07-28 19:47 | [v] Step 4 完成：agent_workflow.md + History 已更新，進入 Step 5 執行 Review
+2026-07-28 19:47 | [v] fleet(Layers + Crosscutting + Quality) -> Step 5 Review 完成：產出 tasks/reviews/review_layers.md + review_crosscutting.md + review_quality.md
+2026-07-28 19:47 | [v] task(彙總) -> Step 5 彙總報告完成：tasks/reviews/architecture_review.md
+2026-07-28 19:47 | [v] task(需求回歸檢查) -> Step 6 發現 3 項 PARTIAL（Domain 逐檔案審查 / Dead Code 列舉 / Duplicated SQL & Validation），判定 ❌ 進入返工
+2026-07-28 19:47 | [v] task(PLANNER) resume -> 返工第 1 次規劃完成（tasks/plan-architecture-review-r1.md）
+2026-07-28 19:47 | [v] task(開發子代理) resume -> 返工第 1 次補充完成：補充 Section 10~12，含 26 Domain 檔案審查表 + Dead Code 掃描 + Duplicated SQL & Validation 分析
+2026-07-28 19:47 | [v] → 重新啟動 Step 6 需求回歸檢查
+2026-07-28 19:47 | [v] task(需求回歸檢查) -> Step 6 返工後檢查：26/26 ALL PASS ✅
+2026-07-28 19:47 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性18 正確性22 可維護性22 測試20 | 總分82 不合格 ❌（Trace 欄位對比/Tests 覆蓋表/State-Version 檢查不足）
+2026-07-28 19:47 | [v] task(PLANNER) resume -> 返工第2次重新規劃
+2026-07-28 19:47 | [v] task(開發子代理) resume -> 返工第2次補充完成：新增 §13 Trace 對比表、§14 Tests 覆蓋表、§10.5~10.6 State/Version 檢查
+2026-07-28 19:47 | [v] task(需求回歸檢查) -> Step 6 返工第2次檢查：26/26 ALL PASS ✅
+2026-07-28 19:47 | [v] task(REVIEWER) -> REVIEWER 重新評分（返工第2次）啟動
+2026-07-28 19:47 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性22 正確性24 可維護性22 測試23 | 總分91 合格 ✅
+2026-07-28 19:47 | [v] task(doc-writer) -> Step 9 完成：總結報告產出 tasks/summary-report-architecture-review.md
+2026-07-28 19:47 | [v] Step 10 完成：需求歸檔至 tasks/requirements-history/requirements-architecture-review.md ✅ 需求歸零 ✅

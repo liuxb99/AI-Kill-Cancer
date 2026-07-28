@@ -1,64 +1,39 @@
-# Task Status
-
-## 任務 ID
-Phase-3E-Final-Hardening
+# Task Status — Architecture Review (Phase 1 ~ Phase 3E)
 
 ## 場景
-hardening（架構強化）
-
-## 場景描述
-修正 Migration 025 的 PostgreSQL constraint 問題、CI Gate 強化、降級環境改進、PostgreSQL 遷移穩健性
-
-## 對應 scene_rules.yaml
-- **id**: hardening
-- **需求來源**: tasks/requirements.md（Phase 3E Final Hardening）
+architecture-review（架構審查 + Code Review）
 
 ## 角色分派
 | 角色 | 職責 |
 |------|------|
-| planner | 制定強化計劃與優先級排序 |
-| backend-logic | 後端邏輯修正（Migration、CI、PostgreSQL 相容性） |
-| test-writer | 撰寫 PostgreSQL Integration Test、Schema Compare Test、CI Migration Test |
+| planner | 制定 Review 計劃（13 項 Review 項目） |
+| doc-writer | 記錄需求 + 最終報告撰寫 |
 | reviewer | 評分代理 |
 
-## 優先級
-- **P0-1**: PostgreSQL Trace Constraint（最高優先）
-- **P0-2**: Migration 025 Downgrade
-- **P0-3**: CI Migration Gate
-- **P0-4**: Downgrade Environment
-- **P1**: PostgreSQL Migration Robustness
-- **P1**: Tests
+## Review Scope 階段
+- Phase1
+- Phase2
+- Phase3A
+- Phase3B
+- Phase3C
+- Phase3D
+- Phase3E
 
----
+## 任務清單
+1. Domain Architecture Review
+2. Repository Layer Review
+3. Service Layer Review
+4. Engine Layer Review
+5. Migration Review
+6. API Layer Review
+7. Digital Thread Review
+8. Trace Review
+9. Graph Adapter Review
+10. Tests Coverage Review
+11. Dead Code Analysis
+12. Architecture Smell Analysis
+13. Refactor Candidate Analysis
+14. 最終報告彙總
 
-## 任務：Phase 3E Final Hardening
-
-### 場景
-hardening（架構強化）— 修正 Migration 025 的 PostgreSQL constraint 問題、CI Gate 強化、降級環境改進、PostgreSQL 遷移穩健性
-
-### 角色分派
-| 角色 | 職責 |
-|------|------|
-| planner | 制定強化計劃與優先級排序 |
-| backend-logic | 後端邏輯修正（Migration、CI、PostgreSQL 相容性） |
-| test-writer | 撰寫 PostgreSQL Integration Test、Schema Compare Test、CI Migration Test |
-| reviewer | 評分代理 |
-
-### P0 任務清單
-| ID | 描述 | 負責角色 |
-|----|------|---------|
-| P0-1 | PostgreSQL Trace Constraint：修正 Migration 025 的 constraint 問題，確保 PostgreSQL 相容性 | backend-logic |
-| P0-2 | Migration 025 Downgrade：實作 Migration 025 的降級邏輯 | backend-logic |
-| P0-3 | CI Migration Gate：強化 CI 流程中的 Migration 閘道檢查 | backend-logic |
-| P0-4 | Downgrade Environment：改進降級環境的支援與測試 | backend-logic |
-| P1 | PostgreSQL Migration Robustness：提升 PostgreSQL 遷移的穩健性與錯誤處理 | backend-logic |
-| P1 | Tests：撰寫 PostgreSQL Integration Test、Schema Compare Test、CI Migration Test | test-writer |
-
-### 完成定義
-- [ ] P0-1 PostgreSQL Trace Constraint 修正完成並通過測試
-- [ ] P0-2 Migration 025 降級邏輯實作完成
-- [ ] P0-3 CI Migration Gate 強化完成
-- [ ] P0-4 Downgrade Environment 改進完成
-- [ ] P1 PostgreSQL Migration Robustness 實作完成
-- [ ] P1 Tests 全部通過
-- [ ] Reviewer 評分通過
+## 狀態
+⏳ 等待 PLANNER 制定詳細計劃
