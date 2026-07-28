@@ -162,6 +162,7 @@ def pytest_configure(config):
 def pg_engine():
     """Session-scoped sync SQLAlchemy engine for PostgreSQL integration tests."""
     import re
+
     from sqlalchemy import create_engine
 
     db_url = os.environ.get("DATABASE_URL")

@@ -135,17 +135,10 @@ def upgrade() -> None:
                 END IF;
             END $$;
         """)
-        op.execute("""
-            DO $$ BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_catalog.pg_constraint
-                    WHERE conname = 'uq_trace_step'
-                      AND conrelid = 'domain_treatment_plan_traces'::regclass
-                ) THEN
-                    ALTER TABLE domain_treatment_plan_traces ADD CONSTRAINT uq_trace_step UNIQUE (trace_id, step_order);
-                END IF;
-            END $$;
-        """)
+        # 三重保护：先 DROP constraint（如果存在），再 DROP index（如果存在），最后创建 UNIQUE constraint
+        op.execute("ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT IF EXISTS uq_trace_step")
+        op.execute("DROP INDEX IF EXISTS uq_trace_step")
+        op.create_unique_constraint("uq_trace_step", "domain_treatment_plan_traces", ["trace_id", "step_order"])
 
 
 def downgrade() -> None:
