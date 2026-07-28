@@ -243,43 +243,11 @@ jobs:
           PYTHONPATH: .
         run: alembic -c migrations/alembic.ini upgrade head
 
-      - name: Migration verify (version check)
+      - name: Migration verify (version + constraint check)
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db_migration_gate
           PYTHONPATH: .
-        run: |
-          python -c "
-from alembic.config import Config
-from alembic.script import ScriptDirectory
-from alembic.runtime.migration import MigrationContext
-from sqlalchemy import create_engine
-import os, re
-
-db_url = os.environ['DATABASE_URL']
-sync_url = re.sub(r'\+asyncpg|\+aiosqlite', '', db_url)
-engine = create_engine(sync_url)
-with engine.connect() as conn:
-    context = MigrationContext.configure(conn)
-    current_rev = context.get_current_revision()
-    config = Config('migrations/alembic.ini')
-    script = ScriptDirectory.from_config(config)
-    head_rev = script.get_current_head()
-    assert current_rev == head_rev, f'Migration mismatch: head={head_rev}, current={current_rev}'
-    print(f'✅ Migration head reached: {current_rev}')
-    # 验证关键 constraint 存在
-    constraints = [
-        ('uq_trace_step', 'domain_treatment_plan_traces'),
-    ]
-    for conname, table in constraints:
-        row = conn.execute(
-            f\"\"\"SELECT 1 FROM pg_catalog.pg_constraint
-                WHERE conname = '{conname}'
-                  AND conrelid = '{table}'::regclass\"\"\"
-        ).fetchone()
-        assert row, f'❌ Constraint {conname} not found on {table}'
-        print(f'✅ Constraint {conname} exists on {table}')
-print('🎉 Migration verification PASS')
-"
+        run: python scripts/ci_migration_verify.py
 
       - name: Migration schema validation (PostgreSQL)
         env:
