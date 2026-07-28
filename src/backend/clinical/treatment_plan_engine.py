@@ -32,13 +32,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from src.backend.clinical.treatment_plan_rules import TreatmentPlanRuleSet
-from src.backend.clinical.treatment_plan_state_machine import (
-    PlanStatus,
-    TreatmentPlanStateMachine,
-)
 from src.backend.clinical.treatment_plan_trace import TreatmentPlanTraceBuilder
 
 logger = logging.getLogger(__name__)
@@ -337,8 +333,6 @@ class TreatmentPlanEngine:
         """Build treatment items from recommendation and decision data."""
         recommendation = input_data.recommendation or {}
         clinical_decision = input_data.clinical_decision or {}
-        phases = ctx.get("phases", [])
-
         items: list[dict] = []
 
         # Extract top drug from recommendation as the primary item
@@ -356,6 +350,7 @@ class TreatmentPlanEngine:
                 "priority": drug.get("rank", 99),
                 "rationale": f"Ranked #{drug.get('rank', '?')} by evidence score",
                 "source_recommendation": "recommendation_engine",
+                "phase_type": "primary_treatment",
             })
 
         # Add items from clinical decision alternatives
@@ -368,6 +363,7 @@ class TreatmentPlanEngine:
                 "priority": alt.get("rank", 99),
                 "rationale": alt.get("rationale", ""),
                 "source_recommendation": "clinical_decision",
+                "phase_type": "primary_treatment",
             })
 
         ctx["items"] = items
@@ -669,6 +665,7 @@ class TreatmentPlanEngine:
                     f"{drug.get('overall_score', drug.get('total_weight', 0.0)):.4f}"
                 ),
                 "source_recommendation": "recommendation_engine",
+                "phase_type": "primary_treatment",
             }
         if "drug_name" in recommendation:
             return {
@@ -678,6 +675,7 @@ class TreatmentPlanEngine:
                 "priority": 1,
                 "rationale": "Single drug recommendation.",
                 "source_recommendation": "recommendation_engine",
+                "phase_type": "primary_treatment",
             }
         return None
 

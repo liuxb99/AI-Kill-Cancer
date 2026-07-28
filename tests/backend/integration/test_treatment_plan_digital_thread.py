@@ -514,7 +514,7 @@ class TestTreatmentPlanDigitalThread:
         consensus,
     ):
         """從 Patient 正向追溯至 Treatment Plan 的 Phases 和 Items。"""
-        plan = await self._create_treatment_plan(
+        await self._create_treatment_plan(
             db_session, patient, recommendation, clinical_decision, consensus,
         )
 

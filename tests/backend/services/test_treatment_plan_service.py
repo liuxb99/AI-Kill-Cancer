@@ -24,19 +24,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.backend.clinical.treatment_plan_engine import EngineOutput
 from src.backend.clinical.treatment_plan_state_machine import (
     IllegalTransitionError,
-    PlanStatus,
 )
 from src.backend.domain.treatment_plan import TreatmentPlanModel
-from src.backend.schemas.clinical_graph_event import (
-    GraphAggregateType,
-    GraphEventType,
-)
 from src.backend.services.treatment_plan_service import (
     CreatePlanRequest,
     TreatmentPlanResponse,
     TreatmentPlanService,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers
@@ -135,6 +129,7 @@ def _make_engine_output(overrides: dict | None = None) -> EngineOutput:
                 "priority": 1,
                 "rationale": "Top-ranked drug",
                 "source_recommendation": "recommendation_engine",
+                "phase_type": "primary_treatment",
             },
         ],
         "monitoring": [
@@ -468,9 +463,9 @@ class TestRevision:
         svc = _make_service(mock_repos)
         req = sample_request()
 
-        # plan_repo.get_by_plan_id returns current version
+        # plan_repo.get_current_by_plan_id returns current version
         current_model = _make_plan_model(plan_id="plan-001", version=1, plan_status="approved")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = current_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = current_model
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -493,6 +488,26 @@ class TestRevision:
         # Verify commit called
         mock_repos["db"].commit.assert_awaited_once()
 
+    async def test_revise_plan_uses_current_version(self, mock_repos):
+        """revise_plan loads the current version via get_current_by_plan_id."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+
+        current_model = _make_plan_model(plan_id="plan-001", version=1, plan_status="approved")
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = current_model
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID)}),
+        ):
+            result = await svc.revise_plan("plan-001", req, user_id=str(USER_UUID))
+
+        # Verify it used get_current_by_plan_id to load the current version
+        mock_repos["plan_repo"].get_current_by_plan_id.assert_awaited_once_with("plan-001")
+        assert result.version == 2
+
     # ── H-03: Version Chain ─────────────────────────────────────────────────
 
     async def test_version_chain(self, mock_repos):
@@ -514,7 +529,7 @@ class TestRevision:
 
         # ── Step 2: Revise to v2 ────────────────────────────────────────
         v1_model = _make_plan_model(plan_id=plan_id, version=1, plan_status="approved")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = v1_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = v1_model
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -529,7 +544,7 @@ class TestRevision:
 
         # ── Step 3: Revise to v3 ────────────────────────────────────────
         v2_model = _make_plan_model(plan_id=plan_id, version=2, plan_status="approved")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = v2_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = v2_model
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -563,7 +578,7 @@ class TestRevision:
         svc = _make_service(mock_repos)
         req = sample_request()
         plan_model = _make_plan_model(plan_id="plan-rp-001", version=1, plan_status="approved")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = plan_model
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -581,7 +596,7 @@ class TestRevision:
         svc = _make_service(mock_repos)
         req = sample_request()
         plan_model = _make_plan_model(plan_id="plan-rp-002", version=1, plan_status="active")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = plan_model
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -599,7 +614,7 @@ class TestRevision:
         svc = _make_service(mock_repos)
         req = sample_request()
         plan_model = _make_plan_model(plan_id="plan-rp-003", version=1, plan_status="paused")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = plan_model
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -617,7 +632,7 @@ class TestRevision:
         svc = _make_service(mock_repos)
         req = sample_request()
         plan_model = _make_plan_model(plan_id="plan-rp-004", version=1, plan_status="draft")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = plan_model
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -635,7 +650,7 @@ class TestRevision:
         svc = _make_service(mock_repos)
         req = sample_request()
         plan_model = _make_plan_model(plan_id="plan-rp-005", version=1, plan_status="cancelled")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = plan_model
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -651,7 +666,7 @@ class TestRevision:
         svc = _make_service(mock_repos)
         req = sample_request()
         plan_model = _make_plan_model(plan_id="plan-rp-006", version=1, plan_status="completed")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = plan_model
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -667,7 +682,7 @@ class TestRevision:
         svc = _make_service(mock_repos)
         req = sample_request()
         plan_model = _make_plan_model(plan_id="plan-rp-007", version=1, plan_status="superseded")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = plan_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = plan_model
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -764,14 +779,48 @@ class TestPhaseMapping:
         assert item_models[0].phase_id != item_models[2].phase_id
         assert item_models[1].phase_id != item_models[2].phase_id
 
-    async def test_items_without_phase_type_fallback_to_first_phase(self, mock_repos):
-        """Items without phase_type or matching item_type should fall back to first phase."""
+    async def test_persist_item_phase_mapping_success(self, mock_repos):
+        """Items with valid phase_type should be correctly mapped to matching phases."""
         svc = _make_service(mock_repos)
         req = sample_request()
 
-        # Use default engine output which has items with no phase_type and
-        # item_type="medication" that doesn't match any phase_type
-        # This tests the fallback to first phase
+        custom_output = _make_engine_output({
+            "phases": [
+                {"phase_type": "preparation", "name": "Preparation", "order": 1, "duration_days": 14},
+                {"phase_type": "primary_treatment", "name": "Primary Treatment", "order": 2, "duration_days": 90},
+                {"phase_type": "maintenance", "name": "Maintenance", "order": 3, "duration_days": 180},
+            ],
+            "items": [
+                {
+                    "item_type": "medication",
+                    "name": "Drug A",
+                    "description": "Preparation drug",
+                    "priority": 1,
+                    "rationale": "Part of preparation",
+                    "source_recommendation": "engine",
+                    "phase_type": "preparation",
+                },
+                {
+                    "item_type": "medication",
+                    "name": "Drug B",
+                    "description": "Primary drug",
+                    "priority": 2,
+                    "rationale": "Part of primary treatment",
+                    "source_recommendation": "engine",
+                    "phase_type": "primary_treatment",
+                },
+                {
+                    "item_type": "radiation",
+                    "name": "Radiation C",
+                    "description": "Maintenance radiation",
+                    "priority": 3,
+                    "rationale": "Part of maintenance",
+                    "source_recommendation": "engine",
+                    "phase_type": "maintenance",
+                },
+            ],
+        })
+        mock_repos["engine"].generate.return_value = custom_output
 
         with (
             patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
@@ -781,26 +830,87 @@ class TestPhaseMapping:
         ):
             await svc.create_plan(req, user_id=str(USER_UUID))
 
-        # Inspect phase models
         phase_call = mock_repos["phase_repo"].create_many.await_args
         assert phase_call is not None
         phase_models = phase_call.args[0] if phase_call.args else phase_call.kwargs.get("models")
         assert phase_models is not None
-        assert len(phase_models) >= 1
-        first_phase_id = phase_models[0].id
+        assert len(phase_models) == 3
+        phase_map = {p.phase_type: p.id for p in phase_models}
 
-        # Inspect item models
         item_call = mock_repos["item_repo"].create_many.await_args
         assert item_call is not None
         item_models = item_call.args[0] if item_call.args else item_call.kwargs.get("models")
         assert item_models is not None
-        assert len(item_models) >= 1
+        assert len(item_models) == 3
 
-        # All items should fall back to first phase
-        for item in item_models:
-            assert item.phase_id == first_phase_id, (
-                f"Item {item.name} should have phase_id={first_phase_id}, got {item.phase_id}"
-            )
+        assert item_models[0].phase_id == phase_map["preparation"]
+        assert item_models[1].phase_id == phase_map["primary_treatment"]
+        assert item_models[2].phase_id == phase_map["maintenance"]
+
+    async def test_persist_item_phase_mapping_not_found_raises_value_error(self, mock_repos):
+        """Item with phase_type that doesn't match any defined phase should raise ValueError."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+
+        custom_output = _make_engine_output({
+            "phases": [
+                {"phase_type": "primary_treatment", "name": "Primary Treatment", "order": 1, "duration_days": 90},
+            ],
+            "items": [
+                {
+                    "item_type": "medication",
+                    "name": "Mystery Drug",
+                    "description": "Unknown phase",
+                    "priority": 1,
+                    "rationale": "Test",
+                    "source_recommendation": "engine",
+                    "phase_type": "nonexistent_phase",
+                },
+            ],
+        })
+        mock_repos["engine"].generate.return_value = custom_output
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID), "display_name": "Test"}),
+            pytest.raises(ValueError, match="does not match any defined phase"),
+        ):
+            await svc.create_plan(req, user_id=str(USER_UUID))
+
+    async def test_no_fallback_to_first_phase(self, mock_repos):
+        """Items missing phase_type should raise ValueError, not fall back to first phase."""
+        svc = _make_service(mock_repos)
+        req = sample_request()
+
+        # Item without phase_type — should raise, not fallback
+        custom_output = _make_engine_output({
+            "phases": [
+                {"phase_type": "primary_treatment", "name": "Primary Treatment", "order": 1, "duration_days": 90},
+            ],
+            "items": [
+                {
+                    "item_type": "medication",
+                    "name": "No Phase Drug",
+                    "description": "Missing phase_type",
+                    "priority": 1,
+                    "rationale": "Test",
+                    "source_recommendation": "engine",
+                    # phase_type intentionally omitted
+                },
+            ],
+        })
+        mock_repos["engine"].generate.return_value = custom_output
+
+        with (
+            patch.object(svc, "_load_recommendation", return_value=_make_recommendation_model()),
+            patch.object(svc, "_load_clinical_decision", return_value=_make_clinical_decision_model()),
+            patch.object(svc, "_load_consensus", return_value=_make_consensus_model()),
+            patch.object(svc, "_load_patient_data", return_value={"id": str(PATIENT_UUID), "display_name": "Test"}),
+            pytest.raises(ValueError, match="missing required 'phase_type'"),
+        ):
+            await svc.create_plan(req, user_id=str(USER_UUID))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -815,9 +925,9 @@ class TestStatusTransitions:
     def _setup(self, mock_repos):
         self._svc = _make_service(mock_repos)
         self._repos = mock_repos
-        # plan_repo.get_by_plan_id returns a draft plan
+        # plan_repo.get_current_by_plan_id returns a draft plan
         self._plan_model = _make_plan_model(plan_id="plan-001", version=1, plan_status="draft")
-        mock_repos["plan_repo"].get_by_plan_id.return_value = self._plan_model
+        mock_repos["plan_repo"].get_current_by_plan_id.return_value = self._plan_model
 
     async def _call_transition(self, method_name: str, plan_id: str = "plan-001"):
         method = getattr(self._svc, method_name)
@@ -864,6 +974,14 @@ class TestStatusTransitions:
         with pytest.raises(IllegalTransitionError):
             await self._call_transition("submit_plan")
 
+    async def test_status_transition_uses_current_version(self):
+        """Status transitions load the current version via get_current_by_plan_id."""
+        self._plan_model.plan_status = "active"
+        result = await self._call_transition("complete_plan")
+        assert result.plan_status == "completed"
+        # Verify it loaded the current version
+        self._repos["plan_repo"].get_current_by_plan_id.assert_awaited_with("plan-001")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Query Tests
@@ -881,16 +999,29 @@ class TestQueries:
     async def test_get_plan_found(self):
         """get_plan returns a TreatmentPlanResponse when plan exists."""
         plan_model = _make_plan_model(plan_id="plan-001")
-        self._repos["plan_repo"].get_by_plan_id.return_value = plan_model
+        self._repos["plan_repo"].get_current_by_plan_id.return_value = plan_model
 
         result = await self._svc.get_plan("plan-001")
         assert result is not None
         assert result.plan_id == "plan-001"
         assert result.version == 1
 
+    async def test_get_plan_returns_current_version(self):
+        """get_plan always returns the current (latest) version."""
+        # Mock returns a version-2 model (current)
+        plan_model = _make_plan_model(plan_id="plan-001", version=2, is_current=True)
+        self._repos["plan_repo"].get_current_by_plan_id.return_value = plan_model
+
+        result = await self._svc.get_plan("plan-001")
+        assert result is not None
+        assert result.version == 2
+        assert result.is_current is True
+        # Verify the mock was called correctly
+        self._repos["plan_repo"].get_current_by_plan_id.assert_awaited_once_with("plan-001")
+
     async def test_get_plan_not_found(self):
         """get_plan returns None when plan does not exist."""
-        self._repos["plan_repo"].get_by_plan_id.return_value = None
+        self._repos["plan_repo"].get_current_by_plan_id.return_value = None
         result = await self._svc.get_plan("nonexistent")
         assert result is None
 
@@ -914,10 +1045,25 @@ class TestQueries:
         assert results[0].version == 2
         assert results[1].version == 1
 
+    async def test_list_versions_returns_all(self):
+        """get_versions returns all versions for a plan_id."""
+        v1 = _make_plan_model(plan_id="plan-chain", version=1)
+        v2 = _make_plan_model(plan_id="plan-chain", version=2)
+        v3 = _make_plan_model(plan_id="plan-chain", version=3)
+        self._repos["plan_repo"].list_versions.return_value = [v3, v2, v1]
+
+        results = await self._svc.get_versions("plan-chain")
+        assert len(results) == 3
+        assert results[0].version == 3
+        assert results[1].version == 2
+        assert results[2].version == 1
+        for r in results:
+            assert r.plan_id == "plan-chain"
+
     async def test_get_trace(self):
         """get_trace returns trace steps."""
         plan_model = _make_plan_model(plan_id="plan-001")
-        self._repos["plan_repo"].get_by_plan_id.return_value = plan_model
+        self._repos["plan_repo"].get_current_by_plan_id.return_value = plan_model
 
         mock_step = MagicMock()
         mock_step.trace_id = "trace-001"
@@ -934,6 +1080,24 @@ class TestQueries:
         traces = await self._svc.get_trace("plan-001")
         assert len(traces) == 1
         assert traces[0]["step_type"] == "load_context"
+
+    async def test_get_plan_version_found(self):
+        """get_plan_version returns a specific version."""
+        plan_model = _make_plan_model(plan_id="plan-001", version=3)
+        self._repos["plan_repo"].get_plan_version.return_value = plan_model
+
+        result = await self._svc.get_plan_version("plan-001", 3)
+        assert result is not None
+        assert result.plan_id == "plan-001"
+        assert result.version == 3
+        self._repos["plan_repo"].get_plan_version.assert_awaited_once_with("plan-001", 3)
+
+    async def test_get_plan_version_not_found(self):
+        """get_plan_version returns None when version does not exist."""
+        self._repos["plan_repo"].get_plan_version.return_value = None
+
+        result = await self._svc.get_plan_version("plan-001", 99)
+        assert result is None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

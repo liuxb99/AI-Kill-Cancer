@@ -38,7 +38,7 @@ def upgrade() -> None:
     op.create_table(
         "domain_treatment_plans",
         sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("plan_id", sa.String(64), nullable=False, index=True),
+        sa.Column("plan_id", sa.String(64), unique=True, nullable=False, index=True),
         sa.Column("version", sa.Integer, nullable=False, server_default=sa.text("1")),
         sa.Column("patient_id", sa.String(36), sa.ForeignKey("domain_patients.id", ondelete="CASCADE"), nullable=False, index=True),
         sa.Column("recommendation_id", sa.String(36), sa.ForeignKey("domain_recommendations.id", ondelete="SET NULL"), nullable=True, index=True),
@@ -65,7 +65,7 @@ def upgrade() -> None:
         sa.Column("cancelled_at", sa.DateTime, nullable=True),
         sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
-        sa.UniqueConstraint("plan_id", "version", name="uq_plan_id_version"),
+        sa.UniqueConstraint("plan_id", "version", name="uq_treatment_plan_version"),
     )
 
     # ─── domain_treatment_phases ────────────────────────────────────────
@@ -156,7 +156,7 @@ def upgrade() -> None:
     op.create_table(
         "domain_treatment_plan_traces",
         sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("trace_id", sa.String(64), nullable=False, index=True),
+        sa.Column("trace_id", sa.String(64), unique=True, nullable=False, index=True),
         sa.Column("plan_id", sa.String(36), sa.ForeignKey("domain_treatment_plans.id", ondelete="CASCADE"), nullable=False, index=True),
         sa.Column("step_order", sa.Integer, nullable=False),
         sa.Column("step_type", sa.String(64), nullable=False),
@@ -165,7 +165,6 @@ def upgrade() -> None:
         sa.Column("rule_ids", sa.JSON, nullable=True),
         sa.Column("evidence_ids", sa.JSON, nullable=True),
         sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
-        sa.UniqueConstraint("trace_id", "step_order", name="uq_trace_step"),
     )
 
 

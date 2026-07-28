@@ -128,16 +128,21 @@ async def create_treatment_plan(
 @router.get("/{plan_id}", response_model=TreatmentPlanResponse)
 async def get_treatment_plan(
     plan_id: str,
+    version: int | None = Query(None, description="Specific version to retrieve"),
     user: UserModel = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ) -> TreatmentPlanResponse:
     """取得單一 Treatment Plan（A-02）。
 
+    若提供 ``version`` 參數則返回指定版本，否則返回 current version。
     任何已認證的使用者都可讀取。
     """
     service = _get_service(db)
     try:
-        result = await service.get_plan(plan_id=plan_id)
+        if version is not None:
+            result = await service.get_plan_version(plan_id=plan_id, version=version)
+        else:
+            result = await service.get_plan(plan_id=plan_id)
     except Exception as exc:
         _handle_service_error(exc, "Error in get_treatment_plan")
 

@@ -83,26 +83,29 @@ def downgrade() -> None:
         # SQLite 不支援 DROP COLUMN，需重建表
         conn.execute(sa.text("PRAGMA foreign_keys=OFF"))
 
+        # 0. 清理残留的备份表（确保幂等性）
+        conn.execute(sa.text("DROP TABLE IF EXISTS _domain_clinical_graph_outbox_backup"))
+
         # 1. 將原始表改名為暫存表
         op.rename_table(
             "domain_clinical_graph_outbox",
             "_domain_clinical_graph_outbox_backup",
         )
 
-        # 2. 建立不含新欄位的新表
+        # 2. 建立不含新欄位的新表（不含任何索引）
         op.create_table(
             "domain_clinical_graph_outbox",
             sa.Column("id", sa.String(36), primary_key=True),
-            sa.Column("event_id", sa.String(64), unique=True, nullable=False, index=True),
-            sa.Column("aggregate_type", sa.String(64), nullable=False, index=True),
-            sa.Column("aggregate_id", sa.String(64), nullable=False, index=True),
+            sa.Column("event_id", sa.String(64), unique=True, nullable=False),
+            sa.Column("aggregate_type", sa.String(64), nullable=False),
+            sa.Column("aggregate_id", sa.String(64), nullable=False),
             sa.Column("event_type", sa.String(64), nullable=False),
             sa.Column("schema_version", sa.Integer, nullable=False, server_default=sa.text("1")),
             sa.Column("payload", sa.JSON, nullable=False),
-            sa.Column("status", sa.String(32), nullable=False, server_default="pending", index=True),
+            sa.Column("status", sa.String(32), nullable=False, server_default="pending"),
             sa.Column("attempt_count", sa.Integer, nullable=False, server_default=sa.text("0")),
             sa.Column("last_error", sa.Text, nullable=True),
-            sa.Column("actor_id", sa.String(64), nullable=True, index=True),
+            sa.Column("actor_id", sa.String(64), nullable=True),
             sa.Column("available_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
             sa.Column("processed_at", sa.DateTime, nullable=True),
             sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
@@ -123,10 +126,16 @@ def downgrade() -> None:
             FROM _domain_clinical_graph_outbox_backup
         """))
 
-        # 4. 刪除備份表及其索引
+        # 4. 刪除備份表（連同其所有索引一起刪除）
         op.drop_table("_domain_clinical_graph_outbox_backup")
 
-        # 5. 重建複合索引（原本的索引在 create_table 時已自動建立部分索引）
+        # 5. 在新表上建立所有索引（備份表已刪除，不會有索引名衝突）
+        op.create_index("ix_domain_clinical_graph_outbox_event_id", "domain_clinical_graph_outbox", ["event_id"], unique=True)
+        op.create_index("ix_domain_clinical_graph_outbox_aggregate_type", "domain_clinical_graph_outbox", ["aggregate_type"])
+        op.create_index("ix_domain_clinical_graph_outbox_aggregate_id", "domain_clinical_graph_outbox", ["aggregate_id"])
+        op.create_index("ix_domain_clinical_graph_outbox_status", "domain_clinical_graph_outbox", ["status"])
+        op.create_index("ix_domain_clinical_graph_outbox_actor_id", "domain_clinical_graph_outbox", ["actor_id"])
+        # 複合索引
         op.create_index("ix_outbox_aggregate", "domain_clinical_graph_outbox", ["aggregate_type", "aggregate_id"])
         op.create_index("ix_outbox_status_available", "domain_clinical_graph_outbox", ["status", "available_at"])
 

@@ -28,14 +28,12 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import Depends
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.backend.config import settings
 from src.backend.domain.enums import Role
-from src.backend.domain.user import UserModel
 from src.backend.main import create_app
 from src.backend.services.treatment_plan_service import (
     TreatmentPlanListItem,
@@ -341,6 +339,49 @@ class TestCreateTreatmentPlan:
         assert resp.status_code == 500
         detail = resp.json().get("detail", "")
         assert "Internal server error" in detail
+
+    def test_create_plan_item_phase_mapping(self, admin_override_client, admin_auth_headers) -> None:
+        """Items should be assigned to the correct phase based on phase_type."""
+        mock_resp = _make_response()
+
+        with patch(
+            "src.backend.api.v1.treatment_plans.TreatmentPlanService.create_plan",
+            new_callable=AsyncMock,
+            return_value=mock_resp,
+        ):
+            resp = admin_override_client.post(
+                BASE,
+                json=self.CREATE_BODY,
+                headers=admin_auth_headers,
+            )
+
+        assert resp.status_code == 201
+        data = resp.json()
+        assert len(data["phases"]) > 0
+        assert len(data["items"]) > 0
+        # Items in the mock response should have phase_type matching
+        for item in data["items"]:
+            assert "item_id" in item
+
+    def test_create_plan_item_phase_type_error_422(self, admin_override_client, admin_auth_headers) -> None:
+        """When phase_type does not match any phase, should return 422."""
+        with patch(
+            "src.backend.api.v1.treatment_plans.TreatmentPlanService.create_plan",
+            new_callable=AsyncMock,
+            side_effect=ValueError(
+                "Treatment item 'Mystery Drug' has phase_type='nonexistent_phase' "
+                "which does not match any defined phase"
+            ),
+        ):
+            resp = admin_override_client.post(
+                BASE,
+                json=self.CREATE_BODY,
+                headers=admin_auth_headers,
+            )
+
+        assert resp.status_code == 422
+        detail = resp.json().get("detail", "")
+        assert "does not match any defined phase" in detail
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

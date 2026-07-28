@@ -136,29 +136,72 @@ class TestTreatmentPlanRepository:
         result = await repo.get_by_id(str(uuid.uuid4()))
         assert result is None
 
-    async def test_get_by_plan_id_found(self, db_session, patient) -> None:
-        """get_by_plan_id returns the matching model by plan_id."""
+    async def test_get_current_by_plan_id_returns_current(self, db_session, patient) -> None:
+        """get_current_by_plan_id returns the is_current=true version when multiple exist."""
         from src.backend.repositories.treatment_plan_repo import (
             TreatmentPlanRepository,
         )
 
-        model = await self._create_plan(db_session, patient, plan_id="tpr-get-by-pid")
+        # Create version 1 (is_current=False, superseded)
+        await self._create_plan(
+            db_session, patient,
+            plan_id="tpr-current-by-pid",
+            version=1,
+            is_current=False,
+        )
+        # Create version 2 (is_current=True, current)
+        await self._create_plan(
+            db_session, patient,
+            plan_id="tpr-current-by-pid",
+            version=2,
+            is_current=True,
+        )
         await db_session.commit()
 
         repo = TreatmentPlanRepository(db_session)
-        fetched = await repo.get_by_plan_id("tpr-get-by-pid")
+        fetched = await repo.get_current_by_plan_id("tpr-current-by-pid")
         assert fetched is not None
-        assert fetched.plan_id == "tpr-get-by-pid"
-        assert str(fetched.id) == str(model.id)
+        assert fetched.plan_id == "tpr-current-by-pid"
+        assert fetched.version == 2
+        assert fetched.is_current is True
 
-    async def test_get_by_plan_id_not_found(self, db_session) -> None:
-        """get_by_plan_id returns None for non-existent plan_id."""
+    async def test_get_current_by_plan_id_returns_none(self, db_session) -> None:
+        """get_current_by_plan_id returns None for non-existent plan_id."""
         from src.backend.repositories.treatment_plan_repo import (
             TreatmentPlanRepository,
         )
 
         repo = TreatmentPlanRepository(db_session)
-        result = await repo.get_by_plan_id("non-existent-plan-id")
+        result = await repo.get_current_by_plan_id("non-existent-plan-id")
+        assert result is None
+
+    async def test_get_plan_version(self, db_session, patient) -> None:
+        """get_plan_version returns a specific version by plan_id + version."""
+        from src.backend.repositories.treatment_plan_repo import (
+            TreatmentPlanRepository,
+        )
+
+        await self._create_plan(
+            db_session, patient,
+            plan_id="tpr-ver",
+            version=42,
+        )
+        await db_session.commit()
+
+        repo = TreatmentPlanRepository(db_session)
+        fetched = await repo.get_plan_version("tpr-ver", 42)
+        assert fetched is not None
+        assert fetched.plan_id == "tpr-ver"
+        assert fetched.version == 42
+
+    async def test_get_plan_version_not_found(self, db_session) -> None:
+        """get_plan_version returns None for non-existent plan_id/version combo."""
+        from src.backend.repositories.treatment_plan_repo import (
+            TreatmentPlanRepository,
+        )
+
+        repo = TreatmentPlanRepository(db_session)
+        result = await repo.get_plan_version("non-existent", 99)
         assert result is None
 
     async def test_get_current_by_patient_id_found(self, db_session, patient) -> None:
@@ -175,7 +218,7 @@ class TestTreatmentPlanRepository:
             is_current=False,
         )
         # Create the current plan
-        model = await self._create_plan(
+        await self._create_plan(
             db_session, patient,
             plan_id="tpr-current",
             version=2,
@@ -277,7 +320,7 @@ class TestTreatmentPlanRepository:
             TreatmentPlanRepository,
         )
 
-        model = await self._create_plan(
+        await self._create_plan(
             db_session, patient,
             plan_id="tpr-versions",
             version=2,
@@ -354,19 +397,21 @@ class TestTreatmentPlanRepository:
         )
         await db_session.commit()
 
+        new_version_id = uuid.uuid4()
         repo = TreatmentPlanRepository(db_session)
         await repo.mark_superseded(
             plan_id="tpr-supersede",
-            superseded_by_plan_id="tpr-superseder",
+            superseded_by_version_id=new_version_id,
             revision_reason="New evidence available",
         )
         await db_session.commit()
 
         # Verify
-        fetched = await repo.get_by_plan_id("tpr-supersede")
+        fetched = await repo.get_plan_version("tpr-supersede", 1)
         assert fetched is not None
         assert fetched.is_current is False
-        assert fetched.supersedes_plan_id == "tpr-superseder"
+        assert fetched.supersedes_version_id == new_version_id
+        assert fetched.supersedes_plan_id == "tpr-supersede"  # 向後相容
         assert fetched.revision_reason == "New evidence available"
 
     async def test_mark_superseded_no_reason(self, db_session, patient) -> None:
@@ -382,17 +427,18 @@ class TestTreatmentPlanRepository:
         )
         await db_session.commit()
 
+        new_version_id = uuid.uuid4()
         repo = TreatmentPlanRepository(db_session)
         await repo.mark_superseded(
             plan_id="tpr-sup-no-reason",
-            superseded_by_plan_id="tpr-new",
+            superseded_by_version_id=new_version_id,
         )
         await db_session.commit()
 
-        fetched = await repo.get_by_plan_id("tpr-sup-no-reason")
+        fetched = await repo.get_plan_version("tpr-sup-no-reason", 1)
         assert fetched is not None
         assert fetched.is_current is False
-        assert fetched.supersedes_plan_id == "tpr-new"
+        assert fetched.supersedes_version_id == new_version_id
         assert fetched.revision_reason is None  # empty string → None
 
     async def test_mark_superseded_only_current(self, db_session, patient) -> None:
@@ -409,20 +455,21 @@ class TestTreatmentPlanRepository:
         )
         await db_session.commit()
 
+        new_version_id = uuid.uuid4()
         repo = TreatmentPlanRepository(db_session)
         await repo.mark_superseded(
             plan_id="tpr-sup-only",
-            superseded_by_plan_id="tpr-new",
+            superseded_by_version_id=new_version_id,
         )
         await db_session.commit()
 
         # Since plan_id is unique, v1 had is_current=False and
         # mark_superseded updates only rows where is_current=True,
         # so no row matched — v1 should remain unchanged.
-        fetched = await repo.get_by_plan_id("tpr-sup-only")
+        fetched = await repo.get_plan_version("tpr-sup-only", 1)
         assert fetched is not None
         assert fetched.is_current is False  # was already False
-        assert fetched.supersedes_plan_id is None  # not updated
+        assert fetched.supersedes_version_id is None  # not updated
 
     async def test_transaction_rollback(self, db_session, patient) -> None:
         """If rolled back, no data should persist."""
@@ -440,7 +487,7 @@ class TestTreatmentPlanRepository:
 
         await db_session.rollback()
 
-        fetched = await repo.get_by_plan_id("tpr-rollback")
+        fetched = await repo.get_current_by_plan_id("tpr-rollback")
         assert fetched is None
 
 
@@ -772,7 +819,7 @@ class TestTreatmentItemRepository:
             status="planned",
             rationale="Recommended for advanced PTC",
         )
-        result = await repo.create(item)
+        await repo.create(item)
         await db_session.commit()
 
         # ── 直接查 DB（避開 ORM session cache）逐欄驗證 ────────────────

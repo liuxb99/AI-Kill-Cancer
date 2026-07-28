@@ -66,6 +66,19 @@ class TreatmentPlanModel(DBBase):
     review_date = Column(DateTime, nullable=True)
     previous_plan_id = Column(String(64), nullable=True, index=True)
     supersedes_plan_id = Column(String(64), nullable=True, index=True)
+    # P0-3: Version Link — FK self reference to TreatmentPlanModel.id
+    previous_version_id = Column(
+        CompatUUID,
+        ForeignKey("domain_treatment_plans.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    supersedes_version_id = Column(
+        CompatUUID,
+        ForeignKey("domain_treatment_plans.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     is_current = Column(Boolean, default=True, nullable=False)
     revision_reason = Column(Text, nullable=True)
     created_by = Column(CompatUUID, ForeignKey("domain_users.id", ondelete="SET NULL"), nullable=True)
@@ -106,6 +119,20 @@ class TreatmentPlanModel(DBBase):
         "TreatmentPlanTraceModel",
         back_populates="plan",
         cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    # P0-3: Self-referencing version link relationships
+    previous_version = relationship(
+        "TreatmentPlanModel",
+        remote_side="TreatmentPlanModel.id",
+        foreign_keys=[previous_version_id],
+        lazy="selectin",
+    )
+    supersedes_version = relationship(
+        "TreatmentPlanModel",
+        remote_side="TreatmentPlanModel.id",
+        foreign_keys=[supersedes_version_id],
         lazy="selectin",
     )
 

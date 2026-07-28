@@ -130,12 +130,12 @@ from src.backend.domain.specimen import (
     SpecimenUpdate,
 )
 from src.backend.domain.treatment_plan import (
-    TreatmentPlanModel,
-    TreatmentPhaseModel,
     TreatmentItemModel,
     TreatmentMonitoringModel,
-    TreatmentSafetyRuleModel,
+    TreatmentPhaseModel,
+    TreatmentPlanModel,
     TreatmentPlanTraceModel,
+    TreatmentSafetyRuleModel,
 )
 from src.backend.domain.tumor_board import (
     TumorBoardConsensusModel,

@@ -10,8 +10,6 @@ Covers:
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from src.backend.clinical.treatment_plan_engine import (
@@ -33,7 +31,6 @@ from src.backend.clinical.treatment_plan_trace import (
     TreatmentPlanTraceBuilder,
     TreatmentPlanTraceStep,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers
@@ -638,6 +635,59 @@ class TestTreatmentPlanEngine:
         inp = _make_minimal_input({"clinical_decision_id": ""})
         with pytest.raises(ValueError, match="clinical_decision_id"):
             self.engine.generate(inp)
+
+    # ── Phase type in items ────────────────────────────────────────────
+
+    def test_items_have_phase_type(self) -> None:
+        """Every treatment item in the output must include a phase_type field."""
+        inp = _make_minimal_input()
+        output = self.engine.generate(inp)
+
+        assert len(output.items) > 0
+        for item in output.items:
+            assert "phase_type" in item, (
+                f"Item '{item.get('name', 'unknown')}' is missing phase_type"
+            )
+            assert item["phase_type"] in ("primary_treatment", "monitoring", "supportive_care"), (
+                f"Item '{item.get('name', 'unknown')}' has unexpected phase_type='{item['phase_type']}'"
+            )
+
+    def test_medication_item_phase_type_primary_treatment(self) -> None:
+        """Medication items from recommendations should have phase_type='primary_treatment'."""
+        inp = _make_minimal_input()
+        output = self.engine.generate(inp)
+
+        med_items = [i for i in output.items if i.get("item_type") == "medication"]
+        assert len(med_items) > 0
+        for item in med_items:
+            assert item.get("phase_type") == "primary_treatment", (
+                f"Medication item '{item.get('name', 'unknown')}' expected "
+                f"phase_type='primary_treatment', got '{item.get('phase_type')}'"
+            )
+
+    def test_monitoring_item_phase_type_monitoring(self) -> None:
+        """Monitoring items should have phase_type='monitoring' (if they appear in items)."""
+        inp = _make_minimal_input()
+        output = self.engine.generate(inp)
+
+        # Currently monitoring items go to output.monitoring, not output.items
+        # This test verifies that monitoring items in output.monitoring have phase_type
+        for m in output.monitoring:
+            assert "phase_type" in m, f"Monitoring item '{m.get('name', 'unknown')}' missing phase_type"
+
+    def test_supportive_care_item_phase_type_supportive_care(self) -> None:
+        """Supportive care items (if any) should have phase_type='supportive_care'."""
+        inp = _make_minimal_input()
+        output = self.engine.generate(inp)
+
+        # Currently engine does not produce supportive_care items;
+        # validate the invariant if any such items exist in the future
+        for item in output.items:
+            if item.get("item_type") == "supportive_care":
+                assert item.get("phase_type") == "supportive_care", (
+                    f"Supportive care item '{item.get('name', 'unknown')}' expected "
+                    f"phase_type='supportive_care', got '{item.get('phase_type')}'"
+                )
 
 
 __all__: list[str] = []

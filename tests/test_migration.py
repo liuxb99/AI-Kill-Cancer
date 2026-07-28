@@ -1328,3 +1328,243 @@ class TestMigration023:
         assert _table_exists(db_path, "domain_treatment_plan_traces") is False
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 3E — Batch: Migration 025 → Composite Unique Constraints
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def alembic_config_025(tmp_path):
+    """Isolated Alembic config for 023→025 migration tests."""
+    db_path = tmp_path / "test_migration_025.db"
+    cfg = Config()
+    cfg.set_main_option("script_location", "migrations")
+    cfg.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{db_path}")
+    return cfg, db_path
+
+
+class TestMigration025Upgrade:
+    """Test that upgrading to 025 correctly:
+    - Creates composite unique constraints
+    - Preserves existing data
+    - Allows multiple plan versions with same plan_id
+    - Allows multiple trace steps with same trace_id
+    - Downgrade restores single-column unique constraints
+    """
+
+    # ── helpers ──────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _get_unique_constraints_from_sql(db_path, table_name):
+        """Return dict mapping constraint name → columns by parsing CREATE TABLE."""
+        import sqlite3, re
+
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if row is None or row[0] is None:
+            return {}
+
+        constraints = {}
+        for match in re.finditer(
+            r"CONSTRAINT\s+(\w+)\s+UNIQUE\s*\(([^)]+)\)",
+            row[0], re.IGNORECASE,
+        ):
+            name = match.group(1)
+            columns = [c.strip().strip('"') for c in match.group(2).split(",")]
+            constraints[name] = columns
+        return constraints
+
+    # ── tests ────────────────────────────────────────────────────────────────
+
+    def test_upgrade_025_creates_composite_unique(self, alembic_config_025):
+        """Verify 025 upgrade creates composite unique constraints."""
+        cfg, db_path = alembic_config_025
+        # Upgrade 023 → 024 → 025
+        command.upgrade(cfg, "023")
+        command.upgrade(cfg, "024")
+        command.upgrade(cfg, "025")
+
+        # Verify composite unique constraints exist
+        plan_constraints = self._get_unique_constraints_from_sql(
+            db_path, "domain_treatment_plans",
+        )
+        assert "uq_plan_id_version" in plan_constraints, (
+            f"Expected 'uq_plan_id_version' in {list(plan_constraints)}"
+        )
+
+        trace_constraints = self._get_unique_constraints_from_sql(
+            db_path, "domain_treatment_plan_traces",
+        )
+        assert "uq_trace_step" in trace_constraints, (
+            f"Expected 'uq_trace_step' in {list(trace_constraints)}"
+        )
+
+    def test_upgrade_025_preserves_data(self, alembic_config_025):
+        """Verify data is preserved through 023 → 024 → 025 upgrade."""
+        cfg, db_path = alembic_config_025
+        command.upgrade(cfg, "023")
+
+        # Insert a plan at 023 level
+        import sqlite3, uuid
+
+        conn = sqlite3.connect(str(db_path))
+        plan_id_val = uuid.uuid4().hex
+        conn.execute(
+            "INSERT INTO domain_treatment_plans (id, plan_id, version, patient_id, plan_status) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (uuid.uuid4().hex, plan_id_val, 1, uuid.uuid4().hex, "draft"),
+        )
+        conn.commit()
+        count_before = conn.execute(
+            "SELECT COUNT(*) FROM domain_treatment_plans"
+        ).fetchone()[0]
+        conn.close()
+
+        # Upgrade to 025
+        command.upgrade(cfg, "024")
+        command.upgrade(cfg, "025")
+
+        # Verify count after upgrade
+        conn = sqlite3.connect(str(db_path))
+        count_after = conn.execute(
+            "SELECT COUNT(*) FROM domain_treatment_plans"
+        ).fetchone()[0]
+        conn.close()
+
+        assert count_after == count_before, (
+            f"Data lost after upgrade: {count_before} → {count_after}"
+        )
+
+    def test_upgrade_025_plan_v1_v2_success(self, alembic_config_025):
+        """P0-1 #6: Old DB → upgrade 025 → plan v1 + v2 can coexist."""
+        cfg, db_path = alembic_config_025
+        command.upgrade(cfg, "023")
+        command.upgrade(cfg, "024")
+        command.upgrade(cfg, "025")
+
+        import sqlite3, uuid
+
+        conn = sqlite3.connect(str(db_path))
+        plan_id_val = uuid.uuid4().hex
+        patient_id_val = uuid.uuid4().hex
+
+        # Version 1
+        conn.execute(
+            "INSERT INTO domain_treatment_plans (id, plan_id, version, patient_id, plan_status, is_current) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (uuid.uuid4().hex, plan_id_val, 1, patient_id_val, "draft", 0),
+        )
+        # Version 2 (same plan_id, different version)
+        conn.execute(
+            "INSERT INTO domain_treatment_plans (id, plan_id, version, patient_id, plan_status, is_current) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (uuid.uuid4().hex, plan_id_val, 2, patient_id_val, "active", 1),
+        )
+        conn.commit()
+
+        rows = conn.execute(
+            "SELECT version, plan_status FROM domain_treatment_plans "
+            "WHERE plan_id = ? ORDER BY version",
+            (plan_id_val,),
+        ).fetchall()
+        conn.close()
+
+        versions = [r[0] for r in rows]
+        assert versions == [1, 2], f"Expected versions [1, 2], got {versions}"
+
+    def test_upgrade_025_trace_step1_step2_step3_success(self, alembic_config_025):
+        """P0-1 #7: Old DB → upgrade 025 → trace step1, step2, step3 can coexist."""
+        cfg, db_path = alembic_config_025
+        command.upgrade(cfg, "023")
+        command.upgrade(cfg, "024")
+        command.upgrade(cfg, "025")
+
+        import sqlite3, uuid
+
+        conn = sqlite3.connect(str(db_path))
+        plan_id_val = uuid.uuid4().hex
+        patient_id_val = uuid.uuid4().hex
+        conn.execute(
+            "INSERT INTO domain_treatment_plans (id, plan_id, version, patient_id, plan_status) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (plan_id_val, uuid.uuid4().hex, 1, patient_id_val, "draft"),
+        )
+
+        # Insert 3 trace steps with same trace_id, different step_order
+        trace_id_val = uuid.uuid4().hex
+        for step in range(1, 4):
+            conn.execute(
+                "INSERT INTO domain_treatment_plan_traces "
+                "(id, trace_id, plan_id, step_order, step_type) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (uuid.uuid4().hex, trace_id_val, plan_id_val, step, "test_step"),
+            )
+        conn.commit()
+
+        rows = conn.execute(
+            "SELECT step_order FROM domain_treatment_plan_traces "
+            "WHERE trace_id = ? ORDER BY step_order",
+            (trace_id_val,),
+        ).fetchall()
+        conn.close()
+
+        steps = [r[0] for r in rows]
+        assert steps == [1, 2, 3], f"Expected steps [1, 2, 3], got {steps}"
+
+    def test_downgrade_025_restores_single_unique(self, alembic_config_025):
+        """Verify downgrade 025 restores single-column unique constraints."""
+        cfg, db_path = alembic_config_025
+        command.upgrade(cfg, "023")
+        command.upgrade(cfg, "024")
+        command.upgrade(cfg, "025")
+
+        # Downgrade back to 024
+        command.downgrade(cfg, "024")
+
+        import sqlite3, uuid
+
+        conn = sqlite3.connect(str(db_path))
+
+        # Attempt to insert duplicate plan_id — should fail with IntegrityError
+        plan_id_val = uuid.uuid4().hex
+        conn.execute(
+            "INSERT INTO domain_treatment_plans (id, plan_id, version, patient_id, plan_status) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (uuid.uuid4().hex, plan_id_val, 1, uuid.uuid4().hex, "draft"),
+        )
+        conn.commit()
+
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                "INSERT INTO domain_treatment_plans (id, plan_id, version, patient_id, plan_status) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (uuid.uuid4().hex, plan_id_val, 2, uuid.uuid4().hex, "active"),
+            )
+            conn.commit()
+
+        # Attempt to insert duplicate trace_id — should fail with IntegrityError
+        trace_id_val = uuid.uuid4().hex
+        conn.execute(
+            "INSERT INTO domain_treatment_plan_traces (id, trace_id, plan_id, step_order, step_type) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (uuid.uuid4().hex, trace_id_val, plan_id_val, 1, "test"),
+        )
+        conn.commit()
+
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                "INSERT INTO domain_treatment_plan_traces (id, trace_id, plan_id, step_order, step_type) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (uuid.uuid4().hex, trace_id_val, plan_id_val, 2, "test"),
+            )
+            conn.commit()
+
+        conn.close()
+
+

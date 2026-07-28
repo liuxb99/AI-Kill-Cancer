@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 import uuid as _uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -362,6 +362,9 @@ class TreatmentPlanService:
             )
 
             await self._db.commit()
+        except ValueError:
+            await self._db.rollback()
+            raise
         except Exception as exc:
             await self._db.rollback()
             logger.exception(
@@ -386,7 +389,31 @@ class TreatmentPlanService:
         TreatmentPlanResponse | None
             The response DTO, or ``None`` if not found.
         """
-        model = await self._plan_repo.get_by_plan_id(plan_id)
+        model = await self._plan_repo.get_current_by_plan_id(plan_id)
+        if model is None:
+            return None
+        return await self._model_to_response(model)
+
+    async def get_plan_version(
+        self,
+        plan_id: str,
+        version: int,
+    ) -> TreatmentPlanResponse | None:
+        """Retrieve a specific version of a treatment plan.
+
+        Parameters
+        ----------
+        plan_id : str
+            The business identifier of the plan.
+        version : int
+            The version number to retrieve.
+
+        Returns
+        -------
+        TreatmentPlanResponse | None
+            The response DTO, or ``None`` if not found.
+        """
+        model = await self._plan_repo.get_plan_version(plan_id, version)
         if model is None:
             return None
         return await self._model_to_response(model)
@@ -460,7 +487,7 @@ class TreatmentPlanService:
             Serialised trace steps.  Returns an empty list if the plan
             is not found.
         """
-        model = await self._plan_repo.get_by_plan_id(plan_id)
+        model = await self._plan_repo.get_current_by_plan_id(plan_id)
         if model is None:
             return []
         traces = await self._trace_repo.list_by_plan_id(model.id)
@@ -513,7 +540,7 @@ class TreatmentPlanService:
         RuntimeError
             If persistence fails.
         """
-        model = await self._plan_repo.get_by_plan_id(plan_id)
+        model = await self._plan_repo.get_current_by_plan_id(plan_id)
         if model is None:
             raise ValueError(f"Treatment plan with id '{plan_id}' not found")
 
@@ -649,7 +676,7 @@ class TreatmentPlanService:
             The new version's response DTO.
         """
         # Load the current version
-        current_model = await self._plan_repo.get_by_plan_id(plan_id)
+        current_model = await self._plan_repo.get_current_by_plan_id(plan_id)
         if current_model is None:
             raise ValueError(f"Treatment plan with id '{plan_id}' not found")
 
@@ -713,16 +740,9 @@ class TreatmentPlanService:
                 "Treatment plan engine encountered an internal error",
             ) from exc
 
-        # Transaction: mark old as superseded, persist new version
+        # Transaction: persist new version, then mark old as superseded
         try:
-            # Mark previous version as superseded
-            await self._plan_repo.mark_superseded(
-                plan_id=plan_id,
-                superseded_by_plan_id=new_plan_id,
-                revision_reason=request.clinical_context.get("revision_reason", ""),
-            )
-
-            # Persist new version
+            # Persist new version first (to get its PK/UUID)
             new_plan_model = await self._persist_plan(
                 plan_id=new_plan_id,
                 version=new_version,
@@ -735,6 +755,14 @@ class TreatmentPlanService:
                 user_id=user_id,
                 created_at=created_at,
                 previous_plan_id=plan_id,
+                previous_version_id=current_model.id,
+            )
+
+            # Mark previous version as superseded (using UUID PK of new version)
+            await self._plan_repo.mark_superseded(
+                plan_id=plan_id,
+                superseded_by_version_id=new_plan_model.id,
+                revision_reason=request.clinical_context.get("revision_reason", ""),
             )
 
             # Outbox: superseded + created
@@ -780,6 +808,7 @@ class TreatmentPlanService:
         user_id: str,
         created_at: datetime,
         previous_plan_id: str | None = None,
+        previous_version_id: _uuid.UUID | None = None,
     ) -> TreatmentPlanModel:
         """Persist the plan model and all related sub-models.
 
@@ -801,6 +830,7 @@ class TreatmentPlanService:
             clinical_rationale=engine_output.clinical_rationale,
             is_current=True,
             previous_plan_id=previous_plan_id,
+            previous_version_id=previous_version_id,
             created_by=UUID(user_id) if user_id else None,
             created_at=created_at,
             updated_at=created_at,
@@ -836,18 +866,21 @@ class TreatmentPlanService:
         # ── Treatment Items ─────────────────────────────────────────────
         item_models: list[TreatmentItemModel] = []
         for idx, item_data in enumerate(engine_output.items):
-            # Determine phase assignment based on item type or first phase
-            phase_id = None
-            # Use phase_type from item if available, otherwise item_type
-            item_phase_type = item_data.get("phase_type") or item_data.get("item_type", "")
+            # Determine phase assignment based on phase_type (no fallback)
+            item_phase_type = item_data.get("phase_type")
+            if not item_phase_type:
+                raise ValueError(
+                    f"Treatment item '{item_data.get('name', 'unknown')}' "
+                    f"is missing required 'phase_type' field"
+                )
             matched_phase = phase_dicts.get(item_phase_type)
-            if matched_phase is not None:
-                phase_id = matched_phase.id
-            else:
-                # Fallback to first phase if no matching phase found
-                first_phase = next(iter(phase_models), None)
-                if first_phase is not None:
-                    phase_id = first_phase.id
+            if not matched_phase:
+                raise ValueError(
+                    f"Treatment item '{item_data.get('name', 'unknown')}' "
+                    f"has phase_type='{item_phase_type}' which does not match "
+                    f"any defined phase. Available phases: {list(phase_dicts.keys())}"
+                )
+            phase_id = matched_phase.id
 
             item_id = _uuid.uuid4().hex
             item_model = TreatmentItemModel(

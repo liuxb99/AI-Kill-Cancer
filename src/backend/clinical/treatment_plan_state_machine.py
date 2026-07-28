@@ -8,7 +8,6 @@ legal transitions.  API layer maps ``IllegalTransitionError`` to HTTP 409.
 from __future__ import annotations
 
 import enum
-from typing import List
 
 
 class PlanStatus(str, enum.Enum):

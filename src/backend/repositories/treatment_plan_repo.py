@@ -94,11 +94,13 @@ class TreatmentPlanRepository(BaseRepository[TreatmentPlanModel]):
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_plan_id(
+    async def get_current_by_plan_id(
         self,
         plan_id: str,
     ) -> Optional[TreatmentPlanModel]:
-        """Retrieve a treatment plan by its business identifier.
+        """Retrieve the current (latest) version of a plan by business ID.
+
+        Returns the version with is_current=true, ordered by version DESC.
 
         Parameters
         ----------
@@ -109,8 +111,39 @@ class TreatmentPlanRepository(BaseRepository[TreatmentPlanModel]):
         -------
         TreatmentPlanModel | None
         """
+        stmt = (
+            select(TreatmentPlanModel)
+            .where(
+                TreatmentPlanModel.plan_id == plan_id,
+                TreatmentPlanModel.is_current == True,  # noqa: E712
+            )
+            .order_by(TreatmentPlanModel.version.desc())
+            .limit(1)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_plan_version(
+        self,
+        plan_id: str,
+        version: int,
+    ) -> Optional[TreatmentPlanModel]:
+        """Retrieve a specific version of a plan.
+
+        Parameters
+        ----------
+        plan_id : str
+            The unique business identifier.
+        version : int
+            The version number to retrieve.
+
+        Returns
+        -------
+        TreatmentPlanModel | None
+        """
         stmt = select(TreatmentPlanModel).where(
             TreatmentPlanModel.plan_id == plan_id,
+            TreatmentPlanModel.version == version,
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -223,20 +256,20 @@ class TreatmentPlanRepository(BaseRepository[TreatmentPlanModel]):
     async def mark_superseded(
         self,
         plan_id: str,
-        superseded_by_plan_id: str,
+        superseded_by_version_id: uuid.UUID,
         revision_reason: str = "",
     ) -> None:
         """Mark the current version of a plan as superseded.
 
-        Sets ``is_current`` to False, and records which plan supersedes it
+        Sets ``is_current`` to False, and records which version supersedes it
         along with the reason for the revision.
 
         Parameters
         ----------
         plan_id : str
             The business identifier of the plan to supersede.
-        superseded_by_plan_id : str
-            The business identifier of the plan that supersedes it.
+        superseded_by_version_id : uuid.UUID
+            The PK (UUID) of the version that supersedes it.
         revision_reason : str
             Optional explanation of why the revision was made.
         """
@@ -248,7 +281,8 @@ class TreatmentPlanRepository(BaseRepository[TreatmentPlanModel]):
             )
             .values(
                 is_current=False,
-                supersedes_plan_id=superseded_by_plan_id,
+                supersedes_version_id=superseded_by_version_id,
+                supersedes_plan_id=plan_id,  # 保持向後相容
                 revision_reason=revision_reason or None,
             )
         )

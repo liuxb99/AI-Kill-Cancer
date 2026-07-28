@@ -381,6 +381,111 @@ class TestTreatmentPlanModel:
         assert plan.safety_rules == []
         assert plan.traces == []
 
+    # ═════════════════════════════════════════════════════════════════════
+    # P0-3: Version Link Tests
+    # ═════════════════════════════════════════════════════════════════════
+
+    async def test_version_link_v1_v2(self, db_session, patient) -> None:
+        """Version chain: v1 → v2, verify previous_version_id and supersedes_version_id."""
+        from src.backend.domain.treatment_plan import TreatmentPlanModel
+
+        # Create v1
+        v1 = TreatmentPlanModel(
+            plan_id="tp-ver-chain",
+            version=1,
+            patient_id=patient.id,
+            plan_status="approved",
+            is_current=False,
+        )
+        db_session.add(v1)
+        await db_session.flush()
+
+        # Create v2 with link to v1
+        v2 = TreatmentPlanModel(
+            plan_id="tp-ver-chain",
+            version=2,
+            patient_id=patient.id,
+            plan_status="active",
+            is_current=True,
+            previous_version_id=v1.id,
+        )
+        db_session.add(v2)
+        await db_session.flush()
+
+        # Mark v1 as superseded by v2
+        v1.supersedes_version_id = v2.id
+        await db_session.commit()
+
+        await db_session.refresh(v1)
+        await db_session.refresh(v2)
+
+        # Verify v1 -> v2 link
+        assert v1.supersedes_version_id == v2.id
+        assert v2.previous_version_id == v1.id
+
+        # v1 has no previous version
+        assert v1.previous_version_id is None
+
+    async def test_version_link_v1_v2_v3(self, db_session, patient) -> None:
+        """Version chain: v1 → revise v2 → revise v3, verify full chain."""
+        from src.backend.domain.treatment_plan import TreatmentPlanModel
+
+        # ── v1 ──────────────────────────────────────────────────────────
+        v1 = TreatmentPlanModel(
+            plan_id="tp-ver-chain-3",
+            version=1,
+            patient_id=patient.id,
+            plan_status="approved",
+            is_current=False,
+        )
+        db_session.add(v1)
+        await db_session.flush()
+
+        # ── v2 (revise v1) ──────────────────────────────────────────────
+        v2 = TreatmentPlanModel(
+            plan_id="tp-ver-chain-3",
+            version=2,
+            patient_id=patient.id,
+            plan_status="active",
+            is_current=False,
+            previous_version_id=v1.id,
+        )
+        db_session.add(v2)
+        await db_session.flush()
+
+        # v1 superseded by v2
+        v1.supersedes_version_id = v2.id
+
+        # ── v3 (revise v2) ──────────────────────────────────────────────
+        v3 = TreatmentPlanModel(
+            plan_id="tp-ver-chain-3",
+            version=3,
+            patient_id=patient.id,
+            plan_status="active",
+            is_current=True,
+            previous_version_id=v2.id,
+        )
+        db_session.add(v3)
+        await db_session.flush()
+
+        # v2 superseded by v3
+        v2.supersedes_version_id = v3.id
+        await db_session.commit()
+
+        await db_session.refresh(v1)
+        await db_session.refresh(v2)
+        await db_session.refresh(v3)
+
+        # Verify chain: v1 ← v2 ← v3
+        assert v1.supersedes_version_id == v2.id
+        assert v1.previous_version_id is None
+
+        assert v2.previous_version_id == v1.id
+        assert v2.supersedes_version_id == v3.id
+
+        assert v3.previous_version_id == v2.id
+        assert v3.supersedes_version_id is None
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TreatmentPhaseModel Tests
