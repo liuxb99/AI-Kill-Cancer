@@ -110,12 +110,9 @@ def upgrade() -> None:
             batch_op.alter_column("trace_id", existing_type=sa.String(64), nullable=False)
             batch_op.create_unique_constraint("uq_trace_step", ["trace_id", "step_order"])
     else:
-        # 动态查询 pg_catalog.pg_constraint 找出 UNIQUE(trace_id) 的真正 constraint 名称
+        # 删除 024 建立的 UNIQUE(trace_id) constraint
         op.execute("""
-            DO $$
-            DECLARE
-                con_name text;
-            BEGIN
+            DO $$ DECLARE con_name text; BEGIN
                 SELECT con.conname INTO con_name
                 FROM pg_catalog.pg_constraint con
                 JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
@@ -124,21 +121,14 @@ def upgrade() -> None:
                   AND con.conkey = (
                       SELECT array_agg(a.attnum ORDER BY a.attnum)
                       FROM pg_catalog.pg_attribute a
-                      WHERE a.attrelid = rel.oid
-                        AND a.attname = 'trace_id'
+                      WHERE a.attrelid = rel.oid AND a.attname = 'trace_id'
                   );
                 IF con_name IS NOT NULL THEN
-                    EXECUTE format(
-                        'ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT %I',
-                        con_name
-                    );
+                    EXECUTE format('ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT %I', con_name);
                 END IF;
             END $$;
         """)
-        # 三重保护：先 DROP constraint（如果存在），再 DROP index（如果存在），最后创建 UNIQUE constraint
-        op.execute("ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT IF EXISTS uq_trace_step")
-        op.execute("DROP INDEX IF EXISTS uq_trace_step")
-        op.create_unique_constraint("uq_trace_step", "domain_treatment_plan_traces", ["trace_id", "step_order"])
+        # 019 的 uq_trace_step UNIQUE INDEX 已存在，不需要额外处理
 
 
 def downgrade() -> None:
@@ -187,8 +177,7 @@ def downgrade() -> None:
             batch_op.create_index("ix_domain_treatment_plan_traces_trace_id",
                                   ["trace_id"], unique=True)
     else:
-        op.execute("ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT IF EXISTS uq_trace_step")
-        # 恢复 024 schema 的 UNIQUE(trace_id)
+        # 恢复 024 的 UNIQUE(trace_id) constraint
         op.execute("""
             DO $$ BEGIN
                 IF NOT EXISTS (
@@ -200,8 +189,3 @@ def downgrade() -> None:
                 END IF;
             END $$;
         """)
-        # 重建 019 原有的 uq_trace_step unique index，让后续 019 downgrade 能正确 drop 它
-        # 使用 op.create_index 以确保与 019 升级创建的完全一致
-        op.create_index("uq_trace_step", "domain_treatment_plan_traces",
-                        ["trace_id", "step_order"], unique=True,
-                        if_not_exists=True)
