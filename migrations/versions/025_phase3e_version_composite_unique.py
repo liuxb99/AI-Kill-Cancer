@@ -57,9 +57,15 @@ def upgrade() -> None:
                 ["supersedes_version_id"], ["id"], ondelete="SET NULL",
             )
     else:
-        # PostgreSQL: direct ALTER TABLE (supports DROP CONSTRAINT)
-        # 1. Drop the unique constraint created by unique=True on plan_id in 023
-        op.drop_constraint("domain_treatment_plans_plan_id_key", "domain_treatment_plans", type_="unique")
+        # PostgreSQL: direct ALTER TABLE with IF EXISTS for reliability
+        op.execute(
+            "ALTER TABLE domain_treatment_plans "
+            "DROP CONSTRAINT IF EXISTS domain_treatment_plans_plan_id_key"
+        )
+        op.execute(
+            "ALTER TABLE domain_treatment_plans "
+            "DROP CONSTRAINT IF EXISTS uq_treatment_plan_version"
+        )
         # 2. Add composite unique
         op.create_unique_constraint("uq_plan_id_version", "domain_treatment_plans",
                                      ["plan_id", "version"])
@@ -97,8 +103,11 @@ def upgrade() -> None:
             batch_op.alter_column("trace_id", existing_type=sa.String(64), nullable=False)
             batch_op.create_unique_constraint("uq_trace_step", ["trace_id", "step_order"])
     else:
-        # PostgreSQL: direct ALTER
-        op.drop_constraint("domain_treatment_plan_traces_trace_id_key", "domain_treatment_plan_traces", type_="unique")
+        # PostgreSQL: direct ALTER with IF EXISTS
+        op.execute(
+            "ALTER TABLE domain_treatment_plan_traces "
+            "DROP CONSTRAINT IF EXISTS domain_treatment_plan_traces_trace_id_key"
+        )
         op.create_unique_constraint("uq_trace_step", "domain_treatment_plan_traces",
                                      ["trace_id", "step_order"])
 
@@ -137,6 +146,9 @@ def downgrade() -> None:
             batch_op.create_index("ix_domain_treatment_plan_traces_trace_id",
                                   ["trace_id"], unique=True)
     else:
-        op.drop_constraint("uq_trace_step", "domain_treatment_plan_traces", type_="unique")
+        op.execute(
+            "ALTER TABLE domain_treatment_plan_traces "
+            "DROP CONSTRAINT IF EXISTS uq_trace_step"
+        )
         op.create_unique_constraint("domain_treatment_plan_traces_trace_id_key",
                                     "domain_treatment_plan_traces", ["trace_id"])
