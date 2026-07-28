@@ -128,7 +128,12 @@ def upgrade() -> None:
                 END IF;
             END $$;
         """)
-        # 019 的 uq_trace_step UNIQUE INDEX 已存在，不需要额外处理
+        # 建立 UNIQUE(trace_id, step_order) constraint
+        op.create_unique_constraint(
+            "uq_domain_treatment_plan_traces_step",
+            "domain_treatment_plan_traces",
+            ["trace_id", "step_order"],
+        )
 
 
 def downgrade() -> None:
@@ -177,6 +182,8 @@ def downgrade() -> None:
             batch_op.create_index("ix_domain_treatment_plan_traces_trace_id",
                                   ["trace_id"], unique=True)
     else:
+        # 删除 025 建立的 UNIQUE(trace_id, step_order) constraint
+        op.execute("ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT IF EXISTS uq_domain_treatment_plan_traces_step")
         # 恢复 024 的 UNIQUE(trace_id) constraint
         op.execute("""
             DO $$ BEGIN

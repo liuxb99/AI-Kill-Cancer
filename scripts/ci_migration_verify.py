@@ -42,22 +42,8 @@ def main():
         )
         print(f"✅ Migration head reached: {current_rev}")
 
-        # 2. Check key constraints exist
-        # uq_trace_step 是 019 建立的 UNIQUE INDEX（不是 constraint）
-        # 改為檢查 pg_indexes
-        indexes = [
-            ("uq_trace_step", "domain_treatment_plan_traces"),
-        ]
-        for idxname, table in indexes:
-            row = conn.execute(
-                text(f"""SELECT 1 FROM pg_catalog.pg_indexes
-                    WHERE indexname = '{idxname}'
-                      AND tablename = '{table}'""")
-            ).fetchone()
-            assert row, f"❌ Index {idxname} not found on {table}"
-            print(f"✅ Index {idxname} exists on {table}")
-
-        # 同時驗證 UNIQUE(trace_id) constraint 已被移除
+        # 2. Verify: UNIQUE(trace_id) constraint has been removed
+        # (it was replaced by the composite unique index uq_trace_step on domain_treatment_plan_traces)
         row = conn.execute(text("""
             SELECT 1 FROM pg_catalog.pg_constraint con
             JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
@@ -70,7 +56,17 @@ def main():
               )
         """)).fetchone()
         assert row is None, "❌ UNIQUE(trace_id) constraint should have been removed"
-        print("✅ No UNIQUE(trace_id) constraint remains on domain_treatment_plan_traces")
+        print("✅ No UNIQUE(trace_id) constraint on domain_treatment_plan_traces (correctly removed)")
+
+        # 3. Verify UNIQUE(trace_id, step_order) constraint exists
+        conname = "uq_domain_treatment_plan_traces_step"
+        row = conn.execute(
+            text(f"""SELECT 1 FROM pg_catalog.pg_constraint
+                WHERE conname = '{conname}'
+                  AND conrelid = 'domain_treatment_plan_traces'::regclass""")
+        ).fetchone()
+        assert row, f"❌ Constraint {conname} not found on domain_treatment_plan_traces"
+        print(f"✅ {conname} (UNIQUE trace_id, step_order) exists on domain_treatment_plan_traces")
 
     print("🎉 Migration verification PASS")
     sys.exit(0)
