@@ -59,7 +59,7 @@ def upgrade() -> None:
     else:
         # PostgreSQL: direct ALTER TABLE (supports DROP CONSTRAINT)
         # 1. Drop the unique constraint created by unique=True on plan_id in 023
-        op.drop_constraint("domain_treatment_plans_plan_id_key", type_="unique")
+        op.drop_constraint("domain_treatment_plans_plan_id_key", "domain_treatment_plans", type_="unique")
         # 2. Add composite unique
         op.create_unique_constraint("uq_plan_id_version", "domain_treatment_plans",
                                      ["plan_id", "version"])
@@ -98,7 +98,7 @@ def upgrade() -> None:
             batch_op.create_unique_constraint("uq_trace_step", ["trace_id", "step_order"])
     else:
         # PostgreSQL: direct ALTER
-        op.drop_constraint("domain_treatment_plan_traces_trace_id_key", type_="unique")
+        op.drop_constraint("domain_treatment_plan_traces_trace_id_key", "domain_treatment_plan_traces", type_="unique")
         op.create_unique_constraint("uq_trace_step", "domain_treatment_plan_traces",
                                      ["trace_id", "step_order"])
 
