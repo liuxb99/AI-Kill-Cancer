@@ -1,9 +1,10 @@
 # Architecture Findings Validation Gate
 
-> **驗證日期**：2025-01（動態生成）  
+> **驗證日期**：2025-07-15  
 > **基準版本**：v1.0.1（architecture_review.md 審查版本）  
-> **當前版本**：基於 git log 最新 commit（含 v1.0.2 + Phase 3C/3D/3E）  
-> **驗證範圍**：P0/P1/P2 技術債、Code Smell、Refactor List、Risk List、附錄 C 關鍵發現  
+> **當前版本**：`87cac71`（AI-Kill-Cancer HEAD）/ `189d415`（KnowGraphGo HEAD）  
+> **驗證範圍**：P0/P1/P2 技術債、Code Smell、Refactor List、Risk List、附錄 C 關鍵發現
+> **Severity Rule**：P0 須同時滿足 5 條件（資料錯誤、transaction 不一致、graph corruption、production crash、測試/程式證據）  
 
 ---
 
@@ -16,7 +17,9 @@
 
 ---
 
-## 一、P0 問題驗證（6 項）
+## 一、P0 問題驗證（1 項）
+
+*注意：經 Severity Calibration Round 2 重新判定後，僅 P0-03（BaseRepository commit）保留 P0，其餘 5 項因不滿足 P0 5 條件而降級至 P1/P2。*
 
 ### Finding: P0-01 — Domain 層混入 SQLAlchemy ORM 依賴
 **原始引用：** 「全部 26 個 Domain 檔案均繼承 `DBBase` 並使用 `Column`、`String` 等 ORM 類型」  
@@ -24,11 +27,12 @@
 **當前程式碼驗證：** 使用 `grep` 掃描 `src/backend/domain/` 目錄下所有檔案，確認每個 `.py` 檔案（含 `Model` 類別）仍然導入 `from src.backend.database.models import Base as DBBase`，並使用 `Column`、`String`、`ForeignKey` 等 SQLAlchemy ORM 類型。Domain 目錄仍有 26 個 `.py` 檔案（含 `__init__.py`），其中 24 個包含 ORM 依賴。  
 **當前證據：** `src/backend/domain/*.py:15` 行（各檔案 `from src.backend.database.models import Base as DBBase`）  
 **Status：** CONFIRMED
-**Severity：** P0
+**Severity：** P1
 **當前 symbol：** 各 Domain Model 類別（如 PatientModel、ClinicalDecisionModel 等）
 **當前檔案：** `src/backend/domain/*.py:15`（各檔案 `from src.backend.database.models import Base as DBBase`）
-**風險證據：** Domain 層本應爲純業務層，混入 SQLAlchemy ORM 後造成：1）無法在非 ORM 環境（如單元測試）中複用；2）ORM 遷移直接影響 Domain 模型；3）違反依賴倒置原則，高階策略層依賴基礎設施。此爲架構上最緊迫問題。
-**建議：** 保持 — 此爲架構上最緊迫問題，尚未開始修復
+**風險證據：** Domain 層混入 SQLAlchemy ORM 屬於架構偏好（DDD purity）問題，並非 production blocker。ORMLite 在測試環境中仍可正常使用，ORM 遷移影響 Domain 模型是已知架構技術債但未造成實際 production 事故。根據 Severity Calibration Round 2 規則：P0 須同時滿足資料錯誤、transaction 不一致、graph corruption、production crash、測試/程式證據 5 條件，Domain ORM 耦合不滿足其中任何 production 級條件，故降級爲 P1。
+**Severity 判定說明：** 此爲 DDD 純淨度（purity）架構偏好，非 production blocker。不滿足 P0 條件①（無資料錯誤）、②（無 transaction 不一致）、③（無 graph corruption）、④（無 production crash），僅滿足⑤（程式證據）。降級至 P1 反映其爲重要但非緊急的架構重構項目。
+**建議：** 保持 — 需要重大重構（40h+），建議在下一階段優先執行
 
 ### Finding: P0-02 — Service 層反向依賴 API 層
 **原始引用：** 「Service 層反向依賴 API 層——違反分層依賴方向」  
@@ -36,10 +40,11 @@
 **當前程式碼驗證：** 第 248 行依然存在 `from src.backend.api.v1.recommendation import RecommendationResponse`（lazy import 在函數內部），且 `grep` 全 `services/` 目錄顯示僅此一處反向依賴。  
 **當前證據：** `src/backend/services/recommendation_service.py:248:services:create_recommendation`  
 **Status：** CONFIRMED
-**Severity：** P0
+**Severity：** P1
 **當前 symbol：** `create_recommendation`（`recommendation_service.py` 內的函數）
 **當前檔案：** `src/backend/services/recommendation_service.py:248`
 **風險證據：** 違反 Clean Architecture 依賴方向規則（Service 層不應依賴 API 層），造成循環依賴風險，且使 Service 層無法在脫離 API 層的環境中獨立測試。
+**Severity 判定說明：** 違反 Clean Architecture 依賴方向，但爲 single lazy import（僅一處），不造成資料錯誤、transaction 不一致、graph corruption 或 production crash。不滿足 P0 條件①-④，僅滿足⑤。降級至 P1。
 **建議：** 保持 — 簡單但重要的依賴方向修正，需 2h
 
 ### Finding: P0-03 — BaseRepository 預設 commit() 導致事務邊界下移
@@ -52,49 +57,87 @@
 **當前 symbol：** `BaseRepository.create` / `update` / `delete`
 **當前檔案：** `src/backend/repositories/base.py:29,73,82`
 **風險證據：** `commit()` 在 Repository 層直接提交事務，導致：1）Service 層無法實現跨多個 Repository 操作的原子性；2）部分更新失敗無法回滾；3）事務邊界從 Service 層下沉至 Repository 層，違反 DDD 事務邊界應由 Aggregate Root 控制的原則。
-**建議：** 保持 — 消除資料不一致風險的核心修復
+**最小重現案例（Atomicity）：**
+```python
+# Service 中的典型場景 — repoA.create() commit 後 repoB.create() 失敗，repoA 的變更無法回滾
+async def create_patient_with_case(patient_data, case_data):
+    repoA = PatientRepository(db)
+    repoB = CancerCaseRepository(db)
+    patient = await repoA.create(**patient_data)  # ← 已 commit，無法回滾
+    case = await repoB.create(**case_data)         # ← 若此步失敗，patient 已持久化
+    return patient, case
+```
+上述場景直接在 `repositories/base.py:29` 的 `create()` 中 `commit()` 導致：第一步成功後資料已寫入資料庫，第二步失敗時 Service 層無法透過 rollback 撤銷第一步的變更，造成資料不一致。此爲 production 級資料錯誤風險。滿足 P0 條件①（資料錯誤）、②（transaction 不一致）、⑤（程式證據）。
+**建議：** 保持 — 消除資料不一致風險的核心修復，需將 commit() 改爲 flush()
 
-### Finding: P0-04 — Outbox Repository 混入大量業務邏輯
+### Finding: P0-04 — Outbox Repository 混入部分業務邏輯
 **原始引用：** 「CRUD 與業務邏輯未分離」  
 **原始證據：** `src/backend/repositories/clinical_graph_outbox_repo.py` — 全檔案  
-**當前程式碼驗證：** 該檔案仍包含大量業務邏輯：`claim_pending()`（L43）、`mark_failed()`、`mark_completed()`、`reset_stuck_processing()` 等方法，以及依賴 `retry_policy.py` 進行重試計算。  
+**當前程式碼驗證：** 該檔案包含以下方法，逐方法分析業務邏輯 vs persistence：
+
+| 方法 | 業務邏輯？ | 說明 |
+|------|:---------:|------|
+| `create()` | 否 | 純 persistence（新增記錄） |
+| `get_by_event_id()` | 否 | 純 persistence（查詢） |
+| `claim_pending()` | 否 | 狀態查詢 + 標記 processing，無 business rule |
+| `mark_completed()` | 否 | 純 persistence（狀態更新） |
+| `mark_failed()` | **是** | 使用 `DEFAULT_RETRY_POLICY.is_dead_letter()` 決定 dead_letter/failed 狀態，使用 `_next_available_at()` 計算 retry delay |
+| `mark_dead_letter()` | 部分 | 直接標記死信，無 retry 計算 |
+| `release_stale()` | 否 | 時間條件查詢 + 狀態重置 |
+| `get_failed_events()`, `list_failed()`, `get_status_counts()` | 否 | 純 persistence（查詢） |
+
+其中僅 `mark_failed()` 包含真正的業務邏輯（Retry Policy 判斷、Dead Letter 判定、Retry Delay 計算），其餘方法均爲純 persistence 操作。
+
 **當前證據：** `src/backend/repositories/clinical_graph_outbox_repo.py:全檔案:ClinicalGraphOutboxRepository`  
-**Status：** CONFIRMED
-**Severity：** P0
+**Status：** PARTIALLY CONFIRMED — 確實混入少量業務邏輯（mark_failed 中的 retry/dead_letter 判斷），但大部分方法仍爲 persistence
+**Severity：** P1
 **當前 symbol：** `ClinicalGraphOutboxRepository`
 **當前檔案：** `src/backend/repositories/clinical_graph_outbox_repo.py:全檔案`
-**風險證據：** Repository 層混入業務邏輯（重試計算、狀態機轉換等）違反 Repository 模式的單一職責。業務邏輯變更時需同時修改 Repository，增加維護成本，且使 Repository 無法作爲單純的資料存取層被其他服務複用。
-**建議：** 保持
+**風險證據：** Repository 層混入少量業務邏輯（重試計算、Dead Letter 判定）違反 Repository 模式的單一職責。但此爲架構組織問題，不直接造成資料錯誤、transaction 不一致、graph corruption 或 production crash。不滿足 P0 條件①-④。
+**Severity 判定說明：** 逐方法分析後確認大部分爲 persistence，僅 `mark_failed()` 包含 retry policy / dead letter / retry delay 等 business logic。根據 Severity Calibration Round 2 指示，判定爲 PARTIALLY CONFIRMED，降級至 P1。
+**建議：** 保持 — 建議抽取 RetryPolicy 至 service 層
 
 ### Finding: P0-05 — Python ID Factory 缺少 5 個治療計劃相關方法
 **原始引用：** 「Python ID Factory 缺少 5 個治療計劃相關方法——跨語言 ID 不一致」  
 **原始證據：** `src/backend/clinical_graph/id_factory.py` — 全檔案  
 **當前程式碼驗證：** 實地讀取 `src/backend/clinical_graph/id_factory.py` 確認：Python `ClinicalGraphIDFactory` 只有 patient_id/recommendation_id/clinical_decision_id/consensus_id/opinion_id/specialty_id/drug_id/evidence_id/variant_id/relation_id 共 10 個方法（L23-77），**缺少** treatment_plan_id、treatment_phase_id、treatment_item_id、monitoring_id、safety_rule_id 這 5 個方法。對比 Go `ClinicalIDFactory`（`KnowGraphGo/adapter/clinical/id_factory.go:76-98`）已有完整的 TreatmentPlanID、TreatmentPhaseID、TreatmentItemID、MonitoringID、SafetyRuleID。  
+**Cross-Language Runtime 使用確認：** `grep` 全量掃描 `src/backend/` 下 `ClinicalGraphIDFactory.` 的調用，僅發現 `clinical_graph.py:189`（patient_id）、`clinical_graph.py:235`（recommendation_id）、`clinical_graph.py:286`（consensus_id）、`tumor_board_service.py:407`（opinion_id）。**Python 端無任何 runtime 調用 `treatment_plan_id`、`treatment_phase_id`、`treatment_item_id`、`monitoring_id`、`safety_rule_id`**。因此跨語言 ID 不一致問題在當前 code path 中不會實際觸發。  
 **當前 symbol：** `ClinicalGraphIDFactory`（Python）/ `ClinicalIDFactory`（Go）  
 **當前檔案：** `src/backend/clinical_graph/id_factory.py:23-77`（Python）/ `KnowGraphGo/adapter/clinical/id_factory.go:76-98`（Go）  
 **Status：** CONFIRMED  
-**Severity：** P0  
-**風險證據：** Python ↔ Go ID Factory 方法不一致，導致跨語言 entity ID 生成規則不同。當 Python 端需生成 treatment_plan/treatment_phase/treatment_item/monitoring/safety_rule 等 entity ID 時，無法使用同一套確定性 UUIDv5 算法，知識圖譜查詢可能因 ID 不匹配而失敗。  
-**建議：** 保持  
+**Severity：** P1  
+**風險證據：** Python ↔ Go ID Factory 方法不一致，存在跨語言 ID 生成規則不同的潛在風險。但經 grep 確認 Python 端**當前無任何 runtime 調用**缺少的 5 個方法，因此跨語言 ID 不匹配不會在當前 production code path 中造成實際的知識圖譜查詢失敗。未來若 Python 端需生成 treatment_plan/treatment_phase/treatment_item/monitoring/safety_rule 等 entity ID 時，需要補上對應方法。
+**Severity 判定說明：** 缺少方法但無 runtime 使用，不造成資料錯誤、transaction 不一致、graph corruption 或 production crash。不滿足 P0 條件①-④，僅滿足⑤。降級至 P1。
+**建議：** 保持 — 需 2h 補上 5 個方法  
 
 ### Finding: P0-06 — buildProvenance 硬編碼爲 ProvenanceImported
 **原始引用：** 「所有事件被標記爲「匯入」」  
 **原始證據：** `KnowGraphGo/adapter/clinical/adapter.go:110-112`  
 **當前程式碼驗證：** 實地讀取 `KnowGraphGo/adapter/clinical/adapter.go` 確認：
 - `buildProvenance()`（L110-112）**依然返回 `graph.ProvenanceImported`**，完全未根據 EventType 區分 provenance 來源。
-- `relationProps()`（L117-133）和 `entityProps()`（L135-160）**已補齊完整 8 個 Provenance 欄位**（event_id、event_type、aggregate_type、aggregate_id、correlation_id、causation_id、occurred_at、source_system）。
+- `relationProps()`（L117-133）和 `entityProps()`（L135-160）**已包含完整 8 個 Provenance 欄位**（event_id、event_type、aggregate_type、aggregate_id、correlation_id、causation_id、occurred_at、source_system），其中 **`event_type` 已可區分** created/updated/approved/activated/completed 等事件類型。
 
-因此核心問題（buildProvenance 本身硬編碼）**仍未修復**，但周邊的 entityProps/relationProps 已改善。  
+**Provenance 語意分析：**
+查閱 `KnowGraphGo/graph/provenance.go` 定義：
+- `ProvenanceImported` = "表示從外部系統匯入的資料"
+- 所有臨床資料確實來自 Python Backend（外部系統），因此 `ProvenanceImported` **語意正確**。
+- `event_type` 欄位（如 `"treatment_plan.created"`、`"treatment_plan.approved"`）已保存在 entity/relation Props 中，可作為事件來源的細粒度區分。
+
+因此核心問題「無法區分事件來源」已透過 `event_type` 欄位得到補償，`buildProvenance` 返回 `ProvenanceImported` 本身語意正確（標示資料來源於外部匯入）。
+
 **當前 symbol：** `buildProvenance` / `relationProps` / `entityProps`  
 **當前檔案：** `KnowGraphGo/adapter/clinical/adapter.go:110-112`（buildProvenance）/ L117-133（relationProps）/ L135-160（entityProps）  
-**Status：** CONFIRMED — buildProvenance 仍硬編碼（entityProps/relationProps 已改善但仍未影響 buildProvenance 行爲）  
-**Severity：** P0  
-**風險證據：** 所有 entity/relation 的 Provenance 欄位（用於標識資料來源）均標記爲 ProvenanceImported，無法區分事件來源（如 created vs updated vs imported），造成知識圖譜溯源能力喪失。  
-**建議：** 保持  
+**Status：** PARTIALLY CONFIRMED — buildProvenance 仍硬編碼，但 entityProps/relationProps 中的 event_type 已能區分事件來源，ProvenanceImported 語意正確
+**Severity：** P2
+**風險證據：** buildProvenance 固定返回 `ProvenanceImported`，但 entityProps/relationProps 已保存 `event_type` 以區分 created/updated/approved/activated/completed 等事件類型。且 `ProvenanceImported` 對於臨床匯入資料語意正確。剩餘風險極低：僅在直接查詢 Entity/Relation 的 Provenance 欄位（而非 Properties）時無法區分事件來源。不滿足 P0 條件①-④。
+**Severity 判定說明：** buildProvenance 硬編碼但語意正確，且 event_type 已保存在 properties 中提供細粒度區分。剩餘風險極低，降級至 P2。
+**建議：** 保持 — 若需精確 Provenance 可考慮根據 EventType 返回不同值（如 created→ProvenanceParsed、imported→ProvenanceImported），但當前架構下收益有限  
 
 ---
 
-## 二、P1 問題驗證（11 項）
+## 二、P1 問題驗證（15 項）
+
+*含從原 P0 降級 4 項：P0-01（Domain ORM）、P0-02（反向依賴）、P0-04（Outbox Repository）、P0-05（ID Factory）。*
 
 ### Finding: P1-01 — RecommendationEngine.run() 違反 Pure Function 原則
 **原始引用：** 「產生 I/O 副作用」  
@@ -236,7 +279,9 @@
 
 ---
 
-## 三、P2 問題驗證（11 項）
+## 三、P2 問題驗證（12 項）
+
+*含從原 P0 降級 1 項：P0-06（buildProvenance）。*
 
 ### Finding: P2-01 — Aggregate 邊界不清晰
 **原始引用：** 「無顯式 Aggregate Root 標記」  
@@ -554,34 +599,40 @@
 
 | 類別 | 總數 | CONFIRMED | PARTIALLY CONFIRMED | OUTDATED | FALSE POSITIVE |
 |------|:---:|:---------:|:-------------------:|:--------:|:------------:|
-| **P0 問題** | 6 | 6 | 0 | 0 | 0 |
-| **P1 問題** | 11 | 9 | 2 | 0 | 0 |
-| **P2 問題** | 11 | 9 | 0 | 2 | 0 |
+| **P0 問題** | 1 | 1 | 0 | 0 | 0 |
+| **P1 問題** | 15 | 12 | 3 | 0 | 0 |
+| **P2 問題** | 12 | 9 | 1 | 2 | 0 |
 | **Code Smell** | 7 | 7 | 0 | 0 | 0 |
 | **Refactor HIGH** | 0† | 0 | 0 | 0 | 0 |
 | **Refactor MEDIUM** | 0† | 0 | 0 | 0 | 0 |
 | **Refactor LOW** | 3 | 1 | 1 | 1 | 0 |
 | **Risk List** | 1 | 0 | 0 | 0 | 1† |
 | **附錄 C** | 1 | 1 | 0 | 0 | 0 |
-| **合計** | **40** | **33** | **3** | **3** | **1** |
+| **合計** | **40** | **31** | **5** | **3** | **1** |
 
 > † Refactor HIGH 和 MEDIUM 的全部條目已分別計入 P0/P1/P2 問題（作爲問題分類的主要歸屬），故去重後爲 0。
 > †† RSK-11 已確認爲 FALSE POSITIVE（誤報），統計表如實反映。
 
 ### 佔比分析
-- **CONFIRMED（仍成立）**：33 / 40 = **82.5%**
-- **PARTIALLY CONFIRMED（部分改善）**：3 / 40 = **7.5%**
+- **CONFIRMED（仍成立）**：31 / 40 = **77.5%**
+- **PARTIALLY CONFIRMED（部分改善）**：5 / 40 = **12.5%**
 - **OUTDATED（已被修復）**：3 / 40 = **7.5%**
 - **FALSE POSITIVE（誤報）**：1 / 40 = **2.5%**
 
 ### 關鍵結論
 
-1. **絕大多數 Findings（82.5%）仍完全成立**：代碼庫在架構審查後雖有多個 Phase（3C、3D、3E）的功能性提交，但架構層面的核心問題幾乎未被觸及。
+1. **多數 Findings（77.5%）仍完全成立**：代碼庫在架構審查後雖有多個 Phase（3C、3D、3E）的功能性提交，但架構層面的核心問題幾乎未被觸及。
 
-2. **P0 問題無一修復**：全部 6 個 P0 問題（Domain ORM 耦合、反向依賴、事務邊界、Outbox 業務邏輯、ID Factory 缺方法、buildProvenance 硬編碼）均保持原始狀態。
+2. **P0 問題從 6 項降至 1 項**：經 Severity Calibration Round 2 重新判定後，僅 P0-03（BaseRepository commit 導致事務邊界下沉）保留 P0。其餘 5 項因不滿足 P0 5 條件（資料錯誤、transaction 不一致、graph corruption、production crash、測試/程式證據）而降級：
+   - **P0-01**（Domain ORM 耦合）→ P1：架構偏好（DDD purity），非 production blocker
+   - **P0-02**（Service→API 反向依賴）→ P1：single lazy import，不造成 production 問題
+   - **P0-04**（Outbox Repository 業務邏輯）→ P1 PARTIALLY CONFIRMED：僅 mark_failed 含業務邏輯
+   - **P0-05**（Python ID Factory 缺方法）→ P1：Python 端無 runtime 調用
+   - **P0-06**（buildProvenance 硬編碼）→ P2 PARTIALLY CONFIRMED：ProvenanceImported 語意正確且 event_type 已補償
 
-3. **少數修復來自 Infrastructure / CI**：Migration SQLite 相容性（015/025）和 KnowGraphGo CLI e2e 測試在 Phase 3D 獲得修復，說明修復集中於基礎設施層而非架構層。
+3. **PARTIALLY CONFIRMED 增加至 5 項（12.5%）**：反映部分 Finding 已被後續提交部分改善。
 
+4. **少數修復來自 Infrastructure / CI**：Migration SQLite 相容性（015/025）和 KnowGraphGo CLI e2e 測試在 Phase 3D 獲得修復，說明修復集中於基礎設施層而非架構層。
 
 5. **架構重構仍需規劃**：架構評分 65/100 的改善需要對 R-H1（Domain/ORM 分離，40h+）等重大重構進行專項投入，建議在下一階段優先執行。
 
