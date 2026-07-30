@@ -162,12 +162,20 @@ jobs:
           async def main():
               engine = create_async_engine(os.environ['DATABASE_URL'])
               async with engine.connect() as conn:
+                  # Delete in topological order (children before parents) to respect FK constraints
+                  await conn.execute(text(\"DELETE FROM domain_clinical_graph_outbox\"))
+                  await conn.execute(text(\"DELETE FROM domain_treatment_plan_traces\"))
+                  await conn.execute(text(\"DELETE FROM domain_treatment_safety_rules\"))
+                  await conn.execute(text(\"DELETE FROM domain_treatment_monitoring\"))
+                  await conn.execute(text(\"DELETE FROM domain_treatment_items\"))
+                  await conn.execute(text(\"DELETE FROM domain_treatment_phases\"))
+                  await conn.execute(text(\"DELETE FROM domain_treatment_plans\"))
+                  await conn.execute(text(\"DELETE FROM domain_recommendation_trace_steps\"))
+                  await conn.execute(text(\"DELETE FROM domain_recommendation_traces\"))
                   await conn.execute(text(\"DELETE FROM domain_tumor_board_opinions\"))
                   await conn.execute(text(\"DELETE FROM domain_tumor_board_consensus_traces\"))
                   await conn.execute(text(\"DELETE FROM domain_tumor_board_consensus\"))
-                  await conn.execute(text(\"DELETE FROM domain_clinical_graph_outbox\"))
-                  await conn.execute(text(\"DELETE FROM domain_treatment_plan_traces\"))
-                  await conn.execute(text(\"DELETE FROM domain_treatment_plans\"))
+                  await conn.execute(text(\"DELETE FROM domain_clinical_decisions\"))
                   await conn.execute(text(\"DELETE FROM domain_recommendations\"))
                   await conn.execute(text(\"DELETE FROM domain_cancer_cases\"))
                   await conn.execute(text(\"DELETE FROM domain_patients WHERE id = 'ci-test-pid'\"))
