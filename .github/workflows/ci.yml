@@ -165,6 +165,8 @@ jobs:
                   await conn.execute(text(\"DELETE FROM domain_tumor_board_opinions\"))
                   await conn.execute(text(\"DELETE FROM domain_tumor_board_consensus_traces\"))
                   await conn.execute(text(\"DELETE FROM domain_tumor_board_consensus\"))
+                  await conn.execute(text(\"DELETE FROM domain_treatment_plan_traces\"))
+                  await conn.execute(text(\"DELETE FROM domain_treatment_plans\"))
                   await conn.execute(text(\"DELETE FROM domain_patients WHERE id = 'ci-test-pid'\"))
                   await conn.commit()
               await engine.dispose()
