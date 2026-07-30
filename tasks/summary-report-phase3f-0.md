@@ -10,7 +10,7 @@
 
 | 项目 | 值 |
 |------|-----|
-| **Commit SHA** | （待 R-06 提交后填入） |
+| **Commit SHA** | f1c5582 |
 | **Phase 版本** | 3F-0 |
 | **核心原则** | 将 Transaction Boundary 完整收回 Service 层，不新增功能 |
 | **分支** | `fix/transaction-boundary-hardening` |
