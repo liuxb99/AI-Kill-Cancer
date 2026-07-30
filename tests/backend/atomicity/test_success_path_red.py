@@ -69,7 +69,7 @@ async def db_session():
 
 @pytest.fixture
 async def upstream_data(db_session):
-    """建立 Service 需要的上游資料（Patient, Recommendation, ClinicalDecision, Consensus）。
+    """建立 Service 需要的上游資料（User, Patient, Recommendation, ClinicalDecision, Consensus）。
 
     直接在 db_session 中建立資料並 flush，確保與 Service 使用同一個 session。
     注意：不 commit，讓 Service 決定交易邊界。
@@ -86,8 +86,19 @@ async def upstream_data(db_session):
     from src.backend.domain.patient import PatientModel
     from src.backend.domain.recommendation import RecommendationModel
     from src.backend.domain.tumor_board import TumorBoardConsensusModel
+    from src.backend.domain.user import UserModel
 
     data = {}
+
+    # ── User (must exist in domain_users for created_by FK) ──
+    user = UserModel(
+        username=f"t05-user-{uuid.uuid4().hex}",
+        password_hash="test-hash",
+    )
+    db_session.add(user)
+    await db_session.flush()
+    data["user"] = user
+    data["user_id"] = user.id
 
     # ── Patient ──
     patient = PatientModel(
@@ -218,12 +229,15 @@ class TestTreatmentPlanServiceSuccessPath:
         2. 驗證 Service 回傳完整的 TreatmentPlanResponse
         3. 驗證資料庫中存在 TreatmentPlan + Phases + Items + Trace + Outbox
         """
+        from sqlalchemy import select
+
         from src.backend.clinical.treatment_plan_engine import (
             TreatmentPlanEngine,
         )
         from src.backend.clinical.treatment_plan_rules import (
             TreatmentPlanRuleSet,
         )
+        from src.backend.domain.user import UserModel
         from src.backend.repositories.treatment_plan_repo import (
             TreatmentItemRepository,
             TreatmentMonitoringRepository,
@@ -253,7 +267,7 @@ class TestTreatmentPlanServiceSuccessPath:
             outbox_repo=FixedOutboxRepository(db_session),
         )
 
-        user_id = str(uuid.uuid4())
+        user_id = str(upstream_data["user_id"])
 
         # ---- Act ----
         response: TreatmentPlanResponse = await service.create_plan(
@@ -284,6 +298,17 @@ class TestTreatmentPlanServiceSuccessPath:
             "✅ GREEN LIGHT: TreatmentPlan exists in database after "
             "service.create_plan() commits."
         )
+        assert str(plan_model.created_by) == user_id, (
+            "created_by should match the user_id passed to service"
+        )
+
+        # 3b. 驗證對應 User row 存在（PostgreSQL FK 相容性）
+        user_stmt = select(UserModel).where(UserModel.id == plan_model.created_by)
+        user_result = await db_session.execute(user_stmt)
+        user_row = user_result.scalar_one_or_none()
+        assert user_row is not None, (
+            "✅ GREEN LIGHT: Corresponding domain_users row exists for created_by FK."
+        )
 
         # 4. 資料庫驗證：Phase 存在
         phase_repo = TreatmentPhaseRepository(db_session)
@@ -302,8 +327,6 @@ class TestTreatmentPlanServiceSuccessPath:
 
         # 7. 資料庫驗證：Outbox 存在
         # 使用 aggregate_id 查詢（因為 event_id 由 repo 自動產生）
-        from sqlalchemy import select
-
         from src.backend.domain.clinical_graph_outbox import (
             ClinicalGraphOutboxModel,
         )
@@ -415,7 +438,7 @@ class TestTreatmentPlanServiceSuccessPath:
         )
 
         with pytest.raises(Exception):
-            await service.create_plan(bad_request, user_id=str(uuid.uuid4()))
+            await service.create_plan(bad_request, user_id=str(upstream_data["user_id"]))
 
         # ---- Assert ----
         # 驗證 Patient 不存在（因為 Service 失敗 rollback 了所有資料）
