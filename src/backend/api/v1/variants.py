@@ -18,6 +18,7 @@ from src.backend.domain.variant import VariantImportBatch, VariantResponse
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.repositories.specimen_repo import SpecimenRepository
 from src.backend.repositories.variant_repo import VariantRepository
+from src.backend.services.variant_ingestion_service import VariantIngestionService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/variants", tags=["variants"])
@@ -61,7 +62,8 @@ async def import_variants(
 
     try:
         items_data = [item.model_dump(exclude_none=True) for item in body.items]
-        variants = await repo.bulk_create(items_data)
+        service = VariantIngestionService(db)
+        variants = await service.bulk_create_variants(items_data)
         return [VariantResponse.model_validate(v) for v in variants]
     except Exception as e:
         logger.exception("Failed to import variants")

@@ -1,39 +1,28 @@
-# Task Status — Architecture Review (Phase 1 ~ Phase 3E)
+# Task Status — Phase 3F-0：Transaction Boundary Hardening
 
 ## 場景
-architecture-review（架構審查 + Code Review）
+hardening（架構強化）
 
-## 角色分派
+## 場景描述
+修正既有功能的架構問題、邊界案例驗證、審計追蹤補全。
+
+## 分派角色
 | 角色 | 職責 |
 |------|------|
-| planner | 制定 Review 計劃（13 項 Review 項目） |
-| doc-writer | 記錄需求 + 最終報告撰寫 |
-| reviewer | 評分代理 |
+| PLANNER | 制定強化計劃與優先級排序 |
+| backend-logic | 修正 BaseRepository、Repository、Service |
+| test-writer | 撰寫 Transaction Tests（Atomicity + Rollback + Success） |
+| doc-writer | 撰寫必要流程文件 |
+| REVIEWER | 評分代理 |
 
-## Review Scope 階段
-- Phase1
-- Phase2
-- Phase3A
-- Phase3B
-- Phase3C
-- Phase3D
-- Phase3E
+## 角色分工說明
+- **PLANNER**：產出 tasks/plan-Phase-3F-0.md，含任務清單、依賴、負責角色、返工預案
+- **backend-logic**：修改 BaseRepository（commit→flush）、檢查所有 Repository 移除非必要 commit/rollback、修正受影響 Service 加入 Transaction Boundary
+- **test-writer**：撰寫 BaseRepository 測試、Atomicity Tests（Flow A+B）、Recommendation/Decision/Consensus 擇一測試、Success Tests、Restart Recovery 測試
+- **doc-writer**：撰寫必要流程文件
+- **REVIEWER**：依 AGENTS.md 規定評分，>=95 合格
 
-## 任務清單
-1. Domain Architecture Review
-2. Repository Layer Review
-3. Service Layer Review
-4. Engine Layer Review
-5. Migration Review
-6. API Layer Review
-7. Digital Thread Review
-8. Trace Review
-9. Graph Adapter Review
-10. Tests Coverage Review
-11. Dead Code Analysis
-12. Architecture Smell Analysis
-13. Refactor Candidate Analysis
-14. 最終報告彙總
-
-## 狀態
-⏳ 等待 PLANNER 制定詳細計劃
+## 排除角色
+- frontend-logic（本輪禁止 Frontend 修改）
+- api-designer（本輪禁止 API Contract 修改）
+- db-modeler（本輪禁止 Migration 大改）

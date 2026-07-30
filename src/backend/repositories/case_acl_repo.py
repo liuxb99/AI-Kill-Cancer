@@ -32,7 +32,7 @@ class CaseACLRepository(BaseRepository[CaseACLModel]):
             and_(CaseACLModel.case_id == case_id, CaseACLModel.user_id == user_id)
         )
         result = await self.db.execute(stmt)
-        await self.db.commit()
+        await self.db.flush()
         return result.rowcount > 0
 
     async def grant_permission(self, case_id, user_id, role: str, granted_by=None) -> CaseACLModel:
@@ -42,7 +42,7 @@ class CaseACLRepository(BaseRepository[CaseACLModel]):
             existing.role = role
             if granted_by:
                 existing.granted_by = granted_by
-            await self.db.commit()
+            await self.db.flush()
             await self.db.refresh(existing)
             return existing
         acl = CaseACLModel(
@@ -52,6 +52,6 @@ class CaseACLRepository(BaseRepository[CaseACLModel]):
             granted_by=granted_by,
         )
         self.db.add(acl)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(acl)
         return acl

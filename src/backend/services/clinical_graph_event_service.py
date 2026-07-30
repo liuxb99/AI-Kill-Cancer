@@ -62,4 +62,30 @@ class ClinicalGraphEventService:
         )
 
 
+    async def retry_event(self, event_id: str) -> dict:
+        """重置 outbox 事件状态为重试。
+
+        由 Service 控制事务边界（commit/rollback）。
+        """
+        event = await self._repo.get_by_event_id(event_id)
+        if not event:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Event not found")
+        if event.status not in ("failed", "dead_letter"):
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=409,
+                detail=f"Event is in status '{event.status}', cannot retry",
+            )
+        event.status = "pending"
+        event.attempt_count = 0
+        event.last_error = None
+        try:
+            await self._db.commit()
+        except Exception:
+            await self._db.rollback()
+            raise
+        return {"status": "retrying", "event_id": event_id}
+
+
 __all__ = ["ClinicalGraphEventService"]

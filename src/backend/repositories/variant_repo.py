@@ -23,7 +23,7 @@ class VariantRepository(BaseRepository[VariantModel]):
         instances = [VariantModel(**item) for item in items]
         for inst in instances:
             self.db.add(inst)
-        await self.db.commit()
+        await self.db.flush()
         for inst in instances:
             await self.db.refresh(inst)
         return instances
