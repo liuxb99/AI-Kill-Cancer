@@ -31,13 +31,13 @@ class KnowledgeSourceRepository(BaseRepository[KnowledgeSourceModel]):
                 if value is not None and hasattr(existing, field):
                     setattr(existing, field, value)
             existing.updated_at = datetime.utcnow()
-            await self.db.commit()
+            await self.db.flush()
             await self.db.refresh(existing)
             return existing
         else:
             instance = KnowledgeSourceModel(name=name, **kwargs)
             self.db.add(instance)
-            await self.db.commit()
+            await self.db.flush()
             await self.db.refresh(instance)
             return instance
 
@@ -63,6 +63,6 @@ class KnowledgeSourceRepository(BaseRepository[KnowledgeSourceModel]):
         if version:
             source.version = version
         source.updated_at = datetime.utcnow()
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(source)
         return source

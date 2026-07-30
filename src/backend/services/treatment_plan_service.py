@@ -289,7 +289,7 @@ class TreatmentPlanService:
         """
         plan_id = _uuid.uuid4().hex
         trace_id = _uuid.uuid4().hex
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # ── Step 1: Load upstream data ──────────────────────────────────
         recommendation = await self._load_recommendation(
@@ -547,7 +547,7 @@ class TreatmentPlanService:
         current_status = PlanStatus(model.plan_status)
         self._state_machine.transition(current_status, target_status)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # Update status and timestamp fields based on target
         model.plan_status = target_status.value
@@ -696,7 +696,7 @@ class TreatmentPlanService:
         new_plan_id = plan_id
         new_version = current_model.version + 1
         trace_id = _uuid.uuid4().hex
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # Load upstream data for the new version
         recommendation = await self._load_recommendation(
@@ -1021,13 +1021,14 @@ class TreatmentPlanService:
             payload["approved_at"] = plan_model.approved_at.isoformat()
 
         await self._outbox_repo.create(
+            event_id=str(_uuid.uuid4()),
             aggregate_type=GraphAggregateType.TREATMENT_PLAN.value,
             aggregate_id=plan_model.plan_id,
             event_type=event_type.value,
             schema_version=1,
             payload=payload,
             actor_id=actor_id,
-            occurred_at=datetime.now(timezone.utc),
+            occurred_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
 
     # ── Internal: Upstream Data Loading ───────────────────────────────────

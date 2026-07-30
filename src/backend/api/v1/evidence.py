@@ -31,8 +31,8 @@ from src.backend.evidence.domain import (
     EvidenceRefreshResponse,
     EvidenceVariantResponse,
 )
-from src.backend.evidence.merger import EvidenceMerger
 from src.backend.repositories.variant_repo import VariantRepository
+from src.backend.services.evidence_ingestion_service import EvidenceIngestionService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/evidence", tags=["evidence"])
@@ -109,8 +109,8 @@ async def get_variant_evidence(
         return EvidenceVariantResponse(**cached)
 
     # Query sources with persistence
-    merger = EvidenceMerger(db=db)
-    result = await merger.merge_variant_evidence(
+    service = EvidenceIngestionService(db=db)
+    result = await service.merge_variant_evidence(
         gene_symbol=variant.gene_symbol,
         hgvs=variant.hgvs_notation or "",
         chromosome=variant.chromosome,
@@ -148,8 +148,8 @@ async def get_gene_evidence(
     if cached:
         return EvidenceGeneResponse(**cached)
 
-    merger = EvidenceMerger(db=db)
-    result = await merger.merge_gene_evidence(
+    service = EvidenceIngestionService(db=db)
+    result = await service.merge_gene_evidence(
         gene_symbol=gene_symbol,
         request_id=f"api-gene-{gene_symbol}",
     )
@@ -177,7 +177,7 @@ async def refresh_evidence(
     invalidate caches, return summary.
     """
     started = datetime.now(UTC)
-    merger = EvidenceMerger(db=db)
+    service = EvidenceIngestionService(db=db)
     errors = []
     sources_updated = []
     total_evidence = 0
@@ -197,7 +197,7 @@ async def refresh_evidence(
     len(cancer_genes)
     for i, gene in enumerate(cancer_genes):
         try:
-            result = await merger.refresh_all(
+            result = await service.refresh_all(
                 gene_symbol=gene,
                 request_id=f"refresh-batch-{i}",
             )

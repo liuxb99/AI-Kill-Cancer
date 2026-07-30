@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -153,21 +153,10 @@ async def retry_event(
     将事件状态重置为 pending，清除错误信息，以便重试处理器重新消费。
     需要 manage:settings 权限（Admin/Researcher）。
     """
-    repo = ClinicalGraphOutboxRepository(db)
-    event = await repo.get_by_event_id(event_id)
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
-    if event.status not in ("failed", "dead_letter"):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Event is in status '{event.status}', cannot retry",
-        )
-    # 重置为 pending
-    event.status = "pending"
-    event.attempt_count = 0
-    event.last_error = None
-    await db.commit()
-    return {"status": "retrying", "event_id": event_id}
+    from src.backend.services.clinical_graph_event_service import ClinicalGraphEventService
+
+    service = ClinicalGraphEventService(db)
+    return await service.retry_event(event_id)
 
 
 @router.get("/patient/{patient_id}/thread")

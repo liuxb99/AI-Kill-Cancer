@@ -77,7 +77,7 @@ class EvidenceItemRepository(BaseRepository[EvidenceItemModel]):
             existing.url = item.get("url", existing.url)
             if item.get("pmid"):
                 existing.pmid = str(item.get("pmid", existing.pmid))
-            await self.db.commit()
+            await self.db.flush()
             await self.db.refresh(existing)
             return existing
 
@@ -97,7 +97,7 @@ class EvidenceItemRepository(BaseRepository[EvidenceItemModel]):
                 existing2.match_level = match_level
                 existing2.conflict_status = conflict_status
                 existing2.retrieved_at = now
-                await self.db.commit()
+                await self.db.flush()
                 await self.db.refresh(existing2)
                 return existing2
 
@@ -131,7 +131,7 @@ class EvidenceItemRepository(BaseRepository[EvidenceItemModel]):
             api_response_hash=item.get("_response_hash", ""),
         )
         self.db.add(instance)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(instance)
         return instance
 
@@ -192,5 +192,5 @@ class EvidenceItemRepository(BaseRepository[EvidenceItemModel]):
         items = list(result.scalars().all())
         for item in items:
             item.withdrawn_at = now
-        await self.db.commit()
+        await self.db.flush()
         return len(items)

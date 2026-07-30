@@ -29,7 +29,7 @@ from src.backend.workbench.models import (
     TreatmentRecommendation,
     WorkbenchTimeline,
 )
-from src.backend.workbench.repository import TumorBoardRepository
+from src.backend.workbench.repository import TumorBoardRepository, WorkbenchNoteModel
 
 logger = logging.getLogger(__name__)
 
@@ -440,3 +440,248 @@ class WorkbenchService:
             unique_variants=unique_variants,
             ranking_differences=[],
         )
+
+    # ─── Tumor Board Review ──────────────────────────────────────────────────
+
+    async def create_review(self, case_id: str, reviewer_id: str, reviewer_name: str) -> dict:
+        """创建肿瘤 board review，由 Service 控制事务边界。"""
+        try:
+            review = await self.tumor_repo.create_review(
+                case_id=case_id,
+                reviewer_id=reviewer_id,
+                reviewer_name=reviewer_name,
+            )
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+        return {"review_id": str(review.id), "status": "draft", "case_id": case_id}
+
+    async def vote(
+        self,
+        case_id: str,
+        user_id: str,
+        user_name: str,
+        vote_value: str,
+        rationale: str,
+    ) -> dict:
+        """添加投票，由 Service 控制事务边界。"""
+        try:
+            reviews = await self.tumor_repo.get_reviews_by_case(case_id)
+            if not reviews:
+                review = await self.tumor_repo.create_review(
+                    case_id=case_id,
+                    reviewer_id=user_id,
+                    reviewer_name=user_name,
+                )
+                review_id = review.id
+            else:
+                review_id = reviews[0].id
+
+            vote_data = {
+                "reviewer_id": user_id,
+                "reviewer_name": user_name,
+                "vote": vote_value,
+                "rationale": rationale,
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+
+            audit = AuditLogModel(
+                actor=user_id,
+                action="tumor_board_vote",
+                resource_type="tumor_board_review",
+                resource_id=str(review_id),
+                details={"case_id": case_id, "vote": vote_value, "rationale": rationale},
+                created_at=datetime.now(UTC),
+            )
+            self.db.add(audit)
+
+            await self.tumor_repo.add_comment(review_id, vote_data)
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        return {"status": "ok", "review_id": str(review_id), "vote": vote_data}
+
+    async def add_comment(
+        self,
+        case_id: str,
+        user_id: str,
+        user_name: str,
+        content: str,
+        comment_type: str,
+    ) -> dict:
+        """添加评论，由 Service 控制事务边界。"""
+        try:
+            reviews = await self.tumor_repo.get_reviews_by_case(case_id)
+            if not reviews:
+                review = await self.tumor_repo.create_review(
+                    case_id=case_id,
+                    reviewer_id=user_id,
+                    reviewer_name=user_name,
+                )
+                review_id = review.id
+            else:
+                review_id = reviews[0].id
+
+            comment_data = {
+                "user_id": user_id,
+                "user_name": user_name,
+                "content": content,
+                "comment_type": comment_type,
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+
+            audit = AuditLogModel(
+                actor=user_id,
+                action="tumor_board_comment",
+                resource_type="tumor_board_review",
+                resource_id=str(review_id),
+                details={"case_id": case_id, "comment_type": comment_type},
+                created_at=datetime.now(UTC),
+            )
+            self.db.add(audit)
+
+            await self.tumor_repo.add_comment(review_id, comment_data)
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        return {"status": "ok", "review_id": str(review_id)}
+
+    # ─── Notes CRUD ──────────────────────────────────────────────────────────
+
+    async def create_note(
+        self,
+        case_id: str,
+        user_id: str,
+        content: str,
+        note_type: str = "general",
+    ) -> dict:
+        """创建笔记，由 Service 控制事务边界。"""
+        model = WorkbenchNoteModel(
+            case_id=case_id,
+            user_id=user_id,
+            content=content,
+            note_type=note_type,
+            created_at=datetime.now(UTC),
+        )
+        self.db.add(model)
+        # Flush 获取 model.id
+        await self.db.flush()
+
+        audit = AuditLogModel(
+            actor=user_id,
+            action="note_created",
+            resource_type="workbench_note",
+            resource_id=str(case_id),
+            details={"note_id": str(model.id), "case_id": case_id},
+            created_at=datetime.now(UTC),
+        )
+        self.db.add(audit)
+
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        await self.db.refresh(model)
+
+        return {
+            "id": str(model.id),
+            "case_id": model.case_id,
+            "user_id": model.user_id or "",
+            "content": model.content,
+            "note_type": model.note_type or "general",
+            "created_at": model.created_at.isoformat() if hasattr(model.created_at, 'isoformat') else str(model.created_at),
+        }
+
+    async def update_note(
+        self,
+        note_id: uuid.UUID,
+        case_id: str,
+        user_id: str,
+        content: str,
+    ) -> dict:
+        """更新笔记，由 Service 控制事务边界。"""
+        from sqlalchemy import select
+
+        stmt = select(WorkbenchNoteModel).where(
+            WorkbenchNoteModel.id == note_id,
+            WorkbenchNoteModel.case_id == case_id,
+        )
+        result = await self.db.execute(stmt)
+        model = result.scalar_one_or_none()
+        if not model:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Note not found"})
+
+        model.content = content
+
+        audit = AuditLogModel(
+            actor=user_id,
+            action="note_updated",
+            resource_type="workbench_note",
+            resource_id=str(note_id),
+            details={"case_id": case_id, "note_id": str(note_id)},
+            created_at=datetime.now(UTC),
+        )
+        self.db.add(audit)
+
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+        await self.db.refresh(model)
+
+        return {
+            "id": str(model.id),
+            "case_id": model.case_id,
+            "user_id": model.user_id or "",
+            "content": model.content,
+            "note_type": model.note_type or "general",
+            "created_at": model.created_at.isoformat() if hasattr(model.created_at, 'isoformat') else str(model.created_at),
+        }
+
+    async def delete_note(
+        self,
+        note_id: uuid.UUID,
+        case_id: str,
+        user_id: str,
+    ) -> dict:
+        """删除笔记，由 Service 控制事务边界。"""
+        from sqlalchemy import select
+
+        stmt = select(WorkbenchNoteModel).where(
+            WorkbenchNoteModel.id == note_id,
+            WorkbenchNoteModel.case_id == case_id,
+        )
+        result = await self.db.execute(stmt)
+        model = result.scalar_one_or_none()
+        if not model:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Note not found"})
+
+        await self.db.delete(model)
+
+        audit = AuditLogModel(
+            actor=user_id,
+            action="note_deleted",
+            resource_type="workbench_note",
+            resource_id=str(note_id),
+            details={"case_id": case_id, "note_id": str(note_id)},
+            created_at=datetime.now(UTC),
+        )
+        self.db.add(audit)
+
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        return {"status": "deleted"}

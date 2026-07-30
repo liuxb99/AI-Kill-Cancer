@@ -44,7 +44,7 @@ from src.backend.workbench.models import (
     TumorBoardVote,
     WorkbenchTimeline,
 )
-from src.backend.workbench.repository import TumorBoardRepository, WorkbenchNoteModel
+from src.backend.workbench.repository import WorkbenchNoteModel
 from src.backend.workbench.service import WorkbenchService
 
 logger = logging.getLogger(__name__)
@@ -102,18 +102,12 @@ async def create_tumor_board_review(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a tumor board review for a case."""
-    repo = TumorBoardRepository(db)
-    try:
-        review = await repo.create_review(
-            case_id=case_id,
-            reviewer_id=str(user.id),
-            reviewer_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
-        )
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise
-    return {"review_id": str(review.id), "status": "draft", "case_id": case_id}
+    service = WorkbenchService(db)
+    return await service.create_review(
+        case_id=case_id,
+        reviewer_id=str(user.id),
+        reviewer_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
+    )
 
 
 @router.get("/tumor-board/{case_id}/timeline", response_model=WorkbenchTimeline)
@@ -264,51 +258,14 @@ async def add_tumor_board_vote(
             "message": f"Vote must be one of: {', '.join(valid_votes)}",
         })
 
-    from datetime import datetime
-
-    from src.backend.domain.audit_log import AuditLogModel
-
-    repo = TumorBoardRepository(db)
-
-    try:
-        reviews = await repo.get_reviews_by_case(case_id)
-        if not reviews:
-            review = await repo.create_review(
-                case_id=case_id,
-                reviewer_id=str(user.id),
-                reviewer_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
-            )
-            review_id = review.id
-        else:
-            review_id = reviews[0].id
-
-        # All identity fields come from JWT — client values are NEVER used
-        vote_data = {
-            "reviewer_id": str(user.id),
-            "reviewer_name": getattr(user, 'display_name', '') or getattr(user, 'username', ''),
-            "vote": vote.vote,
-            "rationale": vote.rationale,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
-
-        audit = AuditLogModel(
-            actor=str(user.id),
-            action="tumor_board_vote",
-            resource_type="tumor_board_review",
-            resource_id=str(review_id),
-            details={"case_id": case_id, "vote": vote.vote, "rationale": vote.rationale},
-            created_at=datetime.now(UTC),
-        )
-        db.add(audit)
-
-        await repo.add_comment(review_id, vote_data)
-
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise
-
-    return {"status": "ok", "review_id": str(review_id), "vote": vote_data}
+    service = WorkbenchService(db)
+    return await service.vote(
+        case_id=case_id,
+        user_id=str(user.id),
+        user_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
+        vote_value=vote.vote,
+        rationale=vote.rationale,
+    )
 
 
 class TumorBoardCommentIn(BaseModel):
@@ -334,50 +291,14 @@ async def add_tumor_board_comment(
             "message": "Comment content cannot be empty",
         })
 
-    from datetime import datetime
-
-    from src.backend.domain.audit_log import AuditLogModel
-
-    repo = TumorBoardRepository(db)
-
-    try:
-        reviews = await repo.get_reviews_by_case(case_id)
-        if not reviews:
-            review = await repo.create_review(
-                case_id=case_id,
-                reviewer_id=str(user.id),
-                reviewer_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
-            )
-            review_id = review.id
-        else:
-            review_id = reviews[0].id
-
-        comment_data = {
-            "user_id": str(user.id),
-            "user_name": getattr(user, 'display_name', '') or getattr(user, 'username', ''),
-            "content": comment.content,
-            "comment_type": comment.comment_type,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
-
-        audit = AuditLogModel(
-            actor=str(user.id),
-            action="tumor_board_comment",
-            resource_type="tumor_board_review",
-            resource_id=str(review_id),
-            details={"case_id": case_id, "comment_type": comment.comment_type},
-            created_at=datetime.now(UTC),
-        )
-        db.add(audit)
-
-        await repo.add_comment(review_id, comment_data)
-
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise
-
-    return {"status": "ok", "review_id": str(review_id)}
+    service = WorkbenchService(db)
+    return await service.add_comment(
+        case_id=case_id,
+        user_id=str(user.id),
+        user_name=getattr(user, 'display_name', '') or getattr(user, 'username', ''),
+        content=comment.content,
+        comment_type=comment.comment_type,
+    )
 
 
 @router.get("/state/{case_id}")
@@ -452,48 +373,13 @@ async def create_note(
     if not note.content or not note.content.strip():
         raise HTTPException(status_code=422, detail={"error": "empty_content", "message": "Note content cannot be empty"})
 
-    from datetime import datetime
-
-    from src.backend.domain.audit_log import AuditLogModel
-
-    model = WorkbenchNoteModel(
+    service = WorkbenchService(db)
+    return await service.create_note(
         case_id=case_id,
         user_id=str(user.id),
         content=note.content,
         note_type=note.note_type,
-        created_at=datetime.now(UTC),
     )
-    db.add(model)
-
-    # Flush to get a real note.id before creating the audit
-    await db.flush()
-
-    audit = AuditLogModel(
-        actor=str(user.id),
-        action="note_created",
-        resource_type="workbench_note",
-        resource_id=str(case_id),
-        details={"note_id": str(model.id), "case_id": case_id},
-        created_at=datetime.now(UTC),
-    )
-    db.add(audit)
-
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise
-
-    await db.refresh(model)
-
-    return {
-        "id": str(model.id),
-        "case_id": model.case_id,
-        "user_id": model.user_id or "",
-        "content": model.content,
-        "note_type": model.note_type or "general",
-        "created_at": model.created_at.isoformat() if hasattr(model.created_at, 'isoformat') else str(model.created_at),
-    }
 
 
 @router.patch("/case/{case_id}/notes/{note_id}")
@@ -513,44 +399,13 @@ async def update_note(
     if not note.content or not note.content.strip():
         raise HTTPException(status_code=422, detail={"error": "empty_content", "message": "Note content cannot be empty"})
 
-    from datetime import datetime
-
-    from sqlalchemy import select
-
-    from src.backend.domain.audit_log import AuditLogModel
-
-    stmt = select(WorkbenchNoteModel).where(
-        WorkbenchNoteModel.id == nid,
-        WorkbenchNoteModel.case_id == case_id,
+    service = WorkbenchService(db)
+    return await service.update_note(
+        note_id=nid,
+        case_id=case_id,
+        user_id=str(user.id),
+        content=note.content,
     )
-    result = await db.execute(stmt)
-    model = result.scalar_one_or_none()
-    if not model:
-        raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Note not found"})
-
-    model.content = note.content
-
-    audit = AuditLogModel(
-        actor=str(user.id),
-        action="note_updated",
-        resource_type="workbench_note",
-        resource_id=str(note_id),
-        details={"case_id": case_id, "note_id": note_id},
-        created_at=datetime.now(UTC),
-    )
-    db.add(audit)
-
-    await db.commit()
-    await db.refresh(model)
-
-    return {
-        "id": str(model.id),
-        "case_id": model.case_id,
-        "user_id": model.user_id or "",
-        "content": model.content,
-        "note_type": model.note_type or "general",
-        "created_at": model.created_at.isoformat() if hasattr(model.created_at, 'isoformat') else str(model.created_at),
-    }
 
 
 @router.delete("/case/{case_id}/notes/{note_id}")
@@ -566,36 +421,12 @@ async def delete_note(
     except ValueError:
         raise HTTPException(status_code=400, detail={"error": "invalid_uuid", "message": "Invalid note ID"})
 
-    from datetime import datetime
-
-    from sqlalchemy import select
-
-    from src.backend.domain.audit_log import AuditLogModel
-
-    stmt = select(WorkbenchNoteModel).where(
-        WorkbenchNoteModel.id == nid,
-        WorkbenchNoteModel.case_id == case_id,
+    service = WorkbenchService(db)
+    return await service.delete_note(
+        note_id=nid,
+        case_id=case_id,
+        user_id=str(user.id),
     )
-    result = await db.execute(stmt)
-    model = result.scalar_one_or_none()
-    if not model:
-        raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Note not found"})
-
-    await db.delete(model)
-
-    audit = AuditLogModel(
-        actor=str(user.id),
-        action="note_deleted",
-        resource_type="workbench_note",
-        resource_id=str(note_id),
-        details={"case_id": case_id, "note_id": note_id},
-        created_at=datetime.now(UTC),
-    )
-    db.add(audit)
-
-    await db.commit()
-
-    return {"status": "deleted"}
 
 
 # ─── Reasoning Session ──────────────────────────────────────────────────────

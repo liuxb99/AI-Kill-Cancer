@@ -26,7 +26,7 @@ class BaseRepository(Generic[ModelT]):
     async def create(self, **kwargs) -> ModelT:
         instance = self.model_class(**kwargs)
         self.db.add(instance)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(instance)
         return instance
 
@@ -70,7 +70,7 @@ class BaseRepository(Generic[ModelT]):
         for field, value in kwargs.items():
             if hasattr(instance, field) and value is not None:
                 setattr(instance, field, value)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(instance)
         return instance
 
@@ -79,5 +79,5 @@ class BaseRepository(Generic[ModelT]):
         if not instance:
             return False
         await self.db.delete(instance)
-        await self.db.commit()
+        await self.db.flush()
         return True

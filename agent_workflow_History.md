@@ -623,3 +623,45 @@ TIME_PENDING | [v] Git Commit 54d8bd4 + Push to origin/master ✅
 2026-07-28 19:47 | [v] task(需求回歸檢查) -> Step 6 返工第4次：26/26 ALL PASS ✅
 2026-07-28 19:47 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性24 正確性24 可維護性23 測試23 | 總分94 合格 ✅（返工第4次，逐條對比原始需求全部 PASS）
 2026-07-28 19:47 | [v] ✅ 返工第4次通過，更新總結報告 + Commit
+2026-07-30 07:40 | [v] Step 0：task(doc-writer) -> 子代理已向使用者報到 ✅
+2026-07-30 07:40 | [v] Step 1：接收需求 -> tasks/requirements.md（Phase 3F-0 Transaction Boundary Hardening）
+2026-07-30 07:40 | [v] Step 2：場景識別 -> tasks/task-status.md（hardening 架構強化）
+2026-07-30 07:40 | [v] Step 3：task(PLANNER) -> 計劃完成，產出 tasks/plan-Phase-3F-0.md（10 階段、30 任務）
+2026-07-30 07:40 | [v] Step 4：更新 Workflow ✅
+2026-07-30 07:41 | [v] task(PLANNER/explore) -> T-01 盤點完成，產出 tasks/phase3f0-inventory.md
+2026-07-30 07:41 | [v] task(test-writer) -> T-02~T-05 紅燈測試完成（4 個測試檔案，紅燈驗證）
+2026-07-30 07:41 | [v] task(backend-logic) -> T-06 BaseRepository commit→flush 完成
+2026-07-30 07:42 | [v] task(backend-logic) -> T-07~T-11 移除 5 個 Repository 自行 commit 完成
+2026-07-30 07:42 | [v] task(backend-logic) -> T-15 Pipeline Service 交易包裝完成（2 新 Service + 3 API 修改）
+2026-07-30 07:43 | [v] task(backend-logic) -> T-13/T-14 API commit→Service 完成（workbench 6 處、clinical_graph 1 處）
+2026-07-30 07:43 | [v] task(backend-logic) -> get_db() 自動 commit 修復系統性回歸問題
+2026-07-30 07:43 | [v] task(test-writer) -> T-17~T-23 測試階段完成（6 測試檔案，22 tests 全部通過）
+2026-07-30 07:43 | [v] T-24~T-25 回歸驗證完成（320 tests 通過，ruff 通過）
+2026-07-30 07:44 | [v] T-26 CI 更新完成
+2026-07-30 07:44 | [v] Step 6 需求回歸檢查完成（R1~R11 全部 PASS）
+2026-07-30 07:44 | [v] task(REVIEWER) -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 流程遵守=NO | 完整性24 正確性24 可維護性23 測試24 | 總分0（流程遵守 NO）
+2026-07-30 07:44 | [v] task(PLANNER) resume -> 返工第 1 次規劃完成
+2026-07-30 07:44 | [v] Step 9：總結報告完成 -> tasks/summary-report-phase3f-0.md
+2026-07-30 07:44 | [v] 返工第 1 次：重新啟動 Step 6 + Step 7 REVIEWER
+2026-07-30 07:45 | [v] task(REVIEWER) resume -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES 流程遵守=YES | 完整性24 正確性25 可維護性24 測試23 | 總分96 合格 ✅（返工第 1 次，11/11 Reviewer Gate PASS）
+2026-07-30 07:46 | [v] Step 10 完成：需求歸檔至 requirements-history/requirements-Phase-3F-0.md ✅ 需求歸零 ✅
+2026-07-30 07:46 | [v] Git Commit f1c5582 + Push to origin/fix/transaction-boundary-hardening ✅
+2026-07-31 00:15 | [v] Outbox event_id Contract Verification → P0 bug 確認，Accepted 改為 NO
+2026-07-31 00:16 | [v] task(PLANNER) resume -> 返工第 2 次計劃完成，產出 tasks/plan-outbox-eventid-r2.md
+2026-07-31 00:16 | [v] task(開發子代理) resume -> 返工第 2 次修正完成：treatment_plan_service.py 加入 event_id + 移除 FixedOutboxRepository
+2026-07-31 00:17 | [v] 273 backend tests passed ✅
+2026-07-31 00:18 | [v] task(doc-writer) -> 回歸檢查報告產出 tasks/reviews/regression-check-phase3f0-final.md
+2026-07-31 00:18 | [v] task(REVIEWER) -> 最終審查報告產出 tasks/reviews/review_Phase-3F-0_final.md（93 分，Outbox Contract FAIL）
+2026-07-31 00:18 | [v] task(REVIEWER) resume -> 返工第 2 次評分報告產出 tasks/reviews/review_Phase-3F-0_r2.md（100 分）
+2026-07-31 00:18 | [v] task(doc-writer) -> Outbox 驗證報告產出 tasks/reviews/outbox-event-id-contract-verification.md
+2026-07-31 00:18 | [v] task(doc-writer) -> 總結報告更新完成（tasks/summary-report-phase3f-0.md 附錄 D）
+2026-07-31 00:20 | [v] Step 6 需求回歸檢查（返工第 2 次）通過 ✅
+2026-07-31 00:20 | [v] Step 7 REVIEWER 重新評分（返工第 2 次）100 分 ✅，Accepted = YES
+2026-07-31 00:20 | [v] Step 9 + Step 10 完成 ✅
+2026-07-31 00:20 | [v] Git Commit + Push to origin/fix/transaction-boundary-hardening ✅
+2026-07-31 00:23 | [v] chore(phase3f0): remove unrelated generated review artifacts（7 個無關檔案已清除）
+2026-07-31 00:25 | [v] CI Run #30563262611 觸發
+2026-07-31 00:30 | [v] CI Run #30563262611 完成 ✅ — 全部通過（frontend + backend + PostgreSQL Integration + Migration Gate）
+2026-07-31 00:30 | [v] docs(phase3f0): add final HEAD SHA and CI run ID to summary report
+2026-07-31 00:30 | [v] 更新 agent_workflow.md 記錄 CI 結果 ✅
+2026-07-31 00:30 | [v] **Phase 3F-0：Transaction Boundary Hardening 全部完成** 🎉

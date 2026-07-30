@@ -20,7 +20,6 @@ from src.backend.auth.dependencies import require_auth, require_case_access, ver
 from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
-from src.backend.evidence.merger import EvidenceMerger
 from src.backend.ranking.engine import DrugRankingEngine
 from src.backend.ranking.models import (
     DrugRankingResult,
@@ -28,6 +27,7 @@ from src.backend.ranking.models import (
 )
 from src.backend.ranking.repository import RankingRunRepository
 from src.backend.repositories.variant_repo import VariantRepository
+from src.backend.services.evidence_ingestion_service import EvidenceIngestionService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ranking", tags=["ranking"])
@@ -63,8 +63,8 @@ async def rank_variant(
                 await verify_case_access(spec.case_id, user, db, CaseRole.EDITOR)
 
     # Gather evidence
-    merger = EvidenceMerger(db=db)
-    evidence_result = await merger.merge_variant_evidence(
+    service = EvidenceIngestionService(db=db)
+    evidence_result = await service.merge_variant_evidence(
         gene_symbol=variant.gene_symbol,
         hgvs=variant.hgvs_notation or "",
         chromosome=variant.chromosome,
@@ -127,11 +127,11 @@ async def rank_case(
     """
     import uuid
 
-    from src.backend.evidence.merger import EvidenceMerger
     from src.backend.ranking.engine import DrugRankingEngine
     from src.backend.ranking.repository import RankingRunRepository
     from src.backend.repositories.cancer_case_repo import CancerCaseRepository
     from src.backend.repositories.variant_repo import VariantRepository
+    from src.backend.services.evidence_ingestion_service import EvidenceIngestionService
 
     try:
         cid = uuid.UUID(case_id)
@@ -160,7 +160,7 @@ async def rank_case(
         )
 
     # Gather evidence for each variant and merge results
-    merger = EvidenceMerger(db=db)
+    service = EvidenceIngestionService(db=db)
     engine = DrugRankingEngine()
 
     all_evidence_items = []
@@ -172,7 +172,7 @@ async def rank_case(
         v_id = str(variant.id) if hasattr(variant, "id") else ""
         variant_ids.append(v_id)
 
-        ev_result = await merger.merge_variant_evidence(
+        ev_result = await service.merge_variant_evidence(
             gene_symbol=variant.gene_symbol if hasattr(variant, "gene_symbol") else "",
             hgvs=getattr(variant, "hgvs_notation", "") or "",
             chromosome=getattr(variant, "chromosome", "") or "",

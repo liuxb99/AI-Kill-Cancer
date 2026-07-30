@@ -50,7 +50,7 @@ class DrugInteractionRepository(BaseRepository[DrugInteractionModel]):
             existing.pmids = item.get("pmids", existing.pmids)
             existing.source_version = item.get("source_version", existing.source_version)
             existing.retrieved_at = now
-            await self.db.commit()
+            await self.db.flush()
             await self.db.refresh(existing)
             return existing
 
@@ -70,7 +70,7 @@ class DrugInteractionRepository(BaseRepository[DrugInteractionModel]):
             source_version=item.get("source_version", ""),
         )
         self.db.add(instance)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(instance)
         return instance
 
