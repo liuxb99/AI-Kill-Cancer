@@ -322,6 +322,20 @@ class TestTreatmentPlanServiceSuccessPath:
         assert outbox.aggregate_id == response.plan_id
         assert outbox.event_type == "treatment_plan.created"
 
+        # 8. 驗證 datetime 為 UTC-naive（PostgreSQL TIMESTAMP WITHOUT TIME ZONE 相容）
+        assert plan_model.created_at.tzinfo is None, (
+            "created_at must be UTC-naive for PostgreSQL compatibility"
+        )
+        assert plan_model.updated_at.tzinfo is None, (
+            "updated_at must be UTC-naive for PostgreSQL compatibility"
+        )
+        for phase in phases:
+            assert phase.created_at.tzinfo is None
+            assert phase.updated_at.tzinfo is None
+        for item in items:
+            assert item.created_at.tzinfo is None
+            assert item.updated_at.tzinfo is None
+
     async def test_service_create_plan_with_patient_create_repo_rollback(
         self,
         db_session,
