@@ -128,6 +128,10 @@ def upgrade() -> None:
                 END IF;
             END $$;
         """)
+        # 额外删除可能残存的唯一索引（migration 023 的 unique=True + index=True
+        # 可能在部分 PG 环境建立的是 UNIQUE INDEX 而非 CONSTRAINT，
+        # 名称为 ix_domain_treatment_plan_traces_trace_id）
+        op.execute("DROP INDEX IF EXISTS ix_domain_treatment_plan_traces_trace_id")
         # 建立 UNIQUE(trace_id, step_order) constraint
         op.create_unique_constraint(
             "uq_domain_treatment_plan_traces_step",
