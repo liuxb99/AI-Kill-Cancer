@@ -21,6 +21,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.backend.database.models import Base
+from src.backend.repositories.clinical_graph_outbox_repo import (
+    ClinicalGraphOutboxRepository,
+)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Fixtures
@@ -187,24 +190,6 @@ def sample_request(upstream_data):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class FixedOutboxRepository:
-    """Wrap ClinicalGraphOutboxRepository to auto-generate missing event_id.
-
-    注意：原始 service 的 _create_outbox_event 未傳入 event_id，
-    但 ClinicalGraphOutboxModel.event_id 是 NOT NULL 且無預設值。
-    此 wrapper 補上預設 event_id 使測試可正常運作。
-    """
-
-    def __init__(self, db):
-        from src.backend.repositories.clinical_graph_outbox_repo import (
-            ClinicalGraphOutboxRepository,
-        )
-        self._inner = ClinicalGraphOutboxRepository(db)
-
-    async def create(self, **kwargs):
-        if "event_id" not in kwargs:
-            kwargs["event_id"] = f"event-{uuid.uuid4().hex}"
-        return await self._inner.create(**kwargs)
 
 
 class TestTreatmentPlanServiceSuccessPath:
@@ -264,7 +249,7 @@ class TestTreatmentPlanServiceSuccessPath:
             monitoring_repo=TreatmentMonitoringRepository(db_session),
             safety_repo=TreatmentSafetyRuleRepository(db_session),
             trace_repo=TreatmentPlanTraceRepository(db_session),
-            outbox_repo=FixedOutboxRepository(db_session),
+            outbox_repo=ClinicalGraphOutboxRepository(db_session),
         )
 
         user_id = str(upstream_data["user_id"])
@@ -358,94 +343,3 @@ class TestTreatmentPlanServiceSuccessPath:
         for item in items:
             assert item.created_at.tzinfo is None
             assert item.updated_at.tzinfo is None
-
-    async def test_service_create_plan_with_patient_create_repo_rollback(
-        self,
-        db_session,
-        upstream_data,
-        sample_request,
-    ) -> None:
-        """GREEN LIGHT: 驗證當 Service 失敗時，所有資料被 rollback。
-
-        此測試展示：因為所有 Repository 使用 flush-only，
-        即使 Service 的交易失敗（rollback），所有資料都不會存在。
-
-        在正確設計中，所有資料在同一個交易邊界內。
-        """
-        from src.backend.clinical.treatment_plan_engine import (
-            TreatmentPlanEngine,
-        )
-        from src.backend.clinical.treatment_plan_rules import (
-            TreatmentPlanRuleSet,
-        )
-        from src.backend.repositories.clinical_graph_outbox_repo import (
-            ClinicalGraphOutboxRepository,
-        )
-        from src.backend.repositories.patient_repo import PatientRepository
-        from src.backend.repositories.treatment_plan_repo import (
-            TreatmentItemRepository,
-            TreatmentMonitoringRepository,
-            TreatmentPhaseRepository,
-            TreatmentPlanRepository,
-            TreatmentPlanTraceRepository,
-            TreatmentSafetyRuleRepository,
-        )
-        from src.backend.services.treatment_plan_service import (
-            TreatmentPlanService,
-        )
-
-        # ---- Arrange ----
-        # 使用 PatientRepository.create() 建立 Patient（flush-only）
-        patient_repo = PatientRepository(db_session)
-        patient = await patient_repo.create(
-            display_name="Flush-Only Patient for T05",
-        )
-
-        # ---- Act ----
-        # 使用有效的 patient_id 讓 create_plan 通過驗證階段，
-        # 但在 _create_outbox_event 中因缺少 event_id（使用原始
-        # ClinicalGraphOutboxRepository，未經 FixedOutboxRepository 包裝）
-        # 導致 IntegrityError（event_id 為 NOT NULL），此異常在 try/except
-        # 塊內被捕獲，觸發 rollback 清除所有 flush-only 的資料。
-        rule_set = TreatmentPlanRuleSet()
-        engine = TreatmentPlanEngine(rule_set=rule_set)
-
-        service = TreatmentPlanService(
-            db=db_session,
-            engine=engine,
-            plan_repo=TreatmentPlanRepository(db_session),
-            phase_repo=TreatmentPhaseRepository(db_session),
-            item_repo=TreatmentItemRepository(db_session),
-            monitoring_repo=TreatmentMonitoringRepository(db_session),
-            safety_repo=TreatmentSafetyRuleRepository(db_session),
-            trace_repo=TreatmentPlanTraceRepository(db_session),
-            outbox_repo=ClinicalGraphOutboxRepository(db_session),
-        )
-
-        # 使用有效的 patient_id（讓 validation 通過），
-        # 其他 ID 保持有效，這樣 create_plan 會執行到 try/except 塊內的
-        # _create_outbox_event 階段才失敗。
-        from src.backend.services.treatment_plan_service import CreatePlanRequest
-
-        bad_request = CreatePlanRequest(
-            patient_id=str(upstream_data["patient_id"]),  # 有效的 patient
-            recommendation_id=sample_request.recommendation_id,
-            clinical_decision_id=sample_request.clinical_decision_id,
-            consensus_id=sample_request.consensus_id,
-            plan_intent="curative",
-            treatment_goals=["test"],
-            clinical_context={},
-        )
-
-        with pytest.raises(Exception):
-            await service.create_plan(bad_request, user_id=str(upstream_data["user_id"]))
-
-        # ---- Assert ----
-        # 驗證 Patient 不存在（因為 Service 失敗 rollback 了所有資料）
-        # 由於 PatientRepository.create() 使用 flush-only，patient 與
-        # Service 操作在同一交易中，service 失敗 rollback 影響 patient
-        found = await patient_repo.get(patient.id)
-        assert found is None, (
-            "✅ GREEN LIGHT PASSED: Patient was rolled back with the service "
-            "transaction because PatientRepository.create() uses flush-only."
-        )

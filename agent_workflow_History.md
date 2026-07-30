@@ -646,3 +646,16 @@ TIME_PENDING | [v] Git Commit 54d8bd4 + Push to origin/master ✅
 2026-07-30 07:45 | [v] task(REVIEWER) resume -> 可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES 流程遵守=YES | 完整性24 正確性25 可維護性24 測試23 | 總分96 合格 ✅（返工第 1 次，11/11 Reviewer Gate PASS）
 2026-07-30 07:46 | [v] Step 10 完成：需求歸檔至 requirements-history/requirements-Phase-3F-0.md ✅ 需求歸零 ✅
 2026-07-30 07:46 | [v] Git Commit f1c5582 + Push to origin/fix/transaction-boundary-hardening ✅
+2026-07-31 00:15 | [v] Outbox event_id Contract Verification → P0 bug 確認，Accepted 改為 NO
+2026-07-31 00:16 | [v] task(PLANNER) resume -> 返工第 2 次計劃完成，產出 tasks/plan-outbox-eventid-r2.md
+2026-07-31 00:16 | [v] task(開發子代理) resume -> 返工第 2 次修正完成：treatment_plan_service.py 加入 event_id + 移除 FixedOutboxRepository
+2026-07-31 00:17 | [v] 273 backend tests passed ✅
+2026-07-31 00:18 | [v] task(doc-writer) -> 回歸檢查報告產出 tasks/reviews/regression-check-phase3f0-final.md
+2026-07-31 00:18 | [v] task(REVIEWER) -> 最終審查報告產出 tasks/reviews/review_Phase-3F-0_final.md（93 分，Outbox Contract FAIL）
+2026-07-31 00:18 | [v] task(REVIEWER) resume -> 返工第 2 次評分報告產出 tasks/reviews/review_Phase-3F-0_r2.md（100 分）
+2026-07-31 00:18 | [v] task(doc-writer) -> Outbox 驗證報告產出 tasks/reviews/outbox-event-id-contract-verification.md
+2026-07-31 00:18 | [v] task(doc-writer) -> 總結報告更新完成（tasks/summary-report-phase3f-0.md 附錄 D）
+2026-07-31 00:20 | [v] Step 6 需求回歸檢查（返工第 2 次）通過 ✅
+2026-07-31 00:20 | [v] Step 7 REVIEWER 重新評分（返工第 2 次）100 分 ✅，Accepted = YES
+2026-07-31 00:20 | [v] Step 9 + Step 10 完成 ✅
+2026-07-31 00:20 | [v] Git Commit + Push to origin/fix/transaction-boundary-hardening ✅

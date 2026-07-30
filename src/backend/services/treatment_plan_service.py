@@ -1021,6 +1021,7 @@ class TreatmentPlanService:
             payload["approved_at"] = plan_model.approved_at.isoformat()
 
         await self._outbox_repo.create(
+            event_id=str(_uuid.uuid4()),
             aggregate_type=GraphAggregateType.TREATMENT_PLAN.value,
             aggregate_id=plan_model.plan_id,
             event_type=event_type.value,

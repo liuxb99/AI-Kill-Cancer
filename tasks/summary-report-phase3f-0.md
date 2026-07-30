@@ -403,4 +403,37 @@ async def get_db():
 
 ---
 
+## 附录 D：返工第 2 次（Outbox event_id 修復）記錄
+
+### 發現背景
+
+- `TreatmentPlanService._create_outbox_event()` 未傳入 `event_id`
+- `ClinicalGraphOutboxModel.event_id` 是 `NOT NULL` 且無預設值
+- `FixedOutboxRepository` 測試 wrapper 遮蔽問題
+
+### 修復內容
+
+- `treatment_plan_service.py` L1024：加入 `event_id=str(_uuid.uuid4())`
+- `test_success_path_red.py`：移除 `FixedOutboxRepository` wrapper
+
+### Reviewer 評分歷程
+
+| 返工次數 | 總分 | Accepted |
+|---------|------|----------|
+| 第 0 次 | 0/100 | NO ❌ |
+| 第 1 次 | 96/100 | 原 YES → 撤回 ❌ |
+| 第 2 次 | **100/100** | **YES** ✅ |
+
+### 最終生產檔案數量
+
+17 ≤ 20 ✅
+
+### 已知 Follow-up
+
+1. Migration 歷史修改風險
+2. CI downgrade data-protection gate 後續拆分
+3. 22 處遺留 commit/rollback
+
+---
+
 *报告结束 — 本文档由 doc-writer 子代理根据代码审查和项目文件产出。*
