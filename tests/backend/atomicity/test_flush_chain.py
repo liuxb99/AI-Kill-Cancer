@@ -28,6 +28,9 @@ async def db_session():
     """Create a database session for testing. Supports Postgres via DATABASE_URL env var."""
     url = os.environ.get("DATABASE_URL", "sqlite+aiosqlite://")
 
+    from src.backend.domain.clinical_graph_outbox import (  # noqa: F401
+        ClinicalGraphOutboxModel,
+    )
     from src.backend.domain.patient import PatientModel  # noqa: F401
     from src.backend.domain.treatment_plan import (  # noqa: F401
         TreatmentItemModel,
@@ -36,9 +39,6 @@ async def db_session():
         TreatmentPlanModel,
         TreatmentPlanTraceModel,
         TreatmentSafetyRuleModel,
-    )
-    from src.backend.domain.clinical_graph_outbox import (  # noqa: F401
-        ClinicalGraphOutboxModel,
     )
 
     if url.startswith("postgresql"):
@@ -73,12 +73,12 @@ class TestFlushChain:
         7. Commit 全部
         8. 驗證所有資料存在
         """
-        from src.backend.domain.patient import PatientModel
         from src.backend.domain.enums import ConsentStatusEnum, SexEnum
+        from src.backend.domain.patient import PatientModel
         from src.backend.domain.treatment_plan import (
-            TreatmentPlanModel,
-            TreatmentPhaseModel,
             TreatmentItemModel,
+            TreatmentPhaseModel,
+            TreatmentPlanModel,
             TreatmentPlanTraceModel,
         )
         from src.backend.repositories.clinical_graph_outbox_repo import (
@@ -287,12 +287,12 @@ class TestFlushChain:
         建立完整的 Plan → Phase → Item → Trace → Outbox chain，
         然後 rollback，確認所有資料都不存在。
         """
-        from src.backend.domain.patient import PatientModel
         from src.backend.domain.enums import ConsentStatusEnum, SexEnum
+        from src.backend.domain.patient import PatientModel
         from src.backend.domain.treatment_plan import (
-            TreatmentPlanModel,
-            TreatmentPhaseModel,
             TreatmentItemModel,
+            TreatmentPhaseModel,
+            TreatmentPlanModel,
             TreatmentPlanTraceModel,
         )
         from src.backend.repositories.clinical_graph_outbox_repo import (
@@ -374,6 +374,7 @@ class TestFlushChain:
 
         # ---- Assert: 全部不存在 ----
         from sqlalchemy import select
+
         from src.backend.domain.clinical_graph_outbox import (
             ClinicalGraphOutboxModel,
         )

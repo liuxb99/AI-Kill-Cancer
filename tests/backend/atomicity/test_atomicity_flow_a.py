@@ -28,8 +28,8 @@ async def db_session():
     """Create a database session for testing. Supports Postgres via DATABASE_URL env var."""
     url = os.environ.get("DATABASE_URL", "sqlite+aiosqlite://")
 
-    from src.backend.domain.patient import PatientModel  # noqa: F401
     from src.backend.domain.cancer_case import CancerCaseModel  # noqa: F401
+    from src.backend.domain.patient import PatientModel  # noqa: F401
 
     if url.startswith("postgresql"):
         engine = create_async_engine(url, echo=False)
@@ -63,8 +63,8 @@ class TestPatientCancerCaseAtomicity:
         3. Rollback 清除 PendingRollbackError
         4. 驗證 Patient 不存在（全部 rollback）
         """
-        from src.backend.repositories.patient_repo import PatientRepository
         from src.backend.repositories.cancer_case_repo import CancerCaseRepository
+        from src.backend.repositories.patient_repo import PatientRepository
 
         # ---- Arrange ----
         patient_repo = PatientRepository(db_session)
@@ -110,8 +110,8 @@ class TestPatientCancerCaseAtomicity:
 
         Session 1 結束時自動 rollback（flush-only），Patient 不被持久化。
         """
-        from src.backend.repositories.patient_repo import PatientRepository
         from src.backend.repositories.cancer_case_repo import CancerCaseRepository
+        from src.backend.repositories.patient_repo import PatientRepository
 
         engine = create_async_engine("sqlite+aiosqlite://", echo=False)
         async with engine.begin() as conn:
@@ -165,9 +165,9 @@ class TestPatientCancerCaseAtomicity:
 
         現在 PatientRepository.create() 使用 flush-only，此模式可以實現。
         """
-        from src.backend.repositories.patient_repo import PatientRepository
-        from src.backend.repositories.cancer_case_repo import CancerCaseRepository
         from src.backend.domain.enums import CancerTypeEnum
+        from src.backend.repositories.cancer_case_repo import CancerCaseRepository
+        from src.backend.repositories.patient_repo import PatientRepository
 
         engine = create_async_engine("sqlite+aiosqlite://", echo=False)
         async with engine.begin() as conn:

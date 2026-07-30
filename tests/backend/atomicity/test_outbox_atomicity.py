@@ -29,14 +29,14 @@ async def db_session():
     """Create a database session for testing. Supports Postgres via DATABASE_URL env var."""
     url = os.environ.get("DATABASE_URL", "sqlite+aiosqlite://")
 
+    from src.backend.domain.clinical_graph_outbox import (  # noqa: F401
+        ClinicalGraphOutboxModel,
+    )
     from src.backend.domain.patient import PatientModel  # noqa: F401
     from src.backend.domain.recommendation import (  # noqa: F401
         RecommendationModel,
         RecommendationTraceModel,
         RecommendationTraceStepModel,
-    )
-    from src.backend.domain.clinical_graph_outbox import (  # noqa: F401
-        ClinicalGraphOutboxModel,
     )
 
     if url.startswith("postgresql"):
@@ -58,8 +58,8 @@ async def upstream_patient(db_session):
 
     使用 flush-only，與測試主體共用同一 session。
     """
-    from src.backend.domain.patient import PatientModel
     from src.backend.domain.enums import ConsentStatusEnum, SexEnum
+    from src.backend.domain.patient import PatientModel
 
     patient = PatientModel(
         display_name="T20-TEST-PATIENT",
@@ -156,13 +156,14 @@ class TestOutboxAtomicity:
 
         # ---- Assert ----
         from sqlalchemy import select
+
+        from src.backend.domain.clinical_graph_outbox import (
+            ClinicalGraphOutboxModel,
+        )
         from src.backend.domain.recommendation import (
             RecommendationModel,
             RecommendationTraceModel,
             RecommendationTraceStepModel,
-        )
-        from src.backend.domain.clinical_graph_outbox import (
-            ClinicalGraphOutboxModel,
         )
 
         # 驗證 Recommendation 存在
@@ -271,6 +272,7 @@ class TestOutboxAtomicity:
         # ---- Assert ----
         # 驗證所有業務資料都不存在
         from sqlalchemy import select
+
         from src.backend.domain.recommendation import (
             RecommendationModel,
         )
@@ -311,9 +313,6 @@ class TestOutboxAtomicity:
         from src.backend.domain.recommendation import (
             RecommendationModel,
         )
-        from src.backend.repositories.clinical_graph_outbox_repo import (
-            ClinicalGraphOutboxRepository,
-        )
 
         rec_id = f"rec-{uuid.uuid4().hex}"
 
@@ -334,6 +333,7 @@ class TestOutboxAtomicity:
         # ---- Assert ----
         # 驗證 Outbox 不存在（因為交易失敗，尚未建立 Outbox）
         from sqlalchemy import select
+
         from src.backend.domain.clinical_graph_outbox import (
             ClinicalGraphOutboxModel,
         )
@@ -372,11 +372,12 @@ class TestOutboxAtomicity:
         4. 驗證全部存在
         """
         from sqlalchemy import select
-        from src.backend.domain.recommendation import (
-            RecommendationModel,
-        )
+
         from src.backend.domain.clinical_graph_outbox import (
             ClinicalGraphOutboxModel,
+        )
+        from src.backend.domain.recommendation import (
+            RecommendationModel,
         )
         from src.backend.repositories.clinical_graph_outbox_repo import (
             ClinicalGraphOutboxRepository,

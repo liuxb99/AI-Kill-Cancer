@@ -30,8 +30,8 @@ async def db_session():
     url = os.environ.get("DATABASE_URL", "sqlite+aiosqlite://")
 
     # 確保所有依賴的 model 在 create_all 前載入
-    from src.backend.domain.patient import PatientModel  # noqa: F401
     from src.backend.domain.cancer_case import CancerCaseModel  # noqa: F401
+    from src.backend.domain.patient import PatientModel  # noqa: F401
 
     if url.startswith("postgresql"):
         engine = create_async_engine(url, echo=False)
@@ -62,9 +62,9 @@ class TestBaseRepositoryAtomicity:
 
         驗證 flush 後 PK 可用（a.id 不是 None）。
         """
-        from src.backend.repositories.base import BaseRepository
-        from src.backend.domain.patient import PatientModel
         from src.backend.domain.cancer_case import CancerCaseModel
+        from src.backend.domain.patient import PatientModel
+        from src.backend.repositories.base import BaseRepository
 
         # ---- Arrange ----
         repo_a = BaseRepository(PatientModel, db_session)
@@ -109,9 +109,9 @@ class TestBaseRepositoryAtomicity:
         結束後尚未持久化。Session 1 結束時（close）自動 rollback，
         A 和 B 都不存在。
         """
-        from src.backend.repositories.base import BaseRepository
-        from src.backend.domain.patient import PatientModel
         from src.backend.domain.cancer_case import CancerCaseModel
+        from src.backend.domain.patient import PatientModel
+        from src.backend.repositories.base import BaseRepository
 
         # 建立引擎和 sessionmaker
         engine = create_async_engine("sqlite+aiosqlite://", echo=False)
@@ -161,10 +161,10 @@ class TestBaseRepositoryAtomicity:
         3. Rollback 模擬 Service 層需要 rollback 的場景
         4. 驗證兩者都不存在（flush-only 行為）
         """
-        from src.backend.repositories.base import BaseRepository
-        from src.backend.domain.patient import PatientModel
         from src.backend.domain.cancer_case import CancerCaseModel
         from src.backend.domain.enums import CancerTypeEnum
+        from src.backend.domain.patient import PatientModel
+        from src.backend.repositories.base import BaseRepository
 
         # ---- Arrange ----
         engine = create_async_engine("sqlite+aiosqlite://", echo=False)

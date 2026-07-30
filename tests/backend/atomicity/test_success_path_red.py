@@ -16,14 +16,11 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime, timezone
-from typing import Any
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.backend.database.models import Base
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Fixtures
@@ -35,15 +32,15 @@ async def db_session():
     """Create a database session for testing. Supports Postgres via DATABASE_URL env var."""
     url = os.environ.get("DATABASE_URL", "sqlite+aiosqlite://")
 
+    from src.backend.domain.clinical_decision import ClinicalDecisionModel  # noqa: F401
+    from src.backend.domain.clinical_graph_outbox import (  # noqa: F401
+        ClinicalGraphOutboxModel,
+    )
     from src.backend.domain.patient import PatientModel  # noqa: F401
     from src.backend.domain.recommendation import (  # noqa: F401
         RecommendationModel,
         RecommendationTraceModel,
         RecommendationTraceStepModel,
-    )
-    from src.backend.domain.clinical_decision import ClinicalDecisionModel  # noqa: F401
-    from src.backend.domain.tumor_board import (  # noqa: F401
-        TumorBoardConsensusModel,
     )
     from src.backend.domain.treatment_plan import (  # noqa: F401
         TreatmentItemModel,
@@ -53,8 +50,8 @@ async def db_session():
         TreatmentPlanTraceModel,
         TreatmentSafetyRuleModel,
     )
-    from src.backend.domain.clinical_graph_outbox import (  # noqa: F401
-        ClinicalGraphOutboxModel,
+    from src.backend.domain.tumor_board import (  # noqa: F401
+        TumorBoardConsensusModel,
     )
 
     if url.startswith("postgresql"):
@@ -77,18 +74,18 @@ async def upstream_data(db_session):
     直接在 db_session 中建立資料並 flush，確保與 Service 使用同一個 session。
     注意：不 commit，讓 Service 決定交易邊界。
     """
+    from src.backend.domain.clinical_decision import ClinicalDecisionModel
+    from src.backend.domain.enums import (
+        ConfidenceLevelEnum,
+        ConsentStatusEnum,
+        DecisionStatusEnum,
+        DecisionTypeEnum,
+        RecommendationStatusEnum,
+        SexEnum,
+    )
     from src.backend.domain.patient import PatientModel
     from src.backend.domain.recommendation import RecommendationModel
-    from src.backend.domain.clinical_decision import ClinicalDecisionModel
     from src.backend.domain.tumor_board import TumorBoardConsensusModel
-    from src.backend.domain.enums import (
-        ConsentStatusEnum,
-        SexEnum,
-        DecisionTypeEnum,
-        DecisionStatusEnum,
-        ConfidenceLevelEnum,
-        RecommendationStatusEnum,
-    )
 
     data = {}
 
@@ -221,23 +218,23 @@ class TestTreatmentPlanServiceSuccessPath:
         2. 驗證 Service 回傳完整的 TreatmentPlanResponse
         3. 驗證資料庫中存在 TreatmentPlan + Phases + Items + Trace + Outbox
         """
-        from src.backend.services.treatment_plan_service import (
-            TreatmentPlanService,
-            TreatmentPlanResponse,
-        )
-        from src.backend.repositories.treatment_plan_repo import (
-            TreatmentPlanRepository,
-            TreatmentPhaseRepository,
-            TreatmentItemRepository,
-            TreatmentPlanTraceRepository,
-            TreatmentMonitoringRepository,
-            TreatmentSafetyRuleRepository,
-        )
         from src.backend.clinical.treatment_plan_engine import (
             TreatmentPlanEngine,
         )
         from src.backend.clinical.treatment_plan_rules import (
             TreatmentPlanRuleSet,
+        )
+        from src.backend.repositories.treatment_plan_repo import (
+            TreatmentItemRepository,
+            TreatmentMonitoringRepository,
+            TreatmentPhaseRepository,
+            TreatmentPlanRepository,
+            TreatmentPlanTraceRepository,
+            TreatmentSafetyRuleRepository,
+        )
+        from src.backend.services.treatment_plan_service import (
+            TreatmentPlanResponse,
+            TreatmentPlanService,
         )
 
         # ---- Arrange ----
@@ -306,6 +303,7 @@ class TestTreatmentPlanServiceSuccessPath:
         # 7. 資料庫驗證：Outbox 存在
         # 使用 aggregate_id 查詢（因為 event_id 由 repo 自動產生）
         from sqlalchemy import select
+
         from src.backend.domain.clinical_graph_outbox import (
             ClinicalGraphOutboxModel,
         )
@@ -337,26 +335,26 @@ class TestTreatmentPlanServiceSuccessPath:
 
         在正確設計中，所有資料在同一個交易邊界內。
         """
-        from src.backend.services.treatment_plan_service import (
-            TreatmentPlanService,
-        )
-        from src.backend.repositories.treatment_plan_repo import (
-            TreatmentPlanRepository,
-            TreatmentPhaseRepository,
-            TreatmentItemRepository,
-            TreatmentPlanTraceRepository,
-            TreatmentMonitoringRepository,
-            TreatmentSafetyRuleRepository,
-        )
-        from src.backend.repositories.clinical_graph_outbox_repo import (
-            ClinicalGraphOutboxRepository,
-        )
-        from src.backend.repositories.patient_repo import PatientRepository
         from src.backend.clinical.treatment_plan_engine import (
             TreatmentPlanEngine,
         )
         from src.backend.clinical.treatment_plan_rules import (
             TreatmentPlanRuleSet,
+        )
+        from src.backend.repositories.clinical_graph_outbox_repo import (
+            ClinicalGraphOutboxRepository,
+        )
+        from src.backend.repositories.patient_repo import PatientRepository
+        from src.backend.repositories.treatment_plan_repo import (
+            TreatmentItemRepository,
+            TreatmentMonitoringRepository,
+            TreatmentPhaseRepository,
+            TreatmentPlanRepository,
+            TreatmentPlanTraceRepository,
+            TreatmentSafetyRuleRepository,
+        )
+        from src.backend.services.treatment_plan_service import (
+            TreatmentPlanService,
         )
 
         # ---- Arrange ----

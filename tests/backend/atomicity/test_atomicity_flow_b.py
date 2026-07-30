@@ -32,6 +32,9 @@ async def db_session():
     """Create a database session for testing. Supports Postgres via DATABASE_URL env var."""
     url = os.environ.get("DATABASE_URL", "sqlite+aiosqlite://")
 
+    from src.backend.domain.clinical_graph_outbox import (  # noqa: F401
+        ClinicalGraphOutboxModel,
+    )
     from src.backend.domain.patient import PatientModel  # noqa: F401
     from src.backend.domain.treatment_plan import (  # noqa: F401
         TreatmentItemModel,
@@ -40,9 +43,6 @@ async def db_session():
         TreatmentPlanModel,
         TreatmentPlanTraceModel,
         TreatmentSafetyRuleModel,
-    )
-    from src.backend.domain.clinical_graph_outbox import (  # noqa: F401
-        ClinicalGraphOutboxModel,
     )
 
     if url.startswith("postgresql"):
@@ -229,7 +229,7 @@ class TestTreatmentPlanFlowAtomicity:
         )
 
         item_repo = TreatmentItemRepository(db_session)
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception):
             bad_item = TreatmentItemModel(
                 item_id="t04-item-bad",
                 plan_id=plan_id,
@@ -246,8 +246,8 @@ class TestTreatmentPlanFlowAtomicity:
         # ---- Assert ----
         # 驗證 Plan 不存在（flush-only，rollback 生效）
         from src.backend.repositories.treatment_plan_repo import (
-            TreatmentPlanRepository,
             TreatmentPhaseRepository,
+            TreatmentPlanRepository,
         )
         plan_repo = TreatmentPlanRepository(db_session)
         found_plan = await plan_repo.get(plan_id)
@@ -284,7 +284,7 @@ class TestTreatmentPlanFlowAtomicity:
         )
 
         # Step 4a: 建立第一個 Trace（成功）
-        trace = await self._create_trace(
+        await self._create_trace(
             db_session, plan, trace_id="t04-trace-002",
         )
 
@@ -312,9 +312,9 @@ class TestTreatmentPlanFlowAtomicity:
         # ---- Assert ----
         # 驗證所有資料都不存在
         from src.backend.repositories.treatment_plan_repo import (
-            TreatmentPlanRepository,
-            TreatmentPhaseRepository,
             TreatmentItemRepository,
+            TreatmentPhaseRepository,
+            TreatmentPlanRepository,
         )
 
         plan_repo = TreatmentPlanRepository(db_session)
@@ -345,7 +345,7 @@ class TestTreatmentPlanFlowAtomicity:
         item = await self._create_item(
             db_session, plan, phase, item_id="t04-item-003",
         )
-        trace = await self._create_trace(
+        await self._create_trace(
             db_session, plan, trace_id="t04-trace-003",
         )
 
@@ -371,9 +371,9 @@ class TestTreatmentPlanFlowAtomicity:
 
         # ---- Assert ----
         from src.backend.repositories.treatment_plan_repo import (
-            TreatmentPlanRepository,
-            TreatmentPhaseRepository,
             TreatmentItemRepository,
+            TreatmentPhaseRepository,
+            TreatmentPlanRepository,
             TreatmentPlanTraceRepository,
         )
 
