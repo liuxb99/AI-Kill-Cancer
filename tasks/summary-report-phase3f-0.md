@@ -428,6 +428,17 @@ async def get_db():
 
 17 ≤ 20 ✅
 
+### 最終提交資訊
+
+| 項目 | 值 |
+|------|-----|
+| **Final HEAD** | `352a23d4db7b7e46286f13223aa855f169c368c6` |
+| **分支** | `fix/transaction-boundary-hardening` |
+| **CI Run ID** | [30563262611](https://github.com/liuxb99/AI-Kill-Cancer/actions/runs/30563262611) |
+| **Backend（含 lint、pytest、CI-01~CI-05、PostgreSQL Integration）** | ✅ success |
+| **Migration Gate（upgrade→verify→downgrade→re-upgrade）** | ✅ success |
+| **Frontend（test + build）** | ✅ success |
+
 ### 已知 Follow-up
 
 1. Migration 歷史修改風險
