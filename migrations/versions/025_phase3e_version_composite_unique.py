@@ -189,8 +189,21 @@ def downgrade() -> None:
         # 删除 025 建立的 UNIQUE(trace_id, step_order) constraint
         op.execute("ALTER TABLE domain_treatment_plan_traces DROP CONSTRAINT IF EXISTS uq_domain_treatment_plan_traces_step")
         # 恢复 024 的 UNIQUE(trace_id) constraint
+        # 注意：如果 trace 表中已有相同 trace_id 的多行資料（由 025 複合約束下產生），
+        # 直接加 UNIQUE(trace_id) 會失敗。此處先清理重複行再添加約束。
         op.execute("""
             DO $$ BEGIN
+                -- Delete duplicate trace_id rows keeping only the first (by step_order)
+                DELETE FROM domain_treatment_plan_traces
+                WHERE id IN (
+                    SELECT id FROM (
+                        SELECT id, ROW_NUMBER() OVER (
+                            PARTITION BY trace_id ORDER BY step_order
+                        ) AS rn
+                        FROM domain_treatment_plan_traces
+                    ) dup
+                    WHERE dup.rn > 1
+                );
                 IF NOT EXISTS (
                     SELECT 1 FROM pg_catalog.pg_constraint
                     WHERE conname = 'domain_treatment_plan_traces_trace_id_key'
