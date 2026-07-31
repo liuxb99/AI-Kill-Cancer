@@ -1,9 +1,4 @@
-"""Minimal GDC API client for public TCGA-THCA data.
-
-The first slice intentionally downloads compact clinical metadata through the
-GDC cases endpoint.  Large molecular files remain optional and are represented
-by manifest metadata so the pipeline can grow without changing its contract.
-"""
+"""GDC API client for public TCGA-THCA clinical and mutation data."""
 
 from __future__ import annotations
 
@@ -12,6 +7,8 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+from src.backend.importers.ptc_tcga.maf_parser import merge_variants_into_cases, parse_maf_bytes
 
 
 GDC_API = "https://api.gdc.cancer.gov"
@@ -22,6 +19,8 @@ class GDCDownloadResult:
     records: list[dict[str, Any]]
     total: int
     source_version: str | None
+    mutation_files: int = 0
+    mutation_variants: int = 0
 
 
 class GDCClient:
@@ -84,12 +83,60 @@ class GDCClient:
             source_version=payload.get("data", {}).get("release"),
         )
 
-    def fetch_somatic_mutation_manifest(self, *, size: int = 1000) -> list[dict[str, Any]]:
-        """Return metadata for public masked somatic mutation MAF files.
+    def fetch_ptc_cases_with_mutations(
+        self,
+        *,
+        size: int = 100,
+        offset: int = 0,
+        mutation_files: int = 1,
+    ) -> GDCDownloadResult:
+        """Download clinical cases and merge public masked somatic mutations.
 
-        The caller can subsequently download selected public file UUIDs through
-        the GDC ``/data/{file_id}`` endpoint or the official gdc-client.
+        GDC mutation files are project-level MAFs. One current open file is
+        normally sufficient for the MVP; callers may request more files when
+        validating multiple workflows. Duplicate variants are removed by their
+        normalized content before persistence.
         """
+        clinical = self.fetch_ptc_cases(size=size, offset=offset)
+        if mutation_files <= 0:
+            return clinical
+        manifest = self.fetch_somatic_mutation_manifest(size=min(mutation_files, 20))
+        merged_by_case: dict[str, list[dict[str, Any]]] = {}
+        seen: dict[str, set[tuple[Any, ...]]] = {}
+        downloaded = 0
+        for item in manifest[:mutation_files]:
+            file_id = item.get("file_id")
+            if not file_id:
+                continue
+            grouped = parse_maf_bytes(self.download_public_file(str(file_id)))
+            downloaded += 1
+            for case_id, variants in grouped.items():
+                target = merged_by_case.setdefault(case_id, [])
+                keys = seen.setdefault(case_id, set())
+                for variant in variants:
+                    key = (
+                        variant.get("gene"),
+                        variant.get("chromosome"),
+                        variant.get("position"),
+                        variant.get("reference"),
+                        variant.get("alternate"),
+                        variant.get("classification"),
+                        variant.get("protein_change"),
+                    )
+                    if key not in keys:
+                        keys.add(key)
+                        target.append(variant)
+        records = merge_variants_into_cases(clinical.records, merged_by_case)
+        return GDCDownloadResult(
+            records=records,
+            total=clinical.total,
+            source_version=clinical.source_version,
+            mutation_files=downloaded,
+            mutation_variants=sum(len(item.get("variants", [])) for item in records),
+        )
+
+    def fetch_somatic_mutation_manifest(self, *, size: int = 1000) -> list[dict[str, Any]]:
+        """Return metadata for public masked somatic mutation MAF files."""
         filters = {
             "op": "and",
             "content": [
