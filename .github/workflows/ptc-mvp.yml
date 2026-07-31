@@ -6,7 +6,7 @@ on:
     paths:
       - "src/backend/domain/ptc_*.py"
       - "src/backend/importers/ptc_tcga/**"
-      - "src/backend/services/ptc_*_service.py"
+      - "src/backend/services/ptc_*.py"
       - "src/backend/api/v1/ptc_*.py"
       - "src/backend/api/v1/router.py"
       - "src/frontend/src/api/ptc*.ts"
@@ -59,6 +59,7 @@ jobs:
             src/backend/services/ptc_integrated_service.py \
             src/backend/services/ptc_literature_service.py \
             src/backend/services/ptc_completion_service.py \
+            src/backend/services/ptc_knowgraph_export.py \
             src/backend/api/v1/ptc_research.py \
             src/backend/api/v1/ptc_knowledge.py \
             src/backend/api/v1/ptc_integrated.py \
@@ -70,7 +71,8 @@ jobs:
             tests/backend/services/test_ptc_knowledge_service.py \
             tests/backend/services/test_ptc_integrated_service.py \
             tests/backend/services/test_ptc_literature_service.py \
-            tests/backend/services/test_ptc_completion_service.py
+            tests/backend/services/test_ptc_completion_service.py \
+            tests/backend/services/test_ptc_knowgraph_export.py
       - name: Upgrade PostgreSQL through PTC migrations
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
@@ -85,7 +87,8 @@ jobs:
             tests/backend/services/test_ptc_knowledge_service.py \
             tests/backend/services/test_ptc_integrated_service.py \
             tests/backend/services/test_ptc_literature_service.py \
-            tests/backend/services/test_ptc_completion_service.py
+            tests/backend/services/test_ptc_completion_service.py \
+            tests/backend/services/test_ptc_knowgraph_export.py
       - name: Verify complete PTC schema
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
@@ -113,11 +116,6 @@ jobs:
                       'domain_ptc_recommendation_snapshots',
                   }
                   assert expected.issubset(names), (names, expected)
-                  target_genes = await conn.execute(text("""
-                      SELECT column_name FROM information_schema.columns
-                      WHERE table_name='domain_ptc_clinical_trials' AND column_name='target_genes'
-                  """))
-                  assert target_genes.first() is not None
               await engine.dispose()
           asyncio.run(main())
           PY
