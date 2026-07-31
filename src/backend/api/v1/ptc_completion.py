@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.database.session import get_db
 from src.backend.services.ptc_completion_service import DEFAULT_PTC_DRUGS, PTCCompletionService
+from src.backend.services.ptc_knowgraph_export import PTCKnowGraphExportService
 
 router = APIRouter(prefix="/ptc-completion", tags=["ptc-completion"])
 
@@ -52,6 +53,15 @@ async def complete_graph(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await PTCCompletionService(db).full_graph(case_limit=case_limit)
+
+
+@router.get("/graph/knowgraph")
+async def knowgraph_export(
+    case_limit: int = Query(default=500, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Return deterministic GraphData that KnowGraphGo can import directly."""
+    return await PTCKnowGraphExportService(db).export(case_limit=case_limit)
 
 
 __all__ = ["router"]
