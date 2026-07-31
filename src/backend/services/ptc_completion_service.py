@@ -13,11 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.backend.domain.ptc_integrated import PTCHerbCompoundModel, PTCHerbDrugInteractionModel, PTCHerbModel
-from src.backend.domain.ptc_knowledge import (
-    PTCClinicalTrialModel,
-    PTCEvidenceRecordModel,
-    PTCTherapyModel,
-)
+from src.backend.domain.ptc_knowledge import PTCClinicalTrialModel, PTCEvidenceRecordModel, PTCTherapyModel
 from src.backend.domain.ptc_research import PTCResearchCaseModel
 from src.backend.importers.ptc_tcga.downloader import GDCClient
 from src.backend.importers.ptc_tcga.service import PTCTCGAImportService
@@ -54,6 +50,7 @@ class PTCCompletionService:
         self,
         *,
         gdc_size: int = 100,
+        gdc_mutation_files: int = 1,
         trial_size: int = 100,
         pubmed_size: int = 100,
         drug_names: list[str] | None = None,
@@ -72,7 +69,12 @@ class PTCCompletionService:
                 stages[name] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
 
         async def import_gdc() -> dict[str, Any]:
-            download = await asyncio.to_thread(GDCClient().fetch_ptc_cases, size=gdc_size, offset=0)
+            download = await asyncio.to_thread(
+                GDCClient().fetch_ptc_cases_with_mutations,
+                size=gdc_size,
+                offset=0,
+                mutation_files=gdc_mutation_files,
+            )
             result = await PTCTCGAImportService(self.db).import_records(
                 download.records,
                 source_version=download.source_version,
@@ -81,6 +83,8 @@ class PTCCompletionService:
                 **asdict(result),
                 "downloaded_cases": len(download.records),
                 "gdc_total_cases": download.total,
+                "mutation_files": download.mutation_files,
+                "mutation_variants": download.mutation_variants,
             }
 
         knowledge = PTCKnowledgeService(self.db)
@@ -172,8 +176,12 @@ class PTCCompletionService:
 
         nodes: dict[str, dict[str, Any]] = {}
         edges: dict[str, dict[str, Any]] = {}
-        add_node = lambda item: nodes.__setitem__(item["id"], item)
-        add_edge = lambda item: edges.__setitem__(item["id"], item)
+
+        def add_node(item: dict[str, Any]) -> None:
+            nodes[item["id"]] = item
+
+        def add_edge(item: dict[str, Any]) -> None:
+            edges[item["id"]] = item
 
         disease_id = "disease:papillary_thyroid_carcinoma"
         add_node(_node(disease_id, "Disease", "Papillary Thyroid Carcinoma"))
@@ -243,14 +251,16 @@ class PTCCompletionService:
                 add_edge(_edge(compound_id, gene_id, "INVESTIGATED_TARGET"))
 
         for interaction in interactions:
-            add_edge(_edge(
-                f"herb:{interaction.herb_key}",
-                f"therapy:{interaction.therapy_key}",
-                "INTERACTS_WITH",
-                interaction_type=interaction.interaction_type,
-                severity=interaction.severity,
-                evidence_level=interaction.evidence_level,
-            ))
+            add_edge(
+                _edge(
+                    f"herb:{interaction.herb_key}",
+                    f"therapy:{interaction.therapy_key}",
+                    "INTERACTS_WITH",
+                    interaction_type=interaction.interaction_type,
+                    severity=interaction.severity,
+                    evidence_level=interaction.evidence_level,
+                )
+            )
 
         return {
             "generated_at": datetime.utcnow().isoformat(),
