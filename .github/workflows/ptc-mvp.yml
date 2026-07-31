@@ -57,14 +57,17 @@ jobs:
             src/backend/importers/ptc_tcga/ \
             src/backend/services/ptc_knowledge_service.py \
             src/backend/services/ptc_integrated_service.py \
+            src/backend/services/ptc_literature_service.py \
             src/backend/api/v1/ptc_research.py \
             src/backend/api/v1/ptc_knowledge.py \
             src/backend/api/v1/ptc_integrated.py \
+            src/backend/api/v1/ptc_literature.py \
             scripts/import_ptc_tcga.py \
             scripts/ptc_cross_repo_e2e.py \
             tests/backend/importers/ \
             tests/backend/services/test_ptc_knowledge_service.py \
-            tests/backend/services/test_ptc_integrated_service.py
+            tests/backend/services/test_ptc_integrated_service.py \
+            tests/backend/services/test_ptc_literature_service.py
       - name: Upgrade PostgreSQL through migration 028
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
@@ -73,7 +76,7 @@ jobs:
       - name: Run PTC tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
-        run: pytest -v --tb=short tests/backend/importers/ tests/backend/services/test_ptc_knowledge_service.py tests/backend/services/test_ptc_integrated_service.py
+        run: pytest -v --tb=short tests/backend/importers/ tests/backend/services/test_ptc_knowledge_service.py tests/backend/services/test_ptc_integrated_service.py tests/backend/services/test_ptc_literature_service.py
       - name: Verify PTC tables
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
