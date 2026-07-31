@@ -66,5 +66,12 @@ async def import_variants(
         variants = await service.bulk_create_variants(items_data)
         return [VariantResponse.model_validate(v) for v in variants]
     except Exception as e:
+        # REVIEW-PHASE3F0-R3-P1-02 / OPEN
+        # 問題：直接把 str(e) 回傳給 API 用戶，可能洩漏 SQL、資料表、constraint、
+        # 驅動或內部路徑資訊；同時所有業務錯誤均被壓成無差別 500。
+        # 修改：保留並重新拋出既有 HTTPException；其餘例外只記錄完整 server log，
+        # 對外回傳固定、安全的錯誤訊息與可追蹤 request/error id，不得暴露原始例外。
+        # 驗證：新增測試證明內部 DB 例外文字不會出現在 response body，且合法的
+        # 4xx 業務錯誤不會被轉換為 500。
         logger.exception("Failed to import variants")
         raise HTTPException(status_code=500, detail=str(e))
