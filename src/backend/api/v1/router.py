@@ -14,6 +14,7 @@ from src.backend.api.v1.knowledge import router as knowledge_router
 from src.backend.api.v1.patients import router as patients_router
 from src.backend.api.v1.ptc_integrated import router as ptc_integrated_router
 from src.backend.api.v1.ptc_knowledge import router as ptc_knowledge_router
+from src.backend.api.v1.ptc_literature import router as ptc_literature_router
 from src.backend.api.v1.ptc_research import router as ptc_research_router
 from src.backend.api.v1.ranking import router as ranking_router
 from src.backend.api.v1.reasoning import router as reasoning_router
@@ -54,3 +55,4 @@ router.include_router(clinical_graph_router)
 router.include_router(ptc_research_router)
 router.include_router(ptc_knowledge_router)
 router.include_router(ptc_integrated_router)
+router.include_router(ptc_literature_router)
