@@ -1,8 +1,4 @@
-"""Complete PTC MVP orchestration, graph snapshot and outcome analytics.
-
-The service intentionally connects the existing PTC sub-systems instead of
-creating another independent engine. Outputs are research-support only.
-"""
+"""Complete PTC MVP orchestration, graph snapshot and outcome analytics."""
 
 from __future__ import annotations
 
@@ -16,11 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.backend.domain.ptc_integrated import (
-    PTCHerbCompoundModel,
-    PTCHerbDrugInteractionModel,
-    PTCHerbModel,
-)
+from src.backend.domain.ptc_integrated import PTCHerbCompoundModel, PTCHerbDrugInteractionModel, PTCHerbModel
 from src.backend.domain.ptc_knowledge import (
     PTCClinicalTrialModel,
     PTCEvidenceRecordModel,
@@ -34,15 +26,8 @@ from src.backend.services.ptc_knowledge_service import PTCKnowledgeService
 from src.backend.services.ptc_literature_service import PTCLiteratureService
 
 DEFAULT_PTC_DRUGS = [
-    "selpercatinib",
-    "pralsetinib",
-    "larotrectinib",
-    "repotrectinib",
-    "dabrafenib",
-    "trametinib",
-    "lenvatinib",
-    "sorafenib",
-    "cabozantinib",
+    "selpercatinib", "pralsetinib", "larotrectinib", "repotrectinib",
+    "dabrafenib", "trametinib", "lenvatinib", "sorafenib", "cabozantinib",
 ]
 DEFAULT_GENES = ["BRAF", "RET", "NTRK1", "NTRK2", "NTRK3", "NRAS", "HRAS", "KRAS", "TERT", "TP53"]
 
@@ -74,12 +59,6 @@ class PTCCompletionService:
         drug_names: list[str] | None = None,
         include_civic: bool = False,
     ) -> dict[str, Any]:
-        """Run the complete public-data pipeline and return per-source results.
-
-        Sources are deliberately isolated: one unavailable public API does not
-        erase data already synchronized from other sources. Each existing
-        ingestion service remains the transaction owner for its own source.
-        """
         started_at = datetime.utcnow()
         stages: dict[str, dict[str, Any]] = {}
 
@@ -89,7 +68,7 @@ class PTCCompletionService:
                 if hasattr(value, "__dataclass_fields__"):
                     value = asdict(value)
                 stages[name] = {"status": "success", "result": value}
-            except Exception as exc:  # source isolation is intentional
+            except Exception as exc:  # public sources are isolated by design
                 stages[name] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
 
         async def import_gdc() -> dict[str, Any]:
@@ -107,7 +86,6 @@ class PTCCompletionService:
         knowledge = PTCKnowledgeService(self.db)
         literature = PTCLiteratureService(self.db)
         integrated = PTCIntegratedService(self.db)
-
         await run_stage("gdc_tcga_thca", import_gdc)
         await run_stage("clinical_trials", lambda: knowledge.sync_clinical_trials(page_size=trial_size))
         await run_stage("openfda", lambda: knowledge.sync_openfda_labels(drug_names or DEFAULT_PTC_DRUGS))
@@ -137,7 +115,7 @@ class PTCCompletionService:
         herbs = list((await self.db.execute(select(PTCHerbModel))).scalars())
         compounds = list((await self.db.execute(select(PTCHerbCompoundModel))).scalars())
         interactions = list((await self.db.execute(select(PTCHerbDrugInteractionModel))).scalars())
-        sources = Counter(item.source_name for item in therapies + evidence if item.source_name)
+        sources = Counter(item.source_name for item in [*therapies, *evidence] if item.source_name)
         return {
             "cases": len(cases),
             "variants": sum(len(case.variants) for case in cases),
@@ -190,15 +168,12 @@ class PTCCompletionService:
         herbs = list((await self.db.execute(select(PTCHerbModel))).scalars())
         compounds = list((await self.db.execute(select(PTCHerbCompoundModel))).scalars())
         interactions = list((await self.db.execute(select(PTCHerbDrugInteractionModel))).scalars())
+        therapy_keys_by_id = {str(item.id): item.therapy_key for item in therapies}
 
         nodes: dict[str, dict[str, Any]] = {}
         edges: dict[str, dict[str, Any]] = {}
-
-        def add_node(item: dict[str, Any]) -> None:
-            nodes[item["id"]] = item
-
-        def add_edge(item: dict[str, Any]) -> None:
-            edges[item["id"]] = item
+        add_node = lambda item: nodes.__setitem__(item["id"], item)
+        add_edge = lambda item: edges.__setitem__(item["id"], item)
 
         disease_id = "disease:papillary_thyroid_carcinoma"
         add_node(_node(disease_id, "Disease", "Papillary Thyroid Carcinoma"))
@@ -235,8 +210,9 @@ class PTCCompletionService:
                 gene_id = f"gene:{item.gene_symbol.upper()}"
                 add_node(_node(gene_id, "Gene", item.gene_symbol.upper()))
                 add_edge(_edge(evidence_id, gene_id, "SUPPORTS_GENE_ASSERTION", direction=item.direction))
-            if item.therapy_key:
-                add_edge(_edge(f"therapy:{item.therapy_key}", evidence_id, "SUPPORTED_BY"))
+            therapy_key = therapy_keys_by_id.get(str(item.therapy_id)) if item.therapy_id else None
+            if therapy_key:
+                add_edge(_edge(f"therapy:{therapy_key}", evidence_id, "SUPPORTED_BY"))
 
         for trial in trials:
             trial_id = f"trial:{trial.nct_id}"
@@ -267,16 +243,14 @@ class PTCCompletionService:
                 add_edge(_edge(compound_id, gene_id, "INVESTIGATED_TARGET"))
 
         for interaction in interactions:
-            add_edge(
-                _edge(
-                    f"herb:{interaction.herb_key}",
-                    f"therapy:{interaction.therapy_key}",
-                    "INTERACTS_WITH",
-                    interaction_type=interaction.interaction_type,
-                    severity=interaction.severity,
-                    evidence_level=interaction.evidence_level,
-                )
-            )
+            add_edge(_edge(
+                f"herb:{interaction.herb_key}",
+                f"therapy:{interaction.therapy_key}",
+                "INTERACTS_WITH",
+                interaction_type=interaction.interaction_type,
+                severity=interaction.severity,
+                evidence_level=interaction.evidence_level,
+            ))
 
         return {
             "generated_at": datetime.utcnow().isoformat(),
