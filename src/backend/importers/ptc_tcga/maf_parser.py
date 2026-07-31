@@ -6,7 +6,7 @@ import csv
 import gzip
 import io
 from collections import defaultdict
-from typing import BinaryIO, Iterable, TextIO
+from typing import Iterable, TextIO
 
 
 def tcga_case_id(sample_barcode: str) -> str:
