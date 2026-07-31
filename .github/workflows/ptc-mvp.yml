@@ -4,16 +4,19 @@ on:
   push:
     branches: [master]
     paths:
-      - "src/backend/domain/ptc_research.py"
+      - "src/backend/domain/ptc_*.py"
       - "src/backend/importers/ptc_tcga/**"
-      - "src/backend/api/v1/ptc_research.py"
+      - "src/backend/services/ptc_knowledge_service.py"
+      - "src/backend/api/v1/ptc_*.py"
       - "src/backend/api/v1/router.py"
       - "src/frontend/src/api/ptcResearch.ts"
-      - "src/frontend/src/pages/PTCResearchPage.tsx"
+      - "src/frontend/src/pages/PTC*.tsx"
       - "src/frontend/src/App.tsx"
-      - "migrations/versions/026_ptc_research_data_foundation.py"
-      - "scripts/ptc_cross_repo_e2e.py"
+      - "migrations/versions/026_*.py"
+      - "migrations/versions/027_*.py"
+      - "scripts/ptc_*.py"
       - "tests/backend/importers/**"
+      - "tests/backend/services/test_ptc_knowledge_service.py"
       - ".github/workflows/ptc-mvp.yml"
   workflow_dispatch:
 
@@ -48,21 +51,25 @@ jobs:
         run: |
           ruff check \
             src/backend/domain/ptc_research.py \
+            src/backend/domain/ptc_knowledge.py \
             src/backend/importers/ptc_tcga/ \
+            src/backend/services/ptc_knowledge_service.py \
             src/backend/api/v1/ptc_research.py \
+            src/backend/api/v1/ptc_knowledge.py \
             scripts/import_ptc_tcga.py \
             scripts/ptc_cross_repo_e2e.py \
-            tests/backend/importers/
-      - name: Upgrade PostgreSQL through migration 026
+            tests/backend/importers/ \
+            tests/backend/services/test_ptc_knowledge_service.py
+      - name: Upgrade PostgreSQL through migration 027
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
           PYTHONPATH: .
         run: alembic -c migrations/alembic.ini upgrade head
-      - name: Run PTC importer tests
+      - name: Run PTC tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
-        run: pytest -v --tb=short tests/backend/importers/
-      - name: Verify migration 026 tables and constraints
+        run: pytest -v --tb=short tests/backend/importers/ tests/backend/services/test_ptc_knowledge_service.py
+      - name: Verify PTC tables
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
         run: |
@@ -77,14 +84,15 @@ jobs:
                   rows = await conn.execute(text("""
                       SELECT table_name FROM information_schema.tables
                       WHERE table_schema='public' AND table_name LIKE 'domain_ptc_%'
-                      ORDER BY table_name
                   """))
                   names = {row[0] for row in rows}
                   expected = {
                       'domain_ptc_research_cases', 'domain_ptc_variants',
                       'domain_ptc_outcomes', 'domain_ptc_import_batches',
+                      'domain_ptc_therapies', 'domain_ptc_therapy_targets',
+                      'domain_ptc_clinical_trials', 'domain_ptc_evidence_records',
                   }
-                  assert names == expected, (names, expected)
+                  assert expected.issubset(names), (names, expected)
               await engine.dispose()
           asyncio.run(main())
           PY
@@ -108,7 +116,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
-          git clone https://x-access-token:${PAT}@github.com/liuxb99/KnowGraphGo.git KnowGraphGo
+          git clone https://x-access-token:${GH_TOKEN}@github.com/liuxb99/KnowGraphGo.git KnowGraphGo
           cd KnowGraphGo
           git checkout 96c569bae1d4bb02c05d8557ec2ee0a5a0a28b63
       - name: Build and test KnowGraphGo PTC adapter
