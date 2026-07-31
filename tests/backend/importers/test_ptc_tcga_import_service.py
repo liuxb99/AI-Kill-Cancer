@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -13,7 +14,7 @@ from src.backend.domain.ptc_research import (
 from src.backend.importers.ptc_tcga.service import PTCTCGAImportService
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def session():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
