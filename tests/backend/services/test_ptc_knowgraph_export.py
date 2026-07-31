@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from src.backend.database.models import Base
-from src.backend.domain.ptc_knowledge import PTCEvidenceRecordModel
+from src.backend.domain.ptc_integrated import PTCHerbDrugInteractionModel
 from src.backend.services.ptc_knowgraph_export import PTCKnowGraphExportService, entity_uuid
 
 
@@ -22,13 +22,13 @@ async def session():
 @pytest.mark.asyncio
 async def test_export_is_deterministic_and_fills_external_stubs(session):
     session.add(
-        PTCEvidenceRecordModel(
-            evidence_key="evidence:external-therapy",
-            source_name="PubMed",
-            source_record_id="777",
-            evidence_type="publication",
+        PTCHerbDrugInteractionModel(
+            herb_key="missing-herb",
             therapy_key="missing-therapy",
-            title="External therapy evidence",
+            interaction_type="potential_interaction",
+            severity="unknown",
+            evidence_level="unknown",
+            source_name="test",
         )
     )
     await session.commit()
@@ -43,5 +43,6 @@ async def test_export_is_deterministic_and_fills_external_stubs(session):
     assert first["metadata"]["relation_count"] == len(first["relations"])
     ids = {item["id"] for item in first["entities"]}
     assert entity_uuid("therapy:missing-therapy") in ids
+    assert entity_uuid("herb:missing-herb") in ids
     assert all(uuid.UUID(item["id"]) for item in first["entities"])
     assert all(item["from"] in ids and item["to"] in ids for item in first["relations"])
