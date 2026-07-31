@@ -41,6 +41,13 @@ from src.backend.domain.ptc_knowledge import (
     PTCTherapyModel,
     PTCTherapyTargetModel,
 )
+from src.backend.domain.ptc_integrated import (
+    PTCCaseSimilarityModel,
+    PTCHerbCompoundModel,
+    PTCHerbDrugInteractionModel,
+    PTCHerbModel,
+    PTCRecommendationSnapshotModel,
+)
 
 config = context.config
 if config.config_file_name is not None:
