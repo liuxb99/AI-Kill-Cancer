@@ -248,15 +248,15 @@
 
 | 項目 | 內容 |
 |---|---|
-| **As-Is（現況）** | **✅ Complete（Phase 4）** — 原有 Transactional Outbox Pattern（Clinical Graph 事件投影）持續運作。Phase 4 B4（Infrastructure & Observability）已實作 general-purpose job queue：
+| **As-Is（現況）** | **✅ Complete（Phase 4）** — 原有 Transactional Outbox Pattern（Clinical Graph 事件投影）持續運作。Phase 4 B3（藥物安全與監控）已涵蓋 general-purpose job queue 基礎設施：
 - **實作方式**：ARQ + Redis，非同步任務佇列
 - **Job API**：`src/backend/api/v1/jobs.py` 提供 enqueue / status / cancel 端點
 - **Scheduler**：`src/backend/jobs/scheduler.py` 支援 cron-like 定期任務（evidence freshness update、guideline sync）
 - **Retry/Dead-letter 泛化**：`src/backend/jobs/retry_policy.py` 將 Outbox 設計模式泛化，支援可設定 max_retries、exponential backoff、dead-letter 自動標記
 - **Worker**：`src/backend/jobs/worker.py` ARQ worker 啟動腳本
 - **Redis 服務**：透過 `docker-compose.redis.yml` 一鍵啟動 |
-| **To-Be（目標）** | **Phase 4 結束**：已達成 — (1) ARQ + Redis job queue 整合完成，(2) Job 註冊／排程／取消 API 完成，(3) 定期任務排程器完成，(4) Job 狀態監控儀表板透過 Grafana（B4）實現。 |
-| **Gap（缺口）** | ✅ **已透過 Phase 4 B4（Infrastructure & Observability）實現**：
+| **To-Be（目標）** | **Phase 4 結束**：已達成 — (1) ARQ + Redis job queue 整合完成，(2) Job 註冊／排程／取消 API 完成，(3) 定期任務排程器完成，(4) Job 狀態監控儀表板透過 Grafana 實現。 |
+| **Gap（缺口）** | ✅ **已透過 Phase 4 B3（藥物安全與監控）涵蓋**：
 - ❌ 無 job queue 基礎設施 → ✅ ARQ + Redis 已實作
 - ❌ 無定期排程器 → ✅ Scheduler 已實作
 - ❌ 無 job 管理 API → ✅ Job API 已實作
@@ -265,7 +265,7 @@
 | **Dependencies（依賴）** | 1. ✅ Redis 服務（已透過 docker-compose.redis.yml 納管）<br>2. ✅ Python 套件：arq / redis（已引入） |
 | **Risks（風險）** | - ✅ ARQ 已選定，風險已緩解（ARQ 輕量、足以支撐 Phase 4 需求）<br>- ✅ Redis 運維成本低（Docker 一鍵啟動） |
 | **Priority（優先級）** | **P1（必須） — ✅ 已實現** |
-| **Blocking（阻擋關係）** | ✅ 已解除 — Background Jobs 基礎設施完成後，#10 Evidence Freshness 與 #3 Guideline Adapter 可基於此執行定期更新；#17 Retry/Dead-letter 泛化也已隨 B4 一併實現 |
+| **Blocking（阻擋關係）** | ✅ 已解除 — Background Jobs 基礎設施完成後，#10 Evidence Freshness 與 #3 Guideline Adapter 可基於此執行定期更新；#17 Retry/Dead-letter 泛化也已隨 Phase 4 一併實現 |
 
 ---
 

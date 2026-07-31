@@ -64,8 +64,8 @@ async def import_variants(
     try:
         items_data = [item.model_dump(exclude_none=True) for item in body.items]
         service = VariantIngestionService(db)
-        variants = await service.bulk_create_variants(items_data)
-        return [VariantResponse.model_validate(v) for v in variants]
+        responses = await service.bulk_create_variants(items_data)
+        return responses
     except HTTPException:
         # 合法 4xx 業務錯誤（如 400）透傳，不轉換為 500
         raise

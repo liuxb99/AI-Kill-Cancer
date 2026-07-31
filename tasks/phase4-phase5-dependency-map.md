@@ -83,9 +83,9 @@ Phase 4 整體時程預估：10-15 週（3 個 Vertical Slice Batch）
                     │  └─ 所有 test suite pass         │
                     └──────────────────────────────────┘
 
-★ = 可並行啟動（B1/B2 可並行，B3 需 B1 部分完成後啟動）
+★ = B1/B2 部分重疊（B2 需 B1 核心完成後啟動）
 ⛓️ = 必須串行（B3 有前置依賴 B1）
-🔀 = 可並行（B1 與 B2 無前置依賴）
+🔀 = B2 需 B1 核心（Patient+Evidence），Gate 後啟動
 ```
 
 ### Batch 一覽表
@@ -93,7 +93,7 @@ Phase 4 整體時程預估：10-15 週（3 個 Vertical Slice Batch）
 | Batch | 名稱 | 優先級 | 前置依賴 | 可並行關係 | 工時預估 | 主要涵蓋模組 |
 |-------|------|--------|---------|-----------|---------|-------------|
 | **B1** | 病患資料整合與臨床工作流 | **P0** | 無 | 🔀 與 B2 並行 | 4-5 週 | Patient Import, Evidence, Recommendation, Treatment Plan, FHIR Export |
-| **B2** | 臨床試驗與證據排序 | **P0** | B1（Patient + Evidence 核心） | 🔀 與 B1 部分並行（B1 核心完成後啟動） | 3-4 週 | Clinical Trial, Evidence Ranking, Recommendation, Treatment Update, CarePlan |
+| **B2** | 臨床試驗與證據排序 | **P0** | B1（Patient + Evidence 核心） | 🔀 B1 核心完成後啟動（Gate），與 B1 剩餘部分並行 | 3-4 週 | Clinical Trial, Evidence Ranking, Recommendation, Treatment Update, CarePlan |
 | **B3** | 藥物安全與監控 | **P1** | B1（Treatment Plan 核心） | ➡️ 串行於 B1 之後；🔀 與 B2 並行 | 3-4 週 | Drug Safety, Interaction, Contraindication, Treatment Revision, Monitoring, FHIR Export |
 
 ---
@@ -111,7 +111,7 @@ Phase 4 整體時程預估：10-15 週（3 個 Vertical Slice Batch）
 | 🗄️ **資料依賴** | Patient Import 資料源 | 支援 HL7 v2 / CSV / FHIR Bundle 等多種匯入格式 |
 | 🔄 **Migration 依賴** | 026_fhir_resource_tables | 若需新建 FHIR 專屬資料表，需執行資料庫遷移 |
 | 🔄 **Migration 依賴** | Patient 資料表擴充 | 支援更多臨床欄位與 FHIR 映射 |
-| 🔀 **可並行** | B2 | 無前置依賴，可與 B2 同時開發（B1 核心完成後 B2 再啟動子項） |
+| 🔀 **可並行** | B2 | B2 Gate = B1 Patient+Evidence 核心完成；B2 啟動後與 B1 剩餘部分（Treatment Plan/FHIR）並行 |
 
 **依賴鏈標記**：B1 → B3（提供 Treatment Plan 核心）  
 **輸出**：FHIR Export、Patient API、Recommendation Engine、Treatment Plan CRUD
@@ -524,9 +524,12 @@ Week 5-7:                          組 D ────────────
 | LOINC | P5 B2 | 檢驗項目編碼 | 建議 |
 | ClinicalTrials.gov API | P4 B2 | 臨床試驗查詢 | **強制** |
 | CIViC API | P4 B1, P4 B2 | 變異臨床證據查詢 | **強制** |
-| DGIdb API | P4 B3 | 藥物-基因交互查詢 | **強制** |
+| DGIdb API | P4 B1 | 藥物-基因交互查詢 | **強制** |
 | OncoTree API | P4 B2 | 癌症類型本體查詢 | 建議 |
 | MyVariant.info API | P4 B2 | 變異註釋查詢 | 建議 |
+| DRKG API | P4 B2 | 藥物重定位知識圖譜查詢 | 建議 |
+| Ensembl VEP API | P4 B2 | 變異效應預測 | **強制** |
+| PharmCAT | P4 B3 | 藥物基因組學（本地工具） | 建議 |
 | DrugBank / OpenFDA | P4 B3 | 藥物交互與禁忌症查詢 | **強制** |
 | NCCN API (付費) | P4 #3 | Guideline 查詢 | 建議（備案：PDF） |
 | ESMO/ASCO Guideline | P4 #3 | Guideline 查詢 | 建議 |

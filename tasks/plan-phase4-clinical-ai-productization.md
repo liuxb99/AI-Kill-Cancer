@@ -48,7 +48,7 @@ Phase 4 完成後，系統從「已開發完成的 AI 原型」升級為「可�
 | # | 能力 | 說明 | 優先級 |
 |---|------|------|--------|
 | 1 | **FHIR R4 完整互通** | 支援 FHIR R4 核心資源（Patient, Observation, MedicationRequest, DiagnosticReport, Condition, Procedure, CarePlan），提供標準 FHIR REST API，支援 SMART-on-FHIR 授權框架 | P0 |
-| 2 | **外部證據源真實連接** | 7 個外部 adapter 從 stub 升級為真實 REST API 連接（CIViC, DGIdb, OncoTree, MyVariant.info, DRKG, PharmCAT, Ensembl VEP local） | P0 |
+| 2 | **外部證據源真實連接** | 10 個外部 adapter（7 同步 + 3 非同步）從 stub 升級為真實 REST API 連接（CIViC, DGIdb, OncoTree, MyVariant.info, DRKG, PharmCAT, Ensembl VEP local；Guideline Sync, Background Refresh, Cache Refresh） | P0 |
 | 3 | **生產級監控** | Metrics（request rate, latency, error rate）、分散式追蹤（OpenTelemetry）、健康儀表板 | P1 |
 | 4 | **CI/CD 補全** | Go pipeline（build + test + lint）+ Docker build/push + 後端部署 pipeline | P1 |
 | 5 | **Docker 化部署** | 提供 Dockerfile + docker-compose，支援一鍵部署（後端 + 前端 + 知識圖譜） | P1 |
@@ -156,7 +156,7 @@ Phase 4 完成後，系統從「已開發完成的 AI 原型」升級為「可�
 | 元件 | 狀態 | Phase 4 工作 |
 |------|------|-------------|
 | **Knowledge Graph (KnowGraphGo)** | ✅ 既有（13 Go packages） | 無需修改，直接複用。需在 CI 中加入 Go pipeline 確保持續整合 |
-| **Evidence Store** | 🟡 既有但 adapter 為 stub | 完成 8 個外部 adapter 的真實實作 |
+| **Evidence Store** | 🟡 既有但 adapter 為 stub | 完成 10 個外部 adapter 的真實實作 |
 | **RAG / Vector DB** | 🔴 Deferred | 建置向量資料庫、Embedding pipeline、RAG 檢索服務。Phase 4 中列為 deferred，僅在 Gap Analysis + ADR + Current Capability 共同證明需要時才啟動 |
 | **Knowledge Layer (Python)** | ✅ 既有（6 files） | 無需修改，直接複用 |
 
@@ -678,7 +678,7 @@ Knowledge Graph Boundary
 
 ### 8.1 現狀
 
-- 7/10 adapter 為 `NotConfiguredAdapter` stub（CIViC, DGIdb, OncoTree, MyVariant, DRKG, PharmCAT, Ensembl VEP）
+- 7 個同步 adapter 為 `NotConfiguredAdapter` stub（CIViC, DGIdb, OncoTree, MyVariant, DRKG, PharmCAT, Ensembl VEP）
 - 但是 `pipeline/vep_adapter.py`（Ensembl REST API）和 `pipeline/civic_adapter.py`（CIViC REST API）和 `pipeline/dgidb_adapter.py`（DGIdb REST API）有真實實作，但 `adapters/` 目錄下的對應 adapter 仍是 stub
 - `knowledge/adapters/` 有 3 個真實 adapter（clinicaltrials.py, clinvar.py, pubmed.py）
 
@@ -902,8 +902,12 @@ Batch 相依關係：
   │    Batch 1       │  │    Batch 2       │  │    Batch 3       │
   │ 病患資料整合與    │  │ 臨床試驗與        │  │ 藥物安全與監控    │
   │ 臨床工作流        │  │ 證據排序          │  │                  │
-  └──────────────────┘  └──────────────────┘  └──────────────────┘
+  └────────┬─────────┘  └──────────────────┘  └──────────────────┘
            │                       │                    │
+           │  Gate: Patient+Evidence 核心               │
+           ├──────────────────────→│                    │
+           │  (B2 啟動條件：B1 完成 Patient Import +    │
+           │   Evidence Collection；與 B1 剩餘部分並行)  │
            └───────────────────────┼────────────────────┘
                                    ▼
                       ┌──────────────────────┐
@@ -918,7 +922,7 @@ Batch 相依關係：
 | B2 | 臨床試驗與證據排序 | Clinical Trial Matching → Evidence Ranking → Recommendation → Treatment Update → CarePlan → Frontend | 16-20 files | 2-3 週 |
 | B3 | 藥物安全與監控 | Drug Safety → Interaction Check → Contraindication → Treatment Revision → Monitoring → FHIR Export | 16-20 files | 2-3 週 |
 
-三個 Batch 可平行啟動，因為每個 Batch 只依賴 Phase 3 既有系統與 Phase 4 Foundation（FHIR Base + Adapter Layer），不互相依賴。
+B1 獨立啟動（無前置依賴）；B2 在 B1 完成 Patient Import + Evidence Collection 核心（Gate）後啟動，與 B1 剩餘部分並行；B3 與 B1/B2 部分重疊。
 
 ---
 
@@ -980,7 +984,7 @@ Patient Import → Evidence Collection → Recommendation → Treatment Plan →
 - 架構師（FHIR 映射設計 + Transaction Boundary）
 
 #### 前置依賴
-- 無（可直接啟動，基於 Phase 3 既有系統）
+- 無（可直接啟動，基於 Phase 3 既有系統）。**注意：B1 的 Patient Import + Evidence Collection 核心為 B2 的啟動 Gate**。
 - 參考：既有 `reporting/renderer.py` 中的 FHIRExporter 實作
 - 參考：既有 Domain Models（PatientModel, CancerCaseModel, TreatmentPlanModel）
 - 參考：`pipeline/civic_adapter.py`、`pipeline/dgidb_adapter.py` 既有實作
@@ -1069,7 +1073,7 @@ Clinical Trial Matching → Evidence Ranking → Recommendation → Treatment Up
 - QA 工程師（mock API 測試 + 整合測試）
 
 #### 前置依賴
-- 無（可與 Batch 1 平行啟動）
+- 需 B1 Patient Import + Evidence Collection 核心完成（Gate）；與 B1 剩餘部分（Treatment Plan / FHIR Export / Audit / Frontend）並行
 - 參考：`pipeline/vep_adapter.py` 既有實作
 - 參考：既有 Ranking Engine 架構
 - 參考：既有 Treatment Plan Service 實作
@@ -1221,7 +1225,7 @@ Drug Safety → Interaction Check → Contraindication → Treatment Revision �
 | Gate | 條件 | 通過標準 |
 |------|------|---------|
 | **G1: FHIR 互通 Gate** | FHIR R4 API 可供外部 EHR 系統呼叫 | 所有核心資源端點（Patient/Observation/Condition/MedicationRequest/DiagnosticReport/CarePlan）可正常 Read/Search；CapabilityStatement 回傳有效 |
-| **G2: 外部證據 Gate** | 7 個外部 adapter 真實連接（同步 + 非同步） | `GET /api/v1/adapters/status` 回傳全部 configured（可能部分 offline 但非 stub）；同步 adapter 走請求/回應模式，非同步 adapter 由排程觸發 |
+| **G2: 外部證據 Gate** | 10 個外部 adapter（7 同步 + 3 非同步）真實連接 | `GET /api/v1/adapters/status` 回傳全部 configured（可能部分 offline 但非 stub）；同步 adapter 走請求/回應模式，非同步 adapter 由排程觸發 |
 | **G3: 臨床試驗與證據排序 Gate** | Clinical Trial Matching + Evidence Ranking 可正常運作 | Clinical Trial Matching Service 可比對病患變異與試驗條件；Evidence Ranking Service 可依權重排序多來源證據 |
 | **G4: 藥物安全與監控 Gate** | Drug Safety + Interaction Check + Contraindication + Monitoring 完整鏈路 | `GET /api/v1/drug-safety/check` 回傳安全性檢查結果；Monitoring Dashboard 顯示監控指標 |
 | **G5: 部署 Gate** | Docker Compose 一鍵啟動 | `docker-compose up` 後系統功能正常；所有 CI pipeline 通過 |

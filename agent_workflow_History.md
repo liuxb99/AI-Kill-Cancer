@@ -727,3 +727,16 @@ TIME_PENDING | [v] Git Commit 54d8bd4 + Push to origin/master ✅
 2026-07-31 09:50 | [v] Step 10：需求歸檔完成 ✅（requirements.md → requirements-history/requirements-Phase-3F0-R3.md，需求歸零）
 2026-07-31 09:50 | [v] Git Commit 7e76313 + 084d45a + Push to origin/plan/phase4-phase5-master-plan ✅（pre-push ECC 驗證通過）
 2026-07-31 10:00 | [v] Git Commit 9f139ba + Push to origin/plan/phase4-phase5-master-plan ✅（Phase 4/5 Master Plan 返工第 2 次文件推送，ECC pre-push 驗證通過）
+2026-07-31 11:00 | [v] git pull origin plan/phase4-phase5-master-plan ✅（合併 828da8a REVIEW-PHASE3F0-R4 註解 commit）
+2026-07-31 11:00 | [v] Step 0 完成：子代理報到 ✅
+2026-07-31 11:00 | [v] Step 1 完成：需求記錄至 tasks/requirements.md（R4 + Master Plan 統一）
+2026-07-31 11:00 | [v] Step 2 完成：場景識別 hardening + master-plan（tasks/task-status.md）
+2026-07-31 11:00 | [v] Step 3 完成：PLANNER 計劃 tasks/plan-Phase-3F0-R4.md（R4 交易邊界 + Master Plan 統一）
+2026-07-31 11:00 | [v] Step 4 完成：Workflow 更新 ✅
+2026-07-31 11:05 | [v] task(backend-logic) -> R4 variant_ingestion_service + variants.py 改造完成（DTO 建構在 commit 前）
+2026-07-31 11:05 | [v] task(doc-writer) -> Master Plan 統一完成（B1/B2「部分重疊+Gate」+ Adapter 10 個一致）
+2026-07-31 11:05 | [v] task(test-writer) -> R4 真實 endpoint 測試新增：test_phase3f0_r4_p0_variants_atomicity.py
+2026-07-31 11:05 | [v] 綠燈驗證：R4 2 passed + R3 7 passed = 全部通過 ✅
+2026-07-31 11:10 | [v] 全量測試：1675 passed / 12 errors（DATABASE_URL=空字串造成 atomicity 測試 URL 解析錯誤，unset 後 9 passed）/ 23 skipped
+2026-07-31 11:10 | [v] Step 6 需求回歸檢查：10/10 PASS ✅
+2026-07-31 11:10 | [v] Step 7 REVIEWER：可執行=YES 無錯誤=YES 滿足需求=YES 測試=YES | 完整性24 正確性25 可維護性22 測試驗證23 | 總分 94/100 合格 ✅

@@ -52,7 +52,9 @@ Phase 4 從「已開發完成的 AI 原型」升級為「可在臨床環境中�
 | CapabilityStatement | `src/backend/fhir/capability.py` | 新建 |
 | SMART-on-FHIR | `src/backend/auth/smart_on_fhir.py` | 新建 |
 | Adapter 層 | `src/backend/adapters/registry.py`、`cache.py`、`health.py` | 新建 |
-| External Adapters | `src/backend/pipeline/civic_adapter.py`、`dgidb_adapter.py`、`oncotree_adapter.py`、`myvariant_adapter.py`、`drkg_adapter.py`、`pharmcat_adapter.py`、`vep_adapter.py`、`opencravat_adapter.py` | 新建/修改 |
+| External Adapters（同步 7） | `src/backend/pipeline/civic_adapter.py`、`dgidb_adapter.py`、`oncotree_adapter.py`、`myvariant_adapter.py`、`drkg_adapter.py`、`vep_adapter.py`、`pharmcat_adapter.py` | 新建/修改 |
+| External Adapters（非同步 3） | `src/backend/adapters/guideline_sync_adapter.py`、`background_refresh_adapter.py`、`cache_refresh_adapter.py` | 新建 |
+| OpenCRAVAT（stub 保留） | `src/backend/pipeline/opencravat_adapter.py`（保持 stub，Phase 5 啟用） | 不修改 |
 | Secrets 管理 | `src/backend/infrastructure/secrets.py`（API key 管理） | 新建 |
 | Migration | `migrations/versions/026_fhir_resource_tables.py` | 新建 |
 | 前端 - 病患檢視 | `frontend/src/pages/PatientDetail.tsx`、`frontend/src/components/EvidencePanel.tsx` | 新建/修改 |
@@ -92,7 +94,7 @@ Phase 4 從「已開發完成的 AI 原型」升級為「可在臨床環境中�
 9. PR 描述包含 Batch 變更摘要
 
 ### 下一批解鎖條件
-B1 合併至 master 後，B2 可基於 B1 的證據檢索與推薦基礎設施建構臨床試驗匹配。B3 需要 B1 的治療計畫模型作為藥物安全檢查的輸入。
+B1 Patient Import + Evidence Collection 核心就緒（Gate）後，B2 可啟動，基於 B1 的證據檢索與推薦基礎設施建構臨床試驗匹配。B3 需要 B1 的治療計畫模型作為藥物安全檢查的輸入。
 
 ---
 
@@ -102,7 +104,7 @@ B1 合併至 master 後，B2 可基於 B1 的證據檢索與推薦基礎設施�
 實現臨床試驗匹配、證據排序、基於排序結果的推薦更新與 CarePlan 管理，並提供前端試算表操作介面。此 Batch 涵蓋 **Clinical Trial → Evidence Ranking → Recommendation → Treatment Update → CarePlan → Frontend** 完整鏈路。
 
 ### 前置依賴
-- **B1（病患資料整合與臨床工作流）**：需要 B1 的 Patient Import、Evidence Retrieval 與 Treatment Plan 基礎設施
+- **B1（病患資料整合與臨床工作流）**：需要 B1 的 Patient Import 與 Evidence Retrieval 核心（Gate 條件）
 - **外部依賴**：ClinicalTrials.gov API 或其他臨床試驗資料來源
 - **外部依賴**：既有 CIViC / DGIdb 等證據來源（B1 已建立 adapter）
 - **既有依賴**：既有 Recommendation Service（擴充排序邏輯）
@@ -262,7 +264,7 @@ Phase 4 所有的 3 個 Vertical Slice Batch 均已定義完成，依賴關係�
 
 ## Phase 4 整合 Gate
 
-Phase 4 採用漸進整合策略：每個 Batch 完成後自動觸發下一 Batch，最終由 B3 承擔全功能回歸驗證。
+Phase 4 採用漸進整合策略：B1 核心完成（Gate）後觸發 B2；B2/B3 部分重疊。最終由 B3 承擔全功能回歸驗證。
 
 | 檢查點 | 條件 | 對應 Batch |
 |--------|------|-----------|
@@ -560,7 +562,8 @@ Docker/CI/CD              ──────  B1-B3 (容器化部署)
 Phase 4
 ═══════
 B1 (病患資料整合與臨床工作流)  ─── 無前置，獨立啟動 ──→ B2
-B2 (臨床試驗與證據排序)        ─── 依賴 B1 ──────────→ B3
+                                  Gate: Patient+Evidence 核心
+B2 (臨床試驗與證據排序)        ─── 依賴 B1 核心 ──────→ B3
 B3 (藥物安全與監控)            ─── 依賴 B1/B2 ───────→ Phase 5
 
 Phase 5

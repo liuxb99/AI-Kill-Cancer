@@ -1081,7 +1081,7 @@ Phase 5 總預估工期：14-18 週（3.5-4.5 個月）
 | **HL7/DICOM/PACS 基礎**（DICOMweb WADO-RS, STOW-RS） | B1（Radiology 未來擴展） | 🟠 High |
 | **RAG/Vector DB/Embedding Pipeline** | B1（Cardiology 語義搜尋）、B3（SDK 整合） | 🟡 Medium |
 | **ML Model Pipeline**（train/eval/deploy） | B1（Cardiology AI Agent） | 🟡 Medium |
-| **Adapters 實作**（8 個 stub 完成真實連接） | B1（Cardio evidence sources） | 🟢 Low |
+| **Adapters 實作**（10 個（7 同步 + 3 非同步）stub 完成真實連接） | B1（Cardio evidence sources） | 🟢 Low |
 | **Observability 強化**（metrics/tracing） | 全部 Batch（平台監控） | 🟢 Low |
 | **Frontend API Client 統一封裝** | B1（新 specialty 前端整合） | 🟢 Low |
 
