@@ -71,6 +71,7 @@ class PTCClinicalTrialModel(Base):
     study_type = Column(String(64), nullable=True)
     conditions = Column(JSON, nullable=False, default=list)
     interventions = Column(JSON, nullable=False, default=list)
+    target_genes = Column(JSON, nullable=False, default=list)
     eligibility = Column(Text, nullable=True)
     enrollment = Column(Integer, nullable=True)
     locations = Column(JSON, nullable=False, default=list)
@@ -115,6 +116,11 @@ class PTCEvidenceRecordModel(Base):
     therapy = relationship("PTCTherapyModel", back_populates="evidences")
     clinical_trial = relationship("PTCClinicalTrialModel", back_populates="evidences")
 
+    @property
+    def genes(self) -> list[str]:
+        """Compatibility view used by the integrated research engine."""
+        return [self.gene_symbol] if self.gene_symbol else []
+
 
 class PTCTherapyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -141,6 +147,7 @@ class PTCTrialResponse(BaseModel):
     phases: list
     conditions: list
     interventions: list
+    target_genes: list
     enrollment: int | None = None
     locations: list
     source_url: str | None = None
