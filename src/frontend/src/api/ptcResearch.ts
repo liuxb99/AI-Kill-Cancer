@@ -60,6 +60,46 @@ export interface PTCGraphPath {
   edges: Array<{ id: string; source: string; target: string; relation: string }>
 }
 
+export interface PTCTherapy {
+  therapy_key: string
+  name: string
+  generic_name?: string
+  therapy_type: string
+  approval_status?: string
+  indications: string[]
+  mechanism?: string
+  warnings: string[]
+  source_name: string
+  source_record_id: string
+  source_url?: string
+}
+
+export interface PTCTrial {
+  nct_id: string
+  brief_title: string
+  overall_status?: string
+  phases: string[]
+  conditions: string[]
+  interventions: Array<{ name?: string; type?: string; description?: string }>
+  enrollment?: number
+  locations: Array<{ facility?: string; city?: string; state?: string; country?: string }>
+  source_url?: string
+}
+
+export interface PTCEvidence {
+  evidence_key: string
+  source_name: string
+  title?: string
+  summary?: string
+  evidence_type: string
+  evidence_level?: string
+  direction?: string
+  gene_symbol?: string
+  variant?: string
+  citation?: string
+  source_url?: string
+}
+
 export function listPTCCases(gene?: string): Promise<PTCResearchCase[]> {
   const params = new URLSearchParams()
   if (gene) params.set('gene', gene)
@@ -85,5 +125,41 @@ export function importPTCRecords(records: unknown[], sourceVersion?: string) {
   }>('/ptc-research/imports', {
     method: 'POST',
     body: JSON.stringify({ records, source_version: sourceVersion }),
+  })
+}
+
+export function listPTCTherapies(gene?: string): Promise<PTCTherapy[]> {
+  const params = new URLSearchParams()
+  if (gene) params.set('gene', gene)
+  return request(`/ptc-knowledge/therapies${params.toString() ? `?${params}` : ''}`)
+}
+
+export function listPTCTrials(recruitingOnly = false): Promise<PTCTrial[]> {
+  return request(`/ptc-knowledge/trials?recruiting_only=${recruitingOnly}`)
+}
+
+export function listPTCEvidence(gene?: string): Promise<PTCEvidence[]> {
+  const params = new URLSearchParams()
+  if (gene) params.set('gene', gene)
+  return request(`/ptc-knowledge/evidence${params.toString() ? `?${params}` : ''}`)
+}
+
+export function getPTCGeneKnowledge(gene: string): Promise<{
+  gene: string
+  therapies: PTCTherapy[]
+  trials: PTCTrial[]
+  evidence: PTCEvidence[]
+}> {
+  return request(`/ptc-knowledge/gene/${encodeURIComponent(gene)}`)
+}
+
+export function syncPTCClinicalTrials(pageSize = 100) {
+  return request<{ status: string; records: number }>(`/ptc-knowledge/sync/clinical-trials?page_size=${pageSize}`, { method: 'POST' })
+}
+
+export function syncPTCOpenFDA(drugNames: string[]) {
+  return request<{ status: string; records: number }>('/ptc-knowledge/sync/openfda', {
+    method: 'POST',
+    body: JSON.stringify({ drug_names: drugNames }),
   })
 }
