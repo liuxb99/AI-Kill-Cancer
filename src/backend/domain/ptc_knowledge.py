@@ -89,7 +89,6 @@ class PTCClinicalTrialModel(Base):
 
 class PTCEvidenceRecordModel(Base):
     __tablename__ = "domain_ptc_evidence_records"
-    __table_args__ = (UniqueConstraint("source_name", "source_record_id", name="uq_ptc_evidence_source"),)
 
     id = Column(CompatUUID, primary_key=True, default=_uuid)
     evidence_key = Column(String(256), nullable=False, unique=True, index=True)
