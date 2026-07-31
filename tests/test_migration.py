@@ -19,6 +19,14 @@ class IrreversibleMigrationError(Exception):
 @pytest.fixture
 def alembic_config(tmp_path):
     """Create a temporary Alembic config pointing to async SQLite."""
+    # Remove any leftover db file from a previous run so that
+    # upgrade/downgrade always starts from a clean database.
+    import os
+
+    db_file = "./test_migration.db"
+    if os.path.exists(db_file):
+        os.remove(db_file)
+
     cfg = Config()
     cfg.set_main_option("script_location", "migrations")
     cfg.set_main_option("sqlalchemy.url", "sqlite+aiosqlite:///./test_migration.db")

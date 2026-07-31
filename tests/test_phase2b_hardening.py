@@ -48,6 +48,7 @@ class FakeDB:
     def __init__(self):
         self.added = []
         self.committed = False
+        self.flushed = False
         self._storage = {}
 
     def add(self, obj):
@@ -57,6 +58,9 @@ class FakeDB:
 
     async def commit(self):
         self.committed = True
+
+    async def flush(self):
+        self.flushed = True
 
     async def refresh(self, obj):
         pass
@@ -143,7 +147,7 @@ class TestKnowledgeSourceRepository:
         assert result.license == "MIT"
         assert result.is_configured == "configured"
         assert len(db.added) == 1
-        assert db.committed
+        assert db.flushed
 
     async def test_upsert_existing(self):
         """Should update an existing knowledge source record."""
