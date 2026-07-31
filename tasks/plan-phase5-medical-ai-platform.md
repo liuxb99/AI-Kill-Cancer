@@ -934,12 +934,14 @@ src/backend/specialties/cardiology/
 ### 12.1 整體時程
 
 ```
-Phase 5 總預估工期：16-20 週（4-5 個月）
+Phase 5 總預估工期：14-18 週（3.5-4.5 個月）
 ```
 
-### 12.2 Batch 1 — Platform Core (Weeks 1-3)
+每個 Batch 為 **Vertical Slice**：獨立可交付、可測試、可部署。
 
-**目標**：完成 Platform 骨架與 Registry 基礎，不影響 Oncology 模組。
+### 12.2 Batch 1 — Platform Core + Specialty Framework (Weeks 1-6)
+
+**目標**：建立 Platform Registry 骨架、Specialty Module Contract、Cardiology 樣本專科、Terminology Service、Knowledge Graph Namespace。此 Batch 完成後即可支援多專科插件式架構。
 
 | 交付項 | 內容 | 依賴 |
 |--------|------|------|
@@ -952,129 +954,80 @@ Phase 5 總預估工期：16-20 週（4-5 個月）
 | B1.7 | PlatformContainer + DI 注入 | B1.1 |
 | B1.8 | Migration 026 (platform_registry_tables) | 無 |
 | B1.9 | 現有 oncology 模組自動註冊為 built-in specialty | B1.1 |
-| B1.10 | 測試：Registry unit tests + contract tests | B1.1-B1.5 |
+| B1.10 | SpecialtyBase 介面定義 + .template/ 模版目錄 | B1.1 |
+| B1.11 | Cardiology Module（manifest + domain models + agents + workflow + terminology mapping） | B1.10, B1.2, B1.3 |
+| B1.12 | TerminologyService 實作（含 cache + bulk lookup） | B1.1 |
+| B1.13 | KnowGraphGo NamespacedStore 實作 | 無（Go 專案） |
+| B1.14 | Knowledge Graph API 擴充（namespace 參數） | B1.13 |
+| B1.15 | Oncology namespace 遷移（現有 graph data 加 prefix） | B1.13 |
+| B1.16 | Go pipeline in CI/CD（go build + test + lint） | 無 |
+| B1.17 | 測試：Registry unit tests + Cardiology tests + Contract tests | 全部 |
 
 **驗收標準**：
 - 啟動時自動掃描並註冊 oncology 模組
-- API `/api/v1/platform/specialties` 回傳 oncology 資訊
-- 現有 oncology 功能完全不受影響（regression test pass）
-- All registry unit tests pass
-
-### 12.3 Batch 2 — Specialty Module Contract + Cardiology Sample (Weeks 4-7)
-
-**目標**：定義 Specialty Module Contract，實作 Cardiology 樣板。
-
-| 交付項 | 內容 | 依賴 |
-|--------|------|------|
-| B2.1 | SpecialtyBase 介面定義 | B1.1 |
-| B2.2 | .template/ 模版目錄 | B2.1 |
-| B2.3 | Cardiology Module 建立（manifest + base structure） | B2.1 |
-| B2.4 | Cardiology Domain Models | B2.3 |
-| B2.5 | Cardiology Agents（diagnosis + guideline + risk） | B2.3, B1.2 |
-| B2.6 | Cardiology Workflow（胸痛評估） | B2.3, B1.3 |
-| B2.7 | Cardiology Terminology Mapping（ICD-10 cardiac + LOINC） | B1.1 |
-| B2.8 | Cardiology Tests | B2.3-B2.7 |
-| B2.9 | TerminologyService 實作 | B1.1 |
-
-**驗收標準**：
+- API `/api/v1/platform/specialties` 回傳 oncology 與 cardiology 資訊
 - Cardiology module 可獨立註冊/啟動/停止
 - `POST /api/v1/workflows/cardiology.chest_pain/execute` 可執行
-- `GET /api/v1/terminology/normalize` 正確映射 cardiac codes
-- Cardiology agent 可分析 CardiologyCase 並回傳有意義的 opinion
-- 所有 test pass
+- Cardiology agent 可分析 CardiologyCase 並回傳 opinion
+- KnowGraphGo 支援 `WithNamespace(ns)` 查詢
+- TerminologyService 可解析 ICD-10 / SNOMED / LOINC
+- CI 包含 Go pipeline
+- 現有 oncology 功能完全不受影響（regression test pass）
+- All tests pass
 
-### 12.4 Batch 3 — Oncology 抽象化 (Weeks 8-10)
+### 12.3 Batch 2 — Oncology Decoupling + Multi-Tenant (Weeks 7-12)
 
-**目標**：逐步提取 Oncology 模組中的通用介面，**不破壞現有功能**。
+**目標**：逐步提取 Oncology 模組中的通用介面（不破壞現有功能），同時引入 multi-tenant 隔離與 API 版本管理。
 
 | 交付項 | 內容 | 依賴 |
 |--------|------|------|
-| B3.1 | AbstractCase 介面 + CancerCase 繼承 | B1.1 |
-| B3.2 | AbstractConsensus 介面 + TumorBoardConsensus 繼承 | B1.1 |
-| B3.3 | ClinicalContext 擴充（diagnosis_code + diagnosis_system） | B2.9 |
-| B3.4 | ClinicalContext.specialty_id 欄位 | B1.1 |
-| B3.5 | Agent 改造（SpecialtyAgentMixin + 註冊化） | B1.2, B2.5 |
-| B3.6 | 治療計畫 rules 中的 oncology-specific 邏輯提取 | B1.5 |
-| B3.7 | Oncology-specific terminology 提取至 plugin | B2.9 |
-| B3.8 | scorer 中 oncology mapping 提取 | B1.5 |
-| B3.9 | 回歸測試（確保 oncology 功能不變） | 全部 |
+| B2.1 | AbstractCase 介面 + CancerCase 繼承 | B1.1 |
+| B2.2 | AbstractConsensus 介面 + TumorBoardConsensus 繼承 | B1.1 |
+| B2.3 | ClinicalContext 擴充（diagnosis_code + diagnosis_system + specialty_id） | B1.12 |
+| B2.4 | Agent 改造（SpecialtyAgentMixin + 註冊化） | B1.2, B1.11 |
+| B2.5 | 治療計畫 rules 中的 oncology-specific 邏輯提取 | B1.5 |
+| B2.6 | Oncology-specific terminology 映射提取至 plugin | B1.12 |
+| B2.7 | Scorer 中 oncology mapping 提取 | B1.5 |
+| B2.8 | TenantMiddleware + JWT tenant claims | B1.1 |
+| B2.9 | TenantAwareRepository（共用表加 tenant_id） | B2.8 |
+| B2.10 | Tenant config registry（YAML + env） | B1.1 |
+| B2.11 | Tenant admin API（CRUD） | B2.8 |
+| B2.12 | API v2 端點規劃（首個 v2 端點：workflows） | B1.6 |
+| B2.13 | 現有 v1 端點標記 specialty_id 支援 | B2.8 |
+| B2.14 | 檔案/queue/快取隔離策略實作 | B2.8 |
+| B2.15 | 回歸測試（確保 oncology 功能不變） | 全部 |
 
 **驗收標準**：
 - Oncology module 仍可正常運作（regression test suite pass）
 - CancerCaseModel 仍可正常 CRUD（繼承 AbstractCase）
 - ClinicalContext.cancer_type 仍可讀取（alias 保留）
 - Agent selection 可正確選擇 oncology agent
-- 無任何 breaking change
-
-### 12.5 Batch 4 — Knowledge Graph Namespace + Terminology (Weeks 11-12)
-
-**目標**：擴充 KnowGraphGo 支援 namespace，完善 terminology 映射。
-
-| 交付項 | 內容 | 依賴 |
-|--------|------|------|
-| B4.1 | KnowGraphGo NamespacedStore 實作 | 無（Go 專案） |
-| B4.2 | Knowledge Graph API 擴充（namespace 參數） | B4.1 |
-| B4.3 | TerminologyService 完成（含 cache + bulk lookup） | B2.9 |
-| B4.4 | Specialty-specific terminology mapping CLI 工具 | B4.3 |
-| B4.5 | Oncology namespace 遷移（現有 graph data 加 prefix） | B4.1 |
-| B4.6 | Go pipeline in CI/CD（go build + test + lint） | 無 |
-
-**驗收標準**：
-- KnowGraphGo 支援 `WithNamespace(ns)` 查詢
-- 跨 namespace 查詢正確路由
-- TerminologyService 可解析 ICD-10 / SNOMED / LOINC
-- CI 包含 Go pipeline
-
-### 12.6 Batch 5 — Tenant Isolation + API Versioning (Weeks 13-14)
-
-**目標**：引入 multi-tenant 架構與 API 版本管理。
-
-| 交付項 | 內容 | 依賴 |
-|--------|------|------|
-| B5.1 | TenantMiddleware + JWT tenant claims | B1.1 |
-| B5.2 | TenantAwareRepository（共用表加 tenant_id） | B5.1 |
-| B5.3 | Tenant config registry（YAML + env） | B1.1 |
-| B5.4 | Tenant admin API（CRUD） | B5.1 |
-| B5.5 | API v2 端點規劃（首個 v2 端點：workflows） | B1.6 |
-| B5.6 | 現有 v1 端點標記 specialty_id 支援 | B5.1 |
-| B5.7 | 檔案/queue/快取隔離策略實作 | B5.1 |
-
-**驗收標準**：
 - Multi-tenant 可正常運作（至少 2 tenant 各自隔離）
 - 無 tenant 可存取另一 tenant 資料
 - Tenant config 可動態 overlay
 - API 端點同時支援 v1 與 v2
+- 無任何 breaking change
 
-### 12.7 Batch 6 — Neurology + Radiology Samples (Weeks 15-17)
+### 12.4 Batch 3 — Developer Docs + SDK Template (Weeks 13-14)
 
-**目標**：基於完成的 Platform 快速建立 Neurology 與 Radiology 樣板。
+**目標**：補齊開發者體驗與遷移工具，確保第三方團隊可獨立開發新 Specialty Module。
 
 | 交付項 | 內容 | 依賴 |
 |--------|------|------|
-| B6.1 | Neurology Module（domain + agents + workflow） | B2.1-B2.8 |
-| B6.2 | Neurology Terminology（ICD-10 G00-G99 + SNOMED） | B4.3 |
-| B6.3 | Neurology Tests | B6.1 |
-| B6.4 | Radiology Module（基礎結構 + DICOM study model） | B2.1, Phase 4 DICOM |
-| B6.5 | Radiology AI Agent（stub） | B6.4 |
-| B6.6 | Radiology Tests | B6.4-B6.5 |
-| B6.7 | Cross-specialty 整合測試 | 全部 |
+| B3.1 | Phase 5 開發者文件（如何建立新 Specialty） | B1.10 |
+| B3.2 | SDK Template 完善（generator script + CI template） | B1.10 |
+| B3.3 | API 文件更新（OpenAPI 3.0） | B1.6 |
+| B3.4 | 從單一 Oncology 遷移至 Multi-Specialty 指南 | B2.1-B2.7 |
+| B3.5 | 效能測試報告（multi-tenant + multi-specialty） | 全部 |
+| B3.6 | 安全審查（tenant isolation + specialty isolation） | B2.8-B2.14 |
+| B3.7 | 最終驗收測試 | 全部 |
 
 **驗收標準**：
-- Neurology module 可獨立運作
-- Radiology module 可接收 DICOM study
-- 跨專科 Workflow 可查詢（例如 Cardiology 轉診至 Radiology）
-- 全部 3 個 sample specialty 在 production 配置中同時啟用
-
-### 12.8 Batch 7 — 文件、遷移指南、驗收 (Week 18)
-
-| 交付項 | 內容 |
-|--------|------|
-| B7.1 | Phase 5 開發者文件（如何建立新 Specialty） |
-| B7.2 | API 文件更新（OpenAPI 3.0） |
-| B7.3 | 從單一 Oncology 遷移至 Multi-Specialty 指南 |
-| B7.4 | 效能測試報告（multi-tenant + multi-specialty） |
-| B7.5 | 安全審查（tenant isolation + specialty isolation） |
-| B7.6 | 最終驗收測試 |
+- 開發者可依照文件在 2 天內建立一個新的 Specialty Module
+- SDK generator script 可自動產生 scaffolding
+- OpenAPI spec 涵蓋所有新端點
+- 遷移指南經 reviewer 確認可操作
+- 所有驗收測試通過（AC1-AC9）
 
 ---
 
@@ -1082,28 +1035,29 @@ Phase 5 總預估工期：16-20 週（4-5 個月）
 
 ### 13.1 強制標準（Must-Have）
 
-| # | 標準 | 驗證方式 |
-|---|------|---------|
-| AC1 | Oncology 模組完全不受影響 | 全部現有 test suite pass |
-| AC2 | 至少 1 個非 oncology specialty（cardiology）可完整運作 | E2E test |
-| AC3 | Registry 可正確註冊/啟動/停止 specialty | API test |
-| AC4 | Agent selection 依 specialty 正確路由 | Integration test |
-| AC5 | Knowledge Graph 支援 namespace 隔離 | Go test |
-| AC6 | Terminology Service 可正確映射 ICD-10/SNOMED | Unit test |
-| AC7 | Multi-tenant 資料隔離 | Security test |
-| AC8 | API 向下相容（v1 端點不改） | Regression test |
-| AC9 | 所有 Batch 測試覆蓋率 ≥80% | Coverage report |
+| # | 標準 | 對應 Batch | 驗證方式 |
+|---|------|-----------|---------|
+| AC1 | Oncology 模組完全不受影響 | B1, B2 | 全部現有 test suite pass |
+| AC2 | 至少 1 個非 oncology specialty（cardiology）可完整運作 | B1 | E2E test |
+| AC3 | Registry 可正確註冊/啟動/停止 specialty | B1 | API test |
+| AC4 | Agent selection 依 specialty 正確路由 | B1, B2 | Integration test |
+| AC5 | Knowledge Graph 支援 namespace 隔離 | B1 | Go test |
+| AC6 | Terminology Service 可正確映射 ICD-10/SNOMED | B1 | Unit test |
+| AC7 | Multi-tenant 資料隔離 | B2 | Security test |
+| AC8 | API 向下相容（v1 端點不改） | B2 | Regression test |
+| AC9 | 開發者可遵循文件建立新 Specialty | B3 | Review + demo |
+| AC10 | 所有 Batch 測試覆蓋率 ≥80% | 全部 | Coverage report |
 
 ### 13.2 期望標準（Should-Have）
 
-| # | 標準 | 優先級 |
-|---|------|--------|
-| SC1 | Neurology module 可基本運作 | P1 |
-| SC2 | Radiology module 可接收 DICOM study | P2 |
-| SC3 | Cross-specialty terminology lookup | P1 |
-| SC4 | Platform API 版本管理（v1/v2） | P1 |
-| SC5 | CI/CD 包含 Go pipeline | P1 |
-| SC6 | 開發者文件完成 | P1 |
+| # | 標準 | 對應 Batch | 優先級 |
+|---|------|-----------|--------|
+| SC1 | Neurology module 可基本運作（基於 SDK Template 建立） | B3 | P2 |
+| SC2 | Radiology module 可接收 DICOM study（依賴 Phase 4） | 未來 | P2 |
+| SC3 | Cross-specialty terminology lookup | B1 | P1 |
+| SC4 | Platform API 版本管理（v1/v2） | B2 | P1 |
+| SC5 | CI/CD 包含 Go pipeline | B1 | P1 |
+| SC6 | SDK generator script 自動產生 scaffolding | B3 | P1 |
 
 ### 13.3 未來標準（Could-Have，Phase 6+）
 
@@ -1123,28 +1077,28 @@ Phase 5 總預估工期：16-20 週（4-5 個月）
 
 | Phase 4 交付項 | 依賴的 Phase 5 Batch | 風險等級 |
 |---------------|---------------------|---------|
-| **FHIR R4 完整實作**（Patient/Observation/MedicationRequest/DiagnosticReport） | B6.4（Radiology DICOM→FHIR） | 🟡 Medium |
-| **HL7/DICOM/PACS 基礎**（DICOMweb WADO-RS, STOW-RS） | B6.4（Radiology Module） | 🟠 High |
-| **RAG/Vector DB/Embedding Pipeline** | B6.1-B6.6（所有 specialty 的語義搜尋） | 🟡 Medium |
-| **ML Model Pipeline**（train/eval/deploy） | B6.5（Radiology AI Agent） | 🟡 Medium |
-| **Adapters 實作**（8 個 stub 完成真實連接） | B2.7, B6.1（Cardio/Neuro evidence sources） | 🟢 Low |
-| **Observability 強化**（metrics/tracing） | B1.1-B7.6（平台監控） | 🟢 Low |
-| **Frontend API Client 統一封裝** | B2.3-B6.6（新 specialty 前端整合） | 🟢 Low |
+| **FHIR R4 完整實作**（Patient/Observation/MedicationRequest/DiagnosticReport） | B1（Radiology 未來擴展） | 🟡 Medium |
+| **HL7/DICOM/PACS 基礎**（DICOMweb WADO-RS, STOW-RS） | B1（Radiology 未來擴展） | 🟠 High |
+| **RAG/Vector DB/Embedding Pipeline** | B1（Cardiology 語義搜尋）、B3（SDK 整合） | 🟡 Medium |
+| **ML Model Pipeline**（train/eval/deploy） | B1（Cardiology AI Agent） | 🟡 Medium |
+| **Adapters 實作**（8 個 stub 完成真實連接） | B1（Cardio evidence sources） | 🟢 Low |
+| **Observability 強化**（metrics/tracing） | 全部 Batch（平台監控） | 🟢 Low |
+| **Frontend API Client 統一封裝** | B1（新 specialty 前端整合） | 🟢 Low |
 
 ### 14.1 相依性矩陣
 
 ```
-Phase 4 完成度     Phase 5 Batch 風險
+Phase 4 完成度         Phase 5 Batch 風險
 ─────────────────────────────────────────────────
-FHIR:    □ 未完成 → B6.4 (Radiology) 受阻
-DICOM:   □ 未完成 → B6.4 (Radiology) 受阻  
-RAG:     □ 未完成 → 語義搜尋功能受限
-ML:      □ 未完成 → AI Agent 部分功能受限
-Adapters: □ 未完成 → 證據來源受限但不阻斷
+FHIR:    □ 未完成 → B1 中 Radiology 未來擴展受阻
+DICOM:   □ 未完成 → B1 中 Radiology 未來擴展受阻  
+RAG:     □ 未完成 → B1 語義搜尋功能受限
+ML:      □ 未完成 → B1 AI Agent 部分功能受限
+Adapters: □ 未完成 → B1 證據來源受限但不阻斷
 Observ:  □ 未完成 → 平台監控受限但不阻斷
 ```
 
-建議 Phase 4 優先完成 FHIR R4 與 DICOM 基礎，確保 Phase 5 Batch 6（Radiology）可如期交付。
+建議 Phase 4 優先完成 FHIR R4 與 DICOM 基礎，確保未來可擴展至 Radiology 等影像專科。
 
 ---
 

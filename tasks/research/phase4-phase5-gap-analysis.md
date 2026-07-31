@@ -39,12 +39,12 @@
 | 項目 | 內容 |
 |---|---|
 | **As-Is（現況）** | **🔴 Missing** — 完全無實作。全域 grep "vector\|embedding\|rag\|RAG\|chroma\|pinecone\|weaviate\|qdrant\|langchain" 無生產程式碼匹配。無 Vector DB、無 Embedding pipeline、無 RAG 檢索架構。 |
-| **To-Be（目標）** | **Phase 4 結束**：建立完整的 RAG pipeline，支援語義搜尋與知識增強生成。具體包括：(1) Vector DB 整合（Chroma/Qdrant/Pinecone），(2) Embedding 模型部署（如 OpenAI ada-002 或開源 BGE），(3) 文檔分塊與索引 pipeline，(4) 檢索-生成整合到 Agent/Reasoning 流程中。 |
-| **Gap（缺口）** | 1. 無 Vector DB 實例與連線<br>2. 無 Embedding 模型／服務<br>3. 無文檔分塊策略與實作<br>4. 無檢索（retriever）元件<br>5. 無 RAG 與 ClinicalReasoningService 的整合<br>6. 無向量索引的管理 API |
-| **Dependencies（依賴）** | 1. 外部 Vector DB 服務或決定使用嵌入式（如 Chroma embedded）<br>2. Embedding API key 或本地模型部署<br>3. Python 套件：langchain / llama-index / chromadb / qdrant-client |
-| **Risks（風險）** | - **技術**：Embedding 模型選擇影響檢索品質；需實驗多種 chunk 策略<br>- **資源**：若使用本地 Embedding 模型需 GPU 資源<br>- **時間**：從零建立約 4-6 週（含整合測試） |
-| **Priority（優先級）** | **P0（阻擋）** — Phase 4 核心功能，無 RAG 則無法實現語義級知識檢索 |
-| **Blocking（阻擋關係）** | 阻擋 Phase 4：Evidence Retrieval 能力、Guideline Agent 語義匹配增強、ClinicalTrialAgent 語義搜尋 |
+| **To-Be（目標）** | **Deferred（Phase 5+）** — 原定 Phase 4 建立完整 RAG pipeline，經 ChatGPT 審查後決定推遲。保留語義搜尋與知識增強生成為長期目標，待產品需求明確且有充分證據後再導入。 |
+| **Gap（缺口）** | 1. 無 Vector DB 實例與連線<br>2. 無 Embedding 模型／服務<br>3. 無文檔分塊策略與實作<br>4. 無檢索（retriever）元件<br>5. 無 RAG 與 ClinicalReasoningService 的整合<br>6. 無向量索引的管理 API<br><br>**⚠️ ChatGPT 審查決定**：目前無充分證據需要引入 Vector DB / Embedding pipeline。Phase 4 保持 Technology Agnostic，避免過早綁定特定基礎設施。上述缺口暫不處理，待 Phase 5 或更晚重新評估。 |
+| **Dependencies（依賴）** | 1. 外部 Vector DB 服務或決定使用嵌入式（如 Chroma embedded）<br>2. Embedding API key 或本地模型部署<br>3. Python 套件：langchain / llama-index / chromadb / qdrant-client<br><br>**（以上依賴項目前全部擱置，不導入任何 Vector DB 相關套件）** |
+| **Risks（風險）** | - **技術**：Embedding 模型選擇影響檢索品質；需實驗多種 chunk 策略<br>- **資源**：若使用本地 Embedding 模型需 GPU 資源<br>- **時間**：從零建立約 4-6 週（含整合測試）<br>- **🧭 推遲風險**：Phase 4 階段無法實現語義檢索，關鍵字檢索（現有基礎）可能無法滿足高階查詢需求；此風險已被接受 |
+| **Priority（優先級）** | **Deferred（Phase 5+）** — 基於 ChatGPT 審查要求，目前無充分證據需要引入 Vector DB / RAG 基礎設施。保持 Technology Agnostic。 |
+| **Blocking（阻擋關係）** | ⏸️ **原阻擋關係暫停**：Evidence Retrieval 語義增強、Guideline Agent 語義匹配、ClinicalTrialAgent 語義搜尋等依賴 RAG 的能力暫不實現，改用關鍵字檢索與現有規則引擎替代方案。 |
 
 ---
 
@@ -369,11 +369,23 @@
 
 ## 總結：優先級矩陣
 
+### ⚠️ Phase 4 範圍變更（基於 ChatGPT 審查）
+
+經 ChatGPT 審查 Master Plan 後，Phase 4 範圍進行以下調整：
+
+| 變更類型 | 項目 | 原狀態 | 新狀態 | 原因 |
+|---------|------|--------|--------|------|
+| **Deferred** | #1 RAG／Evidence Retrieval | Phase 4 P0 必須 | **Deferred to Phase 5+** | 無充分證據需要引入 Vector DB；保持 Technology Agnostic |
+| **Out of Scope** | treatment_plan_service.py 大型 Service Refactor | 未明確列出但假設為 Phase 4 | **Out of Scope** | 非產品能力；內部重構不阻擋產品化 |
+| **Out of Scope** | Frontend 產品化強化（大規模 UI 重構） | 未明確列出但假設為 Phase 4 | **Out of Scope** | 非 Phase 4 核心產品能力；前端維持現有功能迭代 |
+| **保持** | 其餘 Phase 4 項目 | — | 不變 | — |
+
+> **總體原則**：Phase 4 只保留**真正阻擋產品化**的核心能力，移除所有大型 Service Refactor 與 Frontend 重構。RAG/Vector DB 相關能力降級為 Deferred，待 Phase 5 或更晚有明確需求時再導入。
+
 ### Phase 4 必須完成（P0/P1）
 
 | 優先級 | 維度 | 估計工時 | 阻擋關係 |
 |--------|------|----------|----------|
-| **P0** | #1 RAG／Evidence Retrieval | 4-6 週 | 阻擋語義檢索 |
 | **P0** | #16 Background Jobs / Queue | 2-3 週 | 阻擋 #10 |
 | **P1** | #3 NCCN/ESMO/ASCO Guideline Adapter | 2-4 週 | 不阻擋但 GuidelineAgent 受限 |
 | **P1** | #5 Clinical Trial Matching | 3-4 週 | 不阻擋但 TrialAgent 受限 |
@@ -402,6 +414,12 @@
 | **P3** | #8 Explainable AI (增強) | 現有可運作 |
 | **P3** | #9 Citation/Provenance (增強) | 現有可運作 |
 
+### Deferred（Phase 5+）
+
+| 優先級 | 維度 | 附註 |
+|--------|------|------|
+| **Deferred** | #1 RAG／Evidence Retrieval | 基於 ChatGPT 審查要求推遲；保持 Technology Agnostic；待產品需求明確後重新評估 |
+
 ### Phase 5 必須完成（P0）
 
 | 優先級 | 維度 | 估計工時 | 阻擋關係 |
@@ -418,7 +436,8 @@
 ## 關鍵風險摘要
 
 1. **FHIR R4 複雜度風險**：醫療互操作性標準實作需大量領域知識，建議優先導入核心資源集（Patient, Observation, MedicationRequest）並逐步擴充。
-2. **RAG 技術選擇風險**：Vector DB 與 Embedding 模型選擇影響深遠，建議 Phase 4 初期進行 PoC 比較多種方案。
+2. ~~**RAG 技術選擇風險**：Vector DB 與 Embedding 模型選擇影響深遠，建議 Phase 4 初期進行 PoC 比較多種方案。~~  
+   **（已降級）** RAG 已被 Deferred to Phase 5+，此風險不再適用於 Phase 4。Phase 4 維持關鍵字檢索與規則引擎方案。
 3. **NCCN API 授權風險**：需確認商業授權成本與可用性，備案為手動結構化 guideline PDF。
 4. **Oncology Decoupling 架構風險**：Phase 5 最大風險項，建議 Phase 4 後期即開始架構設計，避免 Phase 5 前期探索。
 5. **HL7 實作差異風險**：不同醫療機構 HL7 v2 實作差異大，建議以彈性 parser 為目標而非 strict validation。
