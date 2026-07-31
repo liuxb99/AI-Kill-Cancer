@@ -16,6 +16,7 @@ import TreatmentPlanListPage from './pages/TreatmentPlanListPage'
 import TreatmentPlanCreatePage from './pages/TreatmentPlanCreatePage'
 import TreatmentPlanDetailPage from './pages/TreatmentPlanDetailPage'
 import TreatmentPlanRevisionPage from './pages/TreatmentPlanRevisionPage'
+import PTCResearchPage from './pages/PTCResearchPage'
 import StatusBanner from './components/StatusBanner'
 
 function AppNavbar() {
@@ -26,6 +27,7 @@ function AppNavbar() {
   if (location.pathname === '/') return null
 
   const links = [
+    { label: 'PTC 病例', path: '/ptc-research' },
     { label: '藥物推薦', path: '/recommendation' },
     { label: '臨床決策', path: '/clinical-decision' },
     { label: '腫瘤委員會', path: '/tumor-board' },
@@ -73,6 +75,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/research-portal" element={<ResearchPortal />} />
         <Route path="/workbench" element={<Workbench />} />
+        <Route path="/ptc-research" element={<PTCResearchPage />} />
         <Route path="/recommendation" element={<RecommendationPage />} />
         <Route path="/clinical-decision" element={<ClinicalDecisionListPage />} />
         <Route path="/clinical-decision/:id" element={<ClinicalDecisionPage />} />
