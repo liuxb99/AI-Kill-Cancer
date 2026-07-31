@@ -17,6 +17,7 @@ router = APIRouter(prefix="/ptc-completion", tags=["ptc-completion"])
 
 class CompleteSyncRequest(BaseModel):
     gdc_size: int = Field(default=100, ge=1, le=1000)
+    gdc_mutation_files: int = Field(default=1, ge=0, le=20)
     trial_size: int = Field(default=100, ge=1, le=1000)
     pubmed_size: int = Field(default=100, ge=1, le=500)
     drug_names: list[str] = Field(default_factory=lambda: list(DEFAULT_PTC_DRUGS))
@@ -30,6 +31,7 @@ async def sync_all(
 ) -> dict[str, Any]:
     return await PTCCompletionService(db).sync_all(
         gdc_size=body.gdc_size,
+        gdc_mutation_files=body.gdc_mutation_files,
         trial_size=body.trial_size,
         pubmed_size=body.pubmed_size,
         drug_names=body.drug_names,
