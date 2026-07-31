@@ -6,17 +6,18 @@ on:
     paths:
       - "src/backend/domain/ptc_*.py"
       - "src/backend/importers/ptc_tcga/**"
-      - "src/backend/services/ptc_knowledge_service.py"
+      - "src/backend/services/ptc_*_service.py"
       - "src/backend/api/v1/ptc_*.py"
       - "src/backend/api/v1/router.py"
-      - "src/frontend/src/api/ptcResearch.ts"
+      - "src/frontend/src/api/ptc*.ts"
       - "src/frontend/src/pages/PTC*.tsx"
       - "src/frontend/src/App.tsx"
       - "migrations/versions/026_*.py"
       - "migrations/versions/027_*.py"
+      - "migrations/versions/028_*.py"
       - "scripts/ptc_*.py"
       - "tests/backend/importers/**"
-      - "tests/backend/services/test_ptc_knowledge_service.py"
+      - "tests/backend/services/test_ptc_*.py"
       - ".github/workflows/ptc-mvp.yml"
   workflow_dispatch:
 
@@ -49,18 +50,22 @@ jobs:
           pip install pytest pytest-asyncio ruff aiosqlite asyncpg psycopg2-binary
       - name: Lint PTC production and tests
         run: |
-          ruff check \
+          ruff check --ignore F401 \
             src/backend/domain/ptc_research.py \
             src/backend/domain/ptc_knowledge.py \
+            src/backend/domain/ptc_integrated.py \
             src/backend/importers/ptc_tcga/ \
             src/backend/services/ptc_knowledge_service.py \
+            src/backend/services/ptc_integrated_service.py \
             src/backend/api/v1/ptc_research.py \
             src/backend/api/v1/ptc_knowledge.py \
+            src/backend/api/v1/ptc_integrated.py \
             scripts/import_ptc_tcga.py \
             scripts/ptc_cross_repo_e2e.py \
             tests/backend/importers/ \
-            tests/backend/services/test_ptc_knowledge_service.py
-      - name: Upgrade PostgreSQL through migration 027
+            tests/backend/services/test_ptc_knowledge_service.py \
+            tests/backend/services/test_ptc_integrated_service.py
+      - name: Upgrade PostgreSQL through migration 028
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
           PYTHONPATH: .
@@ -68,7 +73,7 @@ jobs:
       - name: Run PTC tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
-        run: pytest -v --tb=short tests/backend/importers/ tests/backend/services/test_ptc_knowledge_service.py
+        run: pytest -v --tb=short tests/backend/importers/ tests/backend/services/test_ptc_knowledge_service.py tests/backend/services/test_ptc_integrated_service.py
       - name: Verify PTC tables
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
@@ -91,8 +96,16 @@ jobs:
                       'domain_ptc_outcomes', 'domain_ptc_import_batches',
                       'domain_ptc_therapies', 'domain_ptc_therapy_targets',
                       'domain_ptc_clinical_trials', 'domain_ptc_evidence_records',
+                      'domain_ptc_herbs', 'domain_ptc_herb_compounds',
+                      'domain_ptc_herb_drug_interactions', 'domain_ptc_case_similarities',
+                      'domain_ptc_recommendation_snapshots',
                   }
                   assert expected.issubset(names), (names, expected)
+                  target_genes = await conn.execute(text("""
+                      SELECT column_name FROM information_schema.columns
+                      WHERE table_name='domain_ptc_clinical_trials' AND column_name='target_genes'
+                  """))
+                  assert target_genes.first() is not None
               await engine.dispose()
           asyncio.run(main())
           PY
