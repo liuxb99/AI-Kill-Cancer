@@ -35,18 +35,19 @@ from src.backend.domain.ptc_research import (
     PTCResearchCaseModel,
     PTCVariantModel,
 )
+from src.backend.domain.ptc_knowledge import (
+    PTCClinicalTrialModel,
+    PTCEvidenceRecordModel,
+    PTCTherapyModel,
+    PTCTherapyTargetModel,
+)
 
 config = context.config
-# Allow override via DATABASE_URL env var (used in CI with SQLite)
-# Only override when config is loaded from a file, not in-memory (test) config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
     db_url = os.environ.get("DATABASE_URL")
     if db_url:
         config.set_main_option("sqlalchemy.url", db_url)
-else:
-    # In-memory config (e.g., test fixture) — respect programmatic settings
-    pass
 
 target_metadata = Base.metadata
 
@@ -66,7 +67,6 @@ def do_run_migrations(connection):
 
 def run_migrations_online():
     url = config.get_main_option("sqlalchemy.url")
-    # Strip async driver suffix (+asyncpg, +aiosqlite, +aiomysql, +aioodbc, +asyncmy) to get sync variant
     sync_url = re.sub(r"\+asyncpg|\+aiosqlite|\+aiomysql|\+aioodbc|\+asyncmy", "", url)
     connectable = create_engine(sync_url)
     with connectable.connect() as connection:
