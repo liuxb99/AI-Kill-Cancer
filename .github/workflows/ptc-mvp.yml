@@ -1,4 +1,4 @@
-name: PTC MVP Pipeline
+name: PTC Complete Product Skeleton
 
 on:
   push:
@@ -58,26 +58,35 @@ jobs:
             src/backend/services/ptc_knowledge_service.py \
             src/backend/services/ptc_integrated_service.py \
             src/backend/services/ptc_literature_service.py \
+            src/backend/services/ptc_completion_service.py \
             src/backend/api/v1/ptc_research.py \
             src/backend/api/v1/ptc_knowledge.py \
             src/backend/api/v1/ptc_integrated.py \
             src/backend/api/v1/ptc_literature.py \
+            src/backend/api/v1/ptc_completion.py \
             scripts/import_ptc_tcga.py \
             scripts/ptc_cross_repo_e2e.py \
             tests/backend/importers/ \
             tests/backend/services/test_ptc_knowledge_service.py \
             tests/backend/services/test_ptc_integrated_service.py \
-            tests/backend/services/test_ptc_literature_service.py
-      - name: Upgrade PostgreSQL through migration 028
+            tests/backend/services/test_ptc_literature_service.py \
+            tests/backend/services/test_ptc_completion_service.py
+      - name: Upgrade PostgreSQL through PTC migrations
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
           PYTHONPATH: .
         run: alembic -c migrations/alembic.ini upgrade head
-      - name: Run PTC tests
+      - name: Run all PTC tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
-        run: pytest -v --tb=short tests/backend/importers/ tests/backend/services/test_ptc_knowledge_service.py tests/backend/services/test_ptc_integrated_service.py tests/backend/services/test_ptc_literature_service.py
-      - name: Verify PTC tables
+        run: |
+          pytest -v --tb=short \
+            tests/backend/importers/ \
+            tests/backend/services/test_ptc_knowledge_service.py \
+            tests/backend/services/test_ptc_integrated_service.py \
+            tests/backend/services/test_ptc_literature_service.py \
+            tests/backend/services/test_ptc_completion_service.py
+      - name: Verify complete PTC schema
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
         run: |
