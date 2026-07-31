@@ -20,13 +20,12 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.agents.consensus import ConsensusEngine, ConsensusResult
+from src.backend.agents.consensus import ConsensusResult
 from src.backend.agents.models import AgentOpinion
-from src.backend.agents.orchestrator import AgentOrchestrator
 from src.backend.auth.dependencies import (
     require_auth,
     require_case_access,
@@ -36,18 +35,15 @@ from src.backend.clinical.builder import CaseContextBuilder
 from src.backend.clinical.collector import EvidenceCollector
 from src.backend.clinical.decision_thread import (
     DecisionNode,
-    DecisionThreadInjector,
     DecisionThreadRepository,
 )
 from src.backend.clinical.evidence_models import EvidenceBundle
 from src.backend.clinical.models import ClinicalContext
-from src.backend.clinical.recommendation import (
-    RecommendationGenerator,
-    TreatmentRecommendation,
-)
+from src.backend.clinical.recommendation import TreatmentRecommendation
 from src.backend.database.session import get_db
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
+from src.backend.services.clinical_pipeline_service import ClinicalPipelineService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/clinical", tags=["clinical"])
@@ -213,6 +209,7 @@ async def get_clinical_evidence(
     response_model=list[AgentOpinion],
 )
 async def run_agents(
+    request: Request,
     case_id: str,
     user: UserModel = Depends(require_case_access(CaseRole.VIEWER)),
     db: AsyncSession = Depends(get_db),
@@ -225,27 +222,41 @@ async def run_agents(
         2. Collect evidence via EvidenceCollector
         3. Run all agents via AgentOrchestrator.run_all()
 
-    Each step has independent error handling so that partial failures
-    are reported gracefully.
+    Steps 1-2 (read-only) run in this endpoint; the Decision Thread
+    writes and the agent run are delegated to
+    :class:`ClinicalPipelineService`, which owns the transaction
+    (commit once on success, rollback on failure).
     """
-    # Step 1 & 2: context + evidence
-    context, evidence = await _build_context_and_evidence(db, case_id)
+    try:
+        # Step 1 & 2: context + evidence (read-only validation)
+        context, evidence = await _build_context_and_evidence(db, case_id)
 
-    # ── Decision thread: record context_built and evidence_collected ──
-    repo = DecisionThreadRepository(db)
-    injector = DecisionThreadInjector(repo, case_id)
-    await injector.record_context_built(context)
-    await injector.record_evidence_collected(evidence)
-
-    # Step 3: run agents
-    orchestrator = AgentOrchestrator(db)
-    opinions: list[AgentOpinion] = await orchestrator.run_all(context, evidence)
-
-    # ── Decision thread: record each agent opinion ──
-    for opinion in opinions:
-        await injector.record_agent_opinion(opinion)
-
-    return opinions
+        # Steps 3+ and Decision Thread writes run inside one transaction.
+        service = ClinicalPipelineService(db)
+        return await service.run_agents(case_id, context, evidence)
+    except HTTPException:
+        # 4xx 業務錯誤（case 不存在 / 權限不足）透傳，不轉 500
+        raise
+    except Exception:
+        # 不洩漏 str(e)：對外回傳固定訊息 + 可追蹤 error_id
+        error_id = (
+            getattr(request.state, "request_id", None)
+            or request.headers.get("X-Request-ID")
+            or str(uuid.uuid4())
+        )
+        logger.exception(
+            "Clinical agents pipeline failed for case %s [error_id=%s]",
+            case_id,
+            error_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
 
 @router.post(
@@ -253,6 +264,7 @@ async def run_agents(
     response_model=ConsensusResult,
 )
 async def run_consensus(
+    request: Request,
     case_id: str,
     user: UserModel = Depends(require_case_access(CaseRole.VIEWER)),
     db: AsyncSession = Depends(get_db),
@@ -265,34 +277,41 @@ async def run_consensus(
         3. Run all agents via AgentOrchestrator.run_all()
         4. Reach consensus via ConsensusEngine.reach_consensus()
 
-    Each step has independent error handling so that partial failures
-    are reported gracefully.
+    Steps 1-2 (read-only) run in this endpoint; the Decision Thread
+    writes and the pipeline are delegated to
+    :class:`ClinicalPipelineService`, which owns the transaction
+    (commit once on success, rollback on failure).
     """
-    # Step 1 & 2: context + evidence
-    context, evidence = await _build_context_and_evidence(db, case_id)
+    try:
+        # Step 1 & 2: context + evidence (read-only validation)
+        context, evidence = await _build_context_and_evidence(db, case_id)
 
-    # ── Decision thread: record context_built and evidence_collected ──
-    repo = DecisionThreadRepository(db)
-    injector = DecisionThreadInjector(repo, case_id)
-    await injector.record_context_built(context)
-    await injector.record_evidence_collected(evidence)
-
-    # Step 3: run agents
-    orchestrator = AgentOrchestrator(db)
-    opinions: list[AgentOpinion] = await orchestrator.run_all(context, evidence)
-
-    # ── Decision thread: record each agent opinion ──
-    for opinion in opinions:
-        await injector.record_agent_opinion(opinion)
-
-    # Step 4: consensus
-    engine = ConsensusEngine()
-    consensus: ConsensusResult = await engine.reach_consensus(opinions, context)
-
-    # ── Decision thread: record consensus_reached ──
-    await injector.record_consensus_reached(consensus)
-
-    return consensus
+        # Steps 3-4 and Decision Thread writes run inside one transaction.
+        service = ClinicalPipelineService(db)
+        return await service.run_consensus(case_id, context, evidence)
+    except HTTPException:
+        # 4xx 業務錯誤（case 不存在 / 權限不足）透傳，不轉 500
+        raise
+    except Exception:
+        # 不洩漏 str(e)：對外回傳固定訊息 + 可追蹤 error_id
+        error_id = (
+            getattr(request.state, "request_id", None)
+            or request.headers.get("X-Request-ID")
+            or str(uuid.uuid4())
+        )
+        logger.exception(
+            "Clinical consensus pipeline failed for case %s [error_id=%s]",
+            case_id,
+            error_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
 
 @router.post(
@@ -300,6 +319,7 @@ async def run_consensus(
     response_model=TreatmentRecommendation,
 )
 async def recommend_treatment(
+    request: Request,
     case_id: str,
     user: UserModel = Depends(require_case_access(CaseRole.VIEWER)),
     db: AsyncSession = Depends(get_db),
@@ -313,43 +333,41 @@ async def recommend_treatment(
         4. Reach consensus via ConsensusEngine.reach_consensus()
         5. Generate recommendation via RecommendationGenerator.generate()
 
-    Each step has independent error handling so that partial failures
-    are reported gracefully.
+    Steps 1-2 (read-only) run in this endpoint; the Decision Thread
+    writes and the pipeline are delegated to
+    :class:`ClinicalPipelineService`, which owns the transaction
+    (commit once on success, rollback on failure).
     """
-    # Step 1 & 2: context + evidence
-    context, evidence = await _build_context_and_evidence(db, case_id)
+    try:
+        # Step 1 & 2: context + evidence (read-only validation)
+        context, evidence = await _build_context_and_evidence(db, case_id)
 
-    # ── Decision thread: record context_built and evidence_collected ──
-    repo = DecisionThreadRepository(db)
-    injector = DecisionThreadInjector(repo, case_id)
-    await injector.record_context_built(context)
-    await injector.record_evidence_collected(evidence)
-
-    # Step 3: run agents
-    orchestrator = AgentOrchestrator(db)
-    opinions: list[AgentOpinion] = await orchestrator.run_all(context, evidence)
-
-    # ── Decision thread: record each agent opinion ──
-    for opinion in opinions:
-        await injector.record_agent_opinion(opinion)
-
-    # Step 4: consensus
-    engine = ConsensusEngine()
-    consensus: ConsensusResult = await engine.reach_consensus(opinions, context)
-
-    # ── Decision thread: record consensus_reached ──
-    await injector.record_consensus_reached(consensus)
-
-    # Step 5: generate recommendation
-    generator = RecommendationGenerator()
-    recommendation: TreatmentRecommendation = await generator.generate(
-        consensus, context, evidence,
-    )
-
-    # ── Decision thread: record recommendation_generated ──
-    await injector.record_recommendation(recommendation)
-
-    return recommendation
+        # Steps 3-5 and Decision Thread writes run inside one transaction.
+        service = ClinicalPipelineService(db)
+        return await service.recommend_treatment(case_id, context, evidence)
+    except HTTPException:
+        # 4xx 業務錯誤（case 不存在 / 權限不足）透傳，不轉 500
+        raise
+    except Exception:
+        # 不洩漏 str(e)：對外回傳固定訊息 + 可追蹤 error_id
+        error_id = (
+            getattr(request.state, "request_id", None)
+            or request.headers.get("X-Request-ID")
+            or str(uuid.uuid4())
+        )
+        logger.exception(
+            "Clinical recommend pipeline failed for case %s [error_id=%s]",
+            case_id,
+            error_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
 
 @router.post(
@@ -357,6 +375,7 @@ async def recommend_treatment(
     response_model=AnalyzeResponse,
 )
 async def analyze_case(
+    request: Request,
     case_id: str,
     user: UserModel = Depends(require_case_access(CaseRole.VIEWER)),
     db: AsyncSession = Depends(get_db),
@@ -376,47 +395,50 @@ async def analyze_case(
     Each step has independent error handling so that partial failures
     (e.g. an individual agent error) do not block the rest of the
     pipeline.
+
+    Steps 1-2 (read-only) run in this endpoint; the Decision Thread
+    writes and the pipeline are delegated to
+    :class:`ClinicalPipelineService`, which owns the transaction
+    (commit once on success, rollback on failure).
     """
-    # Step 1 & 2: context + evidence
-    context, evidence = await _build_context_and_evidence(db, case_id)
+    try:
+        # Step 1 & 2: context + evidence (read-only validation)
+        context, evidence = await _build_context_and_evidence(db, case_id)
 
-    # ── Decision thread: record context_built and evidence_collected ──
-    repo = DecisionThreadRepository(db)
-    injector = DecisionThreadInjector(repo, case_id)
-    await injector.record_context_built(context)
-    await injector.record_evidence_collected(evidence)
+        # Steps 3-5 and Decision Thread writes run inside one transaction.
+        service = ClinicalPipelineService(db)
+        result = await service.analyze_case(case_id, context, evidence)
 
-    # Step 3: run agents
-    orchestrator = AgentOrchestrator(db)
-    opinions: list[AgentOpinion] = await orchestrator.run_all(context, evidence)
-
-    # ── Decision thread: record each agent opinion ──
-    for opinion in opinions:
-        await injector.record_agent_opinion(opinion)
-
-    # Step 4: consensus
-    engine = ConsensusEngine()
-    consensus: ConsensusResult = await engine.reach_consensus(opinions, context)
-
-    # ── Decision thread: record consensus_reached ──
-    await injector.record_consensus_reached(consensus)
-
-    # Step 5: generate recommendation
-    generator = RecommendationGenerator()
-    recommendation: TreatmentRecommendation = await generator.generate(
-        consensus, context, evidence,
-    )
-
-    # ── Decision thread: record recommendation_generated ──
-    await injector.record_recommendation(recommendation)
-
-    return AnalyzeResponse(
-        context=context,
-        evidence=evidence,
-        opinions=opinions,
-        consensus=consensus,
-        recommendation=recommendation,
-    )
+        return AnalyzeResponse(
+            context=result.context,
+            evidence=result.evidence,
+            opinions=result.opinions,
+            consensus=result.consensus,
+            recommendation=result.recommendation,
+        )
+    except HTTPException:
+        # 4xx 業務錯誤（case 不存在 / 權限不足）透傳，不轉 500
+        raise
+    except Exception:
+        # 不洩漏 str(e)：對外回傳固定訊息 + 可追蹤 error_id
+        error_id = (
+            getattr(request.state, "request_id", None)
+            or request.headers.get("X-Request-ID")
+            or str(uuid.uuid4())
+        )
+        logger.exception(
+            "Clinical analyze pipeline failed for case %s [error_id=%s]",
+            case_id,
+            error_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
 
 # ─── Digital Thread endpoints ─────────────────────────────────────────────────

@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +27,7 @@ from src.backend.reporting.models import ReportCreateResponse
 from src.backend.reporting.renderer import FHIRExporter, ReportRenderer
 from src.backend.reporting.repository import ReportRepository
 from src.backend.reporting.validator import ReportValidator
+from src.backend.services.report_service import ReportService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -80,12 +81,12 @@ async def _get_report_and_verify_access(
 @router.post("/case/{case_id}", response_model=ReportCreateResponse)
 async def create_case_report(
     case_id: str,
+    request: Request,
     user: UserModel = Depends(require_case_access(CaseRole.EDITOR)),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a clinical report for a case (requires EDITOR access on the case)."""
     builder = ReportBuilder()
-    repo = ReportRepository(db)
     renderer = ReportRenderer()
     fhir_exporter = FHIRExporter()
 
@@ -102,13 +103,34 @@ async def create_case_report(
     html = renderer.render_html(report)
     fhir = fhir_exporter.export(report)
 
-    # Persist
-    model = await repo.create(
-        case_id=case_id,
-        report_data=report.model_dump(),
-        html_content=html,
-        fhir_data=fhir,
+    error_id = (
+        getattr(request.state, "request_id", None)
+        or request.headers.get("X-Request-ID")
+        or str(uuid.uuid4())
     )
+    service = ReportService(db)
+    try:
+        # Persist — transaction 由 Service 管理（成功 commit；失敗 rollback 後 re-raise）
+        model = await service.create(
+            case_id=case_id,
+            report_data=report.model_dump(),
+            html_content=html,
+            fhir_data=fhir,
+        )
+    except HTTPException:
+        # 4xx 業務錯誤（如權限不足）透傳，不轉 500
+        raise
+    except Exception:
+        # 對外回傳固定訊息 + 可追蹤 error_id；完整例外寫入 server log。
+        logger.exception("Failed to create report [error_id=%s]", error_id)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
     return ReportCreateResponse(
         report_id=str(model.id),

@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.auth.case_acl_service import CaseACLService
@@ -20,6 +20,7 @@ from src.backend.domain.case_acl import (
     CaseRole,
 )
 from src.backend.domain.user import UserModel
+from src.backend.services.case_access_service import CaseAccessService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cases/{case_id}/acl", tags=["case-acl"])
@@ -56,6 +57,7 @@ async def list_case_acls(
 async def grant_case_access(
     case_id: str,
     body: CaseACLCreate,
+    request: Request,
     user: UserModel = Depends(require_case_access(CaseRole.OWNER)),
     db: AsyncSession = Depends(get_db),
 ):
@@ -66,9 +68,10 @@ async def grant_case_access(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid UUID")
 
-    acl_service = CaseACLService(db)
+    error_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    acl_service = CaseAccessService(db)
     try:
-        acl = await acl_service.grant_access(
+        acl = await acl_service.grant(
             case_id=cid,
             grantor=user,
             target_user_id=target_user_id,
@@ -76,6 +79,18 @@ async def grant_case_access(
         )
     except PermissionDeniedError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to grant case ACL (error_id=%s)", error_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
     return _to_acl_response(acl)
 
 
@@ -83,6 +98,7 @@ async def grant_case_access(
 async def revoke_case_access(
     case_id: str,
     target_user_id: str,
+    request: Request,
     user: UserModel = Depends(require_case_access(CaseRole.OWNER)),
     db: AsyncSession = Depends(get_db),
 ):
@@ -93,8 +109,25 @@ async def revoke_case_access(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid UUID")
 
-    acl_service = CaseACLService(db)
+    error_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    acl_service = CaseAccessService(db)
     try:
-        await acl_service.revoke_access(case_id=cid, grantor=user, target_user_id=tid)
+        await acl_service.revoke(
+            case_id=cid,
+            grantor=user,
+            target_user_id=tid,
+        )
     except PermissionDeniedError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to revoke case ACL (error_id=%s)", error_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )

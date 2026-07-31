@@ -49,7 +49,7 @@ class ReportRepository:
             fhir_data=fhir_data,
         )
         self.db.add(instance)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(instance)
         return instance
 
@@ -64,7 +64,7 @@ class ReportRepository:
             return None
         instance.status = status
         instance.updated_at = datetime.utcnow()
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(instance)
         return instance
 

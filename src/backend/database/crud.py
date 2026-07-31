@@ -237,7 +237,8 @@ async def create_research_paper(
         url=url,
     )
     db.add(paper)
-    await db.commit()
+    # flush-only：commit 由 Service 層統一管理（REVIEW-PHASE3F0-R3-P0-01）
+    await db.flush()
     await db.refresh(paper)
     return paper
 

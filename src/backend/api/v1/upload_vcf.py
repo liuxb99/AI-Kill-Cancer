@@ -24,7 +24,7 @@ import os
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.auth.dependencies import require_auth, verify_case_access
@@ -40,6 +40,7 @@ from src.backend.domain.enums import (
 from src.backend.domain.user import UserModel
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.repositories.uploaded_file_repo import UploadedFileRepository
+from src.backend.services.vcf_upload_service import VCFUploadService
 from src.backend.vcf.models import VCFUploadResponse
 from src.backend.vcf.validator import validate_vcf_streaming
 
@@ -245,6 +246,7 @@ async def _resolve_storage(
 
 @router.post("/upload", response_model=VCFUploadResponse)
 async def upload_vcf(
+    request: Request,
     file: UploadFile = File(...),
     genome_build: str | None = Form(None),
     sequencing_test_id: str | None = Form(None),
@@ -326,10 +328,13 @@ async def upload_vcf(
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Upload streaming failed for %s", upload_id)
+        error_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+        logger.exception("Upload streaming failed for %s (error_id=%s)", upload_id, error_id)
         _cleanup_path(storage_path)
         raise HTTPException(status_code=500, detail={
-            "error": "upload_failed", "message": "Failed to read uploaded file",
+            "error": "upload_failed",
+            "message": "Failed to read uploaded file",
+            "error_id": error_id,
         })
 
     if exceeded:
@@ -414,8 +419,10 @@ async def upload_vcf(
         quarantine_reason = "; ".join(errors[:5]) if errors else "VCF validation failed"
 
     # ── DB persist (AFTER validation, before full file storage) ───────
+    # Transaction 由 Service 層管理（commit/rollback）；API 層不直接 commit。
     try:
-        db_record = await repo.create(
+        service = VCFUploadService(db_session)
+        db_record = await service.create_upload_metadata(
             id=uuid.UUID(upload_id),
             sequencing_test_id=sequencing_test_id,
             original_filename=filename,
@@ -437,11 +444,17 @@ async def upload_vcf(
             retention_until=(now + timedelta(days=RETENTION_DAYS_REJECTED)).isoformat() if not is_valid else None,
             duplicate_of_upload_id=duplicate_of_id,
         )
+    except HTTPException:
+        # 4xx 業務錯誤透傳，不轉 500
+        raise
     except Exception:
-        logger.exception("DB persistence failed for upload %s", upload_id)
+        error_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+        logger.exception("DB persistence failed for upload %s (error_id=%s)", upload_id, error_id)
         _cleanup_path(storage_path)
         raise HTTPException(status_code=500, detail={
-            "error": "db_error", "message": "Failed to save upload metadata",
+            "error": "db_error",
+            "message": "Failed to save upload metadata",
+            "error_id": error_id,
         })
 
     # ── Response (never return server path) ──────────────────────────

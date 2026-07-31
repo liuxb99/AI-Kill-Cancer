@@ -55,7 +55,8 @@ class RankingRunRepository:
             status=ranking_data.get("status", "completed"),
         )
         self.db.add(instance)
-        await self.db.commit()
+        # flush-only：transaction commit/rollback 由 Service 層統一管理
+        await self.db.flush()
         await self.db.refresh(instance)
         return instance
 

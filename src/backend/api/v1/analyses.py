@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.api.v1.deps import get_analysis_run_repo
@@ -20,6 +20,7 @@ from src.backend.domain.evidence import EvidenceSearchResult
 from src.backend.domain.user import UserModel
 from src.backend.domain.visualization_graph import GraphAnalysisResponse, VisualizationGraph
 from src.backend.repositories.analysis_run_repo import AnalysisRunRepository
+from src.backend.services.analysis_run_service import AnalysisRunService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analyses", tags=["analyses"])
@@ -27,9 +28,9 @@ router = APIRouter(prefix="/analyses", tags=["analyses"])
 
 @router.post("", response_model=AnalysisRunResponse, status_code=201)
 async def create_analysis(
+    request: Request,
     body: AnalysisRunCreate,
     user: UserModel = Depends(require_auth),
-    repo: AnalysisRunRepository = Depends(get_analysis_run_repo),
     db: AsyncSession = Depends(get_db),
 ):
     # Verify EDITOR access on the case
@@ -40,13 +41,30 @@ async def create_analysis(
         raise HTTPException(status_code=400, detail="Invalid case_id")
 
     try:
+        service = AnalysisRunService(db)
         data = body.model_dump(exclude_none=True)
-        data["status"] = AnalysisStatusEnum.PENDING
-        analysis = await repo.create(**data)
+        analysis = await service.create(**data)
         return AnalysisRunResponse.model_validate(analysis)
-    except Exception as e:
-        logger.exception("Failed to create analysis run")
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        # 4xx 業務錯誤（如權限不足）透傳，不轉 500
+        raise
+    except Exception:
+        # REVIEW-PHASE3F0-R3-P0-01 / P1-02 模式：不洩漏 str(e)，
+        # 對外回傳固定訊息 + 可追蹤 error_id；完整例外寫入 server log。
+        error_id = (
+            getattr(request.state, "request_id", None)
+            or request.headers.get("X-Request-ID")
+            or str(uuid.uuid4())
+        )
+        logger.exception("Failed to create analysis run [error_id=%s]", error_id)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
 
 @router.get("/{analysis_id}", response_model=AnalysisRunResponse)

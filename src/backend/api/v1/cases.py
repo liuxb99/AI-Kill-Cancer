@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.api.v1.deps import get_cancer_case_repo
@@ -22,6 +22,7 @@ from src.backend.domain.cancer_case import (
 from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.user import UserModel
 from src.backend.repositories.cancer_case_repo import CancerCaseRepository
+from src.backend.services.cancer_case_service import CancerCaseService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cases", tags=["cases"])
@@ -30,36 +31,31 @@ router = APIRouter(prefix="/cases", tags=["cases"])
 @router.post("", response_model=CancerCaseResponse, status_code=201)
 async def create_case(
     body: CancerCaseCreate,
+    request: Request,
     user: UserModel = Depends(require_auth),
-    repo: CancerCaseRepository = Depends(get_cancer_case_repo),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new cancer case. Creator becomes the owner."""
+    error_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    service = CancerCaseService(db)
     try:
-        case = await repo.create(**body.model_dump(exclude_none=True))
-        # Auto-grant owner role to the creator
-        acl_service = CaseACLService(db)
-        await acl_service.grant_owner(case.id, user.id)
-        return CancerCaseResponse(
-            id=str(case.id),
-            patient_id=str(case.patient_id),
-            oncotree_code=case.oncotree_code,
-            cancer_type=case.cancer_type.value if hasattr(case.cancer_type, "value") else case.cancer_type,
-            histology=case.histology,
-            stage=case.stage,
-            diagnosis_date=case.diagnosis_date,
-            radioiodine_status=case.radioiodine_status,
-            recurrence_status=case.recurrence_status,
-            metastatic_sites=case.metastatic_sites or [],
-            treatment_history=case.treatment_history or [],
-            current_medications=case.current_medications or [],
-            clinical_notes=case.clinical_notes,
-            created_at=case.created_at,
-            updated_at=case.updated_at,
+        case = await service.create(
+            user_id=user.id,
+            **body.model_dump(exclude_none=True),
         )
-    except Exception as e:
-        logger.exception("Failed to create cancer case")
-        raise HTTPException(status_code=500, detail=str(e))
+        return CancerCaseResponse.model_validate(case)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to create cancer case (error_id=%s)", error_id)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
 
 @router.get("/{case_id}", response_model=CancerCaseResponse)
@@ -132,8 +128,9 @@ async def list_cases(
 async def update_case(
     case_id: str,
     body: CancerCaseUpdate,
+    request: Request,
     _: UserModel = Depends(require_case_access(CaseRole.EDITOR)),
-    repo: CancerCaseRepository = Depends(get_cancer_case_repo),
+    db: AsyncSession = Depends(get_db),
 ):
     """Update a cancer case (requires EDITOR access)."""
     try:
@@ -141,7 +138,22 @@ async def update_case(
     except ValueError:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    case = await repo.update(cid, **body.model_dump(exclude_none=True))
+    error_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    service = CancerCaseService(db)
+    try:
+        case = await service.update(cid, **body.model_dump(exclude_none=True))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to update cancer case (error_id=%s)", error_id)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
     return CancerCaseResponse.model_validate(case)
@@ -150,8 +162,9 @@ async def update_case(
 @router.delete("/{case_id}", status_code=204)
 async def delete_case(
     case_id: str,
+    request: Request,
     _: UserModel = Depends(require_case_access(CaseRole.OWNER)),
-    repo: CancerCaseRepository = Depends(get_cancer_case_repo),
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete a cancer case (requires OWNER access)."""
     try:
@@ -159,6 +172,21 @@ async def delete_case(
     except ValueError:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    deleted = await repo.delete(cid)
+    error_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    service = CancerCaseService(db)
+    try:
+        deleted = await service.delete(cid)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to delete cancer case (error_id=%s)", error_id)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
     if not deleted:
         raise HTTPException(status_code=404, detail="Case not found")

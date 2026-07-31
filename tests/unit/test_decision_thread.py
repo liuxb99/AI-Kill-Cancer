@@ -254,8 +254,10 @@ class TestDecisionThreadRepository:
         # Timestamp should be populated
         assert result.timestamp != ""
         # Verify DB session interactions
+        # REVIEW-PHASE3F0-R3-P0-01: create_node is flush-only; the Service
+        # layer owns the commit.
         repo.db.add.assert_called_once()
-        repo.db.commit.assert_awaited_once()
+        repo.db.flush.assert_awaited_once()
         repo.db.refresh.assert_awaited_once()
 
     async def test_create_node_with_timestamp(self, repo):
@@ -793,6 +795,10 @@ class TestDecisionNodePersistence:
         saved_id = saved.id
         saved_timestamp = saved.timestamp
 
+        # REVIEW-PHASE3F0-R3-P0-01: repo is flush-only — the Service layer
+        # owns the commit. Commit here so the data is durable across sessions.
+        await session.commit()
+
         # Session closes automatically after this test (fixture scope)
 
         # ── Act: open brand-new session and read back ────────────────────
@@ -842,6 +848,10 @@ class TestDecisionNodePersistence:
             id="", case_id=case_id, node_type="agent_opinion",
             parent_id=n2.id, input_snapshot={"step": 3}, context_hash="h3",
         ))
+
+        # REVIEW-PHASE3F0-R3-P0-01: repo is flush-only — the Service layer
+        # owns the commit. Commit here so the nodes survive session reload.
+        await session.commit()
 
         # ── Act: reload in new session ──────────────────────────────────
         session_factory = async_sessionmaker(
@@ -902,6 +912,10 @@ class TestDecisionNodePersistence:
 
         # ── Act: record context_built ────────────────────────────────────
         node_id = await injector.record_context_built(ctx)
+
+        # REVIEW-PHASE3F0-R3-P0-01: repo is flush-only — the Service layer
+        # owns the commit. Commit here so the node is durable across sessions.
+        await session.commit()
 
         # ── Reload in new session ────────────────────────────────────────
         session_factory = async_sessionmaker(
@@ -972,6 +986,10 @@ class TestDecisionNodePersistence:
         await injector.record_consensus_reached(FakeConsensus())
         await injector.record_recommendation(FakeRecommendation())
 
+        # REVIEW-PHASE3F0-R3-P0-01: repo is flush-only — the Service layer
+        # owns the commit. Commit here so the chain survives session reload.
+        await session.commit()
+
         # ── Act: reload in new session ─────────────────────────────────
         session_factory = async_sessionmaker(
             db_engine, class_=AsyncSession, expire_on_commit=False
@@ -1037,6 +1055,10 @@ class TestDecisionNodePersistence:
             context_hash=None,
         ))
 
+        # REVIEW-PHASE3F0-R3-P0-01: repo is flush-only — the Service layer
+        # owns the commit. Commit here so the node is durable across sessions.
+        await session.commit()
+
         session_factory = async_sessionmaker(
             db_engine, class_=AsyncSession, expire_on_commit=False
         )
@@ -1068,6 +1090,10 @@ class TestDecisionNodePersistence:
             id="", case_id=case_id, node_type="evidence_collected",
         ))
 
+        # REVIEW-PHASE3F0-R3-P0-01: repo is flush-only — the Service layer
+        # owns the commit. Commit here so the rows are visible to a new session.
+        await session.commit()
+
         # Count in a new session
         count = await self._count_nodes(db_engine)
         assert count == 2
@@ -1081,6 +1107,9 @@ class TestDecisionNodePersistence:
             await r2.create_node(DecisionNode(
                 id="", case_id=case_id, node_type="agent_opinion",
             ))
+            # REVIEW-PHASE3F0-R3-P0-01: repo is flush-only — commit here so
+            # the third node is durable before counting in a new session.
+            await s2.commit()
 
         count = await self._count_nodes(db_engine)
         assert count == 3

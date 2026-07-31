@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.api.v1.deps import get_sequencing_repo
@@ -17,6 +17,7 @@ from src.backend.domain.sequencing import SequencingTestCreate, SequencingTestRe
 from src.backend.domain.user import UserModel
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.repositories.specimen_repo import SpecimenRepository
+from src.backend.services.sequencing_test_service import SequencingTestService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/sequencing-tests", tags=["sequencing-tests"])
@@ -39,8 +40,8 @@ async def _resolve_sequencing_case_id(
 @router.post("", response_model=SequencingTestResponse, status_code=201)
 async def create_sequencing_test(
     body: SequencingTestCreate,
+    request: Request,
     user: UserModel = Depends(require_auth),
-    repo: SequencingTestRepository = Depends(get_sequencing_repo),
     db: AsyncSession = Depends(get_db),
 ):
     # Verify EDITOR access on the specimen's case
@@ -54,12 +55,30 @@ async def create_sequencing_test(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid specimen_id")
 
+    error_id = (
+        getattr(request.state, "request_id", None)
+        or request.headers.get("X-Request-ID")
+        or str(uuid.uuid4())
+    )
+    service = SequencingTestService(db)
     try:
-        test_obj = await repo.create(**body.model_dump(exclude_none=True))
+        test_obj = await service.create(**body.model_dump(exclude_none=True))
         return SequencingTestResponse.model_validate(test_obj)
-    except Exception as e:
-        logger.exception("Failed to create sequencing test")
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        # 4xx 業務錯誤（如權限不足）透傳，不轉 500
+        raise
+    except Exception:
+        # REVIEW-PHASE3F0-R3-P0-01 模式：不洩漏 str(e)，
+        # 對外回傳固定訊息 + 可追蹤 error_id；完整例外寫入 server log。
+        logger.exception("Failed to create sequencing test [error_id=%s]", error_id)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
 
 @router.get("/{test_id}", response_model=SequencingTestResponse)

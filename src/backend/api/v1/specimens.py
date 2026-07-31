@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.api.v1.deps import get_specimen_repo
@@ -16,6 +16,7 @@ from src.backend.domain.case_acl import CaseRole
 from src.backend.domain.specimen import SpecimenCreate, SpecimenResponse
 from src.backend.domain.user import UserModel
 from src.backend.repositories.specimen_repo import SpecimenRepository
+from src.backend.services.specimen_service import SpecimenService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/specimens", tags=["specimens"])
@@ -24,8 +25,8 @@ router = APIRouter(prefix="/specimens", tags=["specimens"])
 @router.post("", response_model=SpecimenResponse, status_code=201)
 async def create_specimen(
     body: SpecimenCreate,
+    request: Request,
     user: UserModel = Depends(require_auth),
-    repo: SpecimenRepository = Depends(get_specimen_repo),
     db: AsyncSession = Depends(get_db),
 ):
     # Verify EDITOR access on the case
@@ -35,8 +36,10 @@ async def create_specimen(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid case_id in request body")
 
+    error_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    service = SpecimenService(db)
     try:
-        specimen = await repo.create(**body.model_dump(exclude_none=True))
+        specimen = await service.create(**body.model_dump(exclude_none=True))
         return SpecimenResponse(
             id=str(specimen.id),
             case_id=str(specimen.case_id),
@@ -49,9 +52,18 @@ async def create_specimen(
             created_at=specimen.created_at,
             updated_at=specimen.updated_at,
         )
-    except Exception as e:
-        logger.exception("Failed to create specimen")
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to create specimen (error_id=%s)", error_id)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
 
 @router.get("/{specimen_id}", response_model=SpecimenResponse)

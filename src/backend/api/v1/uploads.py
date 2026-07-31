@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.api.v1.deps import get_upload_repo
@@ -18,6 +18,7 @@ from src.backend.domain.user import UserModel
 from src.backend.repositories.sequencing_test_repo import SequencingTestRepository
 from src.backend.repositories.specimen_repo import SpecimenRepository
 from src.backend.repositories.uploaded_file_repo import UploadedFileRepository
+from src.backend.services.upload_service import UploadService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/uploads", tags=["uploads"])
@@ -46,8 +47,8 @@ async def _resolve_upload_case_id(
 @router.post("", response_model=UploadedFileResponse, status_code=201)
 async def create_upload(
     body: UploadedFileCreate,
+    request: Request,
     user: UserModel = Depends(require_auth),
-    repo: UploadedFileRepository = Depends(get_upload_repo),
     db: AsyncSession = Depends(get_db),
 ):
     # Verify case access if sequencing_test_id is provided
@@ -65,11 +66,22 @@ async def create_upload(
             raise HTTPException(status_code=400, detail="Invalid sequencing_test_id")
 
     try:
-        upload = await repo.create(**body.model_dump(exclude_none=True))
+        upload = await UploadService(db).create(**body.model_dump(exclude_none=True))
         return UploadedFileResponse.model_validate(upload)
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
+        request_id = getattr(request.state, "request_id", None)
+        error_id = str(request_id) if request_id else str(uuid.uuid4())
         logger.exception("Failed to create upload record")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
 
 @router.get("/{upload_id}", response_model=UploadedFileResponse)

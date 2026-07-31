@@ -1,41 +1,46 @@
-# Agent Workflow — Phase 4 & Phase 5 Master Plan
+# Agent Workflow — REVIEW-PHASE3F0-R3 返工
 
 ## 當前任務ID
-Phase-4-5-Master-Plan
+Phase-3F0-R3
 
 ## 場景
-master-plan（大型規劃與調研）
+hardening（架構強化）→ REVIEW 註解返工
 
 ## 循環/返工次數
-0
+0（本輪）
 
 ## 評分
-（尚未評分）
+98/100 ✅ 合格（REVIEWER review_Phase-3F0-R3_0.md）
 
 ## 當前狀態
 
-### 階段 I：專案現況盤點
-[v] T-01 程式碼盤點與現況調查 ✅ → tasks/research/current-capability-inventory.md
+### Step 0-4：準備 ✅
+[v] git pull origin master（合併 REVIEW 註解 commit 8b502fe + 3e75eb0）
+[v] Step 1：需求記錄 ✅（tasks/requirements.md 附錄 B）
+[v] Step 2：場景識別 ✅（tasks/task-status.md）
+[v] Step 3：PLANNER 計劃 ✅（tasks/plan-Phase-3F0-R3.md）
+[v] Step 4：Workflow 更新 ✅
 
-### 階段 II：分析與規劃（可並行）
-[v] T-02 Gap Analysis ✅ → tasks/research/phase4-phase5-gap-analysis.md
-[v] T-03 Phase 4 Master Plan ✅ → tasks/plan-phase4-clinical-ai-productization.md
-[v] T-04 Phase 5 Master Plan ✅ → tasks/plan-phase5-medical-ai-platform.md
-
-### 階段 III：整合產出
-[v] T-05 Dependency Map ✅ → tasks/phase4-phase5-dependency-map.md
-[v] T-07 ADR ✅ → docs/adr/（6 個 ADR）
-[v] T-06 Development Roadmap ✅ → tasks/roadmap-phase4-phase5.md
+### Step 5：執行開發 ✅
+[v] 紅燈測試先行：4 FAILED / 3 PASSED（問題存在證據）
+[v] 批次 0：get_db 移除 auto commit + services/base.py ✅
+[v] 批次 1：A 類 12 檔案 / 21 endpoint 改由 Service 管理 ✅
+[v] 批次 2：P1-02 variants.py 錯誤處理 ✅
+[v] 綠燈驗證：P0-01 5 passed + P1-02 2 passed ✅
+[v] 全量測試：1660 passed / 7 failed（預先存在）/ 23 skipped + atomicity 18 passed
 
 ### 最終
-[v] Step 6：需求回歸檢查 ✅（R1~R8 全部 PASS）
-[v] Step 7：REVIEWER 評分 ✅（97/100 合格，6/6 Gate PASS）
-[v] Step 8：返工第 1 次 ✅（94→97 合格）
-[ ] Step 10：需求歸檔（⏸️ 暫緩 — 等待使用者審查後決定）
+[v] Step 6：需求回歸檢查 ✅（B.1 6/6、B.2 4/4、B.3 2/2 全部 PASS）
+[v] Step 7：REVIEWER 評分 98/100 ✅ 合格
+
+### 待辦
+[ ] Step 9：總結報告
+[ ] Step 10：需求歸檔
+[ ] Commit / Push
 
 ## Current Step
-[v] 返工第 1 次全部完成 ✅
-[ ] ⏸️ 等待使用者審查 Master Plan
+[v] 返工循環全部完成 ✅（98/100）
+[ ] 準備 Commit / Push
 
 ## Next Step
-等待審查後決定：開始 Phase 4 Batch 1 或進一步調整
+Commit / Push（R3 相關檔案）

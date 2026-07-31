@@ -166,6 +166,11 @@ class DecisionThreadRepository:
     async def create_node(self, node: DecisionNode) -> DecisionNode:
         """Persist a new decision node.
 
+        REVIEW-PHASE3F0-R3-P0-01: this repository is now flush-only — it no
+        longer owns the transaction. The caller (Service layer) is
+        responsible for committing once at the end of the pipeline and
+        rolling back on failure.
+
         Args:
             node: The ``DecisionNode`` instance to persist.  Its ``id``
                 field is ignored — a new UUID is assigned by the model.
@@ -199,7 +204,7 @@ class DecisionThreadRepository:
             context_hash=node.context_hash or "",
         )
         self.db.add(model)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(model)
         return DecisionNode.model_validate(model)
 

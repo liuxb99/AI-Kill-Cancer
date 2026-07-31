@@ -2,13 +2,14 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.database import create_research_paper, search_research_papers
+from src.backend.database import search_research_papers
 from src.backend.database.session import get_db
 from src.backend.models import DataProvenance
+from src.backend.services.research_paper_service import ResearchPaperService
 
 logger = logging.getLogger(__name__)
 
@@ -78,12 +79,16 @@ _uploads: list[dict] = []
 # --- Paper Endpoints (DB-backed) ---
 
 @router.post("/papers", response_model=PaperSubmitResponse)
-async def submit_paper(body: PaperSubmitRequest, db: AsyncSession = Depends(get_db)):
+async def submit_paper(
+    body: PaperSubmitRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    service = ResearchPaperService(db)
     try:
         authors_list = [a.strip() for a in body.authors.split(",") if a.strip()]
         keywords_list = [kw.strip() for kw in (body.keywords or "").split(",") if kw.strip()]
-        paper = await create_research_paper(
-            db=db,
+        paper = await service.submit(
             title=body.title,
             authors=authors_list,
             journal=body.journal,
@@ -99,9 +104,26 @@ async def submit_paper(body: PaperSubmitRequest, db: AsyncSession = Depends(get_
             status="pending_review",
             submitted_at=paper.created_at.isoformat(),
         )
-    except Exception as e:
-        logger.exception("Paper submission failed")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    except HTTPException:
+        # 4xx 業務錯誤透傳，不轉 500
+        raise
+    except Exception:
+        # REVIEW-PHASE3F0-R3-P0-01 模式：不洩漏 str(e)，
+        # 對外回傳固定訊息 + 可追蹤 error_id；完整例外寫入 server log。
+        error_id = (
+            getattr(request.state, "request_id", None)
+            or request.headers.get("X-Request-ID")
+            or str(uuid.uuid4())
+        )
+        logger.exception("Paper submission failed [error_id=%s]", error_id)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "error_id": error_id,
+                "message": "Internal server error",
+            },
+        )
 
 
 @router.get("/papers", response_model=list[PaperSubmitResponse])
