@@ -16,18 +16,18 @@ import TreatmentPlanListPage from './pages/TreatmentPlanListPage'
 import TreatmentPlanCreatePage from './pages/TreatmentPlanCreatePage'
 import TreatmentPlanDetailPage from './pages/TreatmentPlanDetailPage'
 import TreatmentPlanRevisionPage from './pages/TreatmentPlanRevisionPage'
+import PTCKnowledgePage from './pages/PTCKnowledgePage'
 import PTCResearchPage from './pages/PTCResearchPage'
 import StatusBanner from './components/StatusBanner'
 
 function AppNavbar() {
   const navigate = useNavigate()
   const location = useLocation()
-
-  // 只在非首頁顯示導航欄（首頁已有自己的導航）
   if (location.pathname === '/') return null
 
   const links = [
     { label: 'PTC 病例', path: '/ptc-research' },
+    { label: 'PTC 藥物證據', path: '/ptc-knowledge' },
     { label: '藥物推薦', path: '/recommendation' },
     { label: '臨床決策', path: '/clinical-decision' },
     { label: '腫瘤委員會', path: '/tumor-board' },
@@ -39,20 +39,13 @@ function AppNavbar() {
 
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-6 text-sm font-medium text-gray-600">
-        <span
-          className="text-primary-700 font-bold cursor-pointer"
-          onClick={() => navigate('/')}
-        >
+      <div className="max-w-7xl mx-auto px-4 py-2 flex items-center gap-6 text-sm font-medium text-gray-600 overflow-x-auto">
+        <span className="text-primary-700 font-bold cursor-pointer whitespace-nowrap" onClick={() => navigate('/')}>
           AI Kill Cancer
         </span>
-        <div className="flex gap-4">
+        <div className="flex gap-4 whitespace-nowrap">
           {links.map((link) => (
-            <span
-              key={link.path}
-              className="cursor-pointer hover:text-primary-600 transition"
-              onClick={() => navigate(link.path)}
-            >
+            <span key={link.path} className="cursor-pointer hover:text-primary-600 transition" onClick={() => navigate(link.path)}>
               {link.label}
             </span>
           ))}
@@ -76,6 +69,7 @@ function App() {
         <Route path="/research-portal" element={<ResearchPortal />} />
         <Route path="/workbench" element={<Workbench />} />
         <Route path="/ptc-research" element={<PTCResearchPage />} />
+        <Route path="/ptc-knowledge" element={<PTCKnowledgePage />} />
         <Route path="/recommendation" element={<RecommendationPage />} />
         <Route path="/clinical-decision" element={<ClinicalDecisionListPage />} />
         <Route path="/clinical-decision/:id" element={<ClinicalDecisionPage />} />
