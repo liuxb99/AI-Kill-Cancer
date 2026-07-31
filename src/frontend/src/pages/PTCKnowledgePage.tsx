@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import {
   getPTCGeneKnowledge,
@@ -90,40 +90,24 @@ export default function PTCKnowledgePage() {
       <section className="mb-6">
         <p className="text-sm font-semibold text-primary-600">PTC Precision Oncology</p>
         <h1 className="text-3xl font-bold">藥物、證據與臨床試驗</h1>
-        <p className="mt-2 text-gray-600">
-          從公開來源同步可追溯資料；內容供研究與決策支援，不直接構成醫療建議。
-        </p>
+        <p className="mt-2 text-gray-600">從公開來源同步可追溯資料；內容供研究與決策支援，不直接構成醫療建議。</p>
       </section>
 
       <section className="mb-6 grid gap-4 rounded-lg border bg-white p-5 shadow-sm lg:grid-cols-2">
         <div>
           <h2 className="font-semibold">ClinicalTrials.gov</h2>
           <p className="mt-1 text-sm text-gray-500">同步 Papillary Thyroid Carcinoma 相關研究。</p>
-          <button className="mt-3 rounded bg-primary-600 px-4 py-2 text-white" onClick={() => void syncTrials()}>
-            同步臨床試驗
-          </button>
+          <button className="mt-3 rounded bg-primary-600 px-4 py-2 text-white" onClick={() => void syncTrials()}>同步臨床試驗</button>
         </div>
         <div>
           <h2 className="font-semibold">openFDA 藥物標籤</h2>
-          <input
-            className="mt-2 w-full rounded border px-3 py-2 text-sm"
-            value={drugNames}
-            onChange={(event) => setDrugNames(event.target.value)}
-            aria-label="藥物名稱"
-          />
-          <button className="mt-3 rounded bg-primary-600 px-4 py-2 text-white" onClick={() => void syncLabels()}>
-            同步藥物標籤
-          </button>
+          <input className="mt-2 w-full rounded border px-3 py-2 text-sm" value={drugNames} onChange={(event) => setDrugNames(event.target.value)} aria-label="藥物名稱" />
+          <button className="mt-3 rounded bg-primary-600 px-4 py-2 text-white" onClick={() => void syncLabels()}>同步藥物標籤</button>
         </div>
       </section>
 
       <section className="mb-6 flex flex-wrap gap-3">
-        <input
-          className="w-56 rounded border px-3 py-2"
-          value={gene}
-          onChange={(event) => setGene(event.target.value.toUpperCase())}
-          aria-label="基因"
-        />
+        <input className="w-56 rounded border px-3 py-2" value={gene} onChange={(event) => setGene(event.target.value.toUpperCase())} aria-label="基因" />
         <button className="rounded border px-4 py-2" onClick={() => void filterGene()}>查詢基因鏈</button>
         <button className="rounded border px-4 py-2" onClick={() => void loadAll()}>顯示全部</button>
       </section>
@@ -134,42 +118,15 @@ export default function PTCKnowledgePage() {
 
       <div className="grid gap-6 xl:grid-cols-3">
         <Panel title={`Therapies (${therapies.length})`}>
-          {therapies.map((item) => (
-            <article key={item.therapy_key} className="border-b py-3 last:border-0">
-              <div className="font-semibold">{item.name}</div>
-              <div className="text-xs text-gray-500">{item.generic_name || '—'} · {item.source_name}</div>
-              {item.mechanism && <p className="mt-2 text-sm text-gray-700">{item.mechanism}</p>}
-              {item.indications.slice(0, 2).map((text, index) => <p key={index} className="mt-1 text-xs text-gray-500">{text}</p>)}
-            </article>
-          ))}
+          {therapies.map((item) => <article key={item.therapy_key} className="border-b py-3 last:border-0"><div className="font-semibold">{item.name}</div><div className="text-xs text-gray-500">{item.generic_name || '—'} · {item.source_name}</div>{item.mechanism && <p className="mt-2 text-sm text-gray-700">{item.mechanism}</p>}{item.indications.slice(0, 2).map((text, index) => <p key={index} className="mt-1 text-xs text-gray-500">{text}</p>)}</article>)}
           {therapies.length === 0 && <Empty />}
         </Panel>
-
         <Panel title={`Evidence (${evidence.length})`}>
-          {evidence.map((item) => (
-            <article key={item.evidence_key} className="border-b py-3 last:border-0">
-              <div className="font-semibold">{item.title || item.source_record_id}</div>
-              <div className="text-xs text-gray-500">{item.source_name} · {item.evidence_level || '未分級'}</div>
-              {item.summary && <p className="mt-2 text-sm text-gray-700">{item.summary}</p>}
-            </article>
-          ))}
+          {evidence.map((item) => <article key={item.evidence_key} className="border-b py-3 last:border-0"><div className="font-semibold">{item.title || item.source_name}</div><div className="text-xs text-gray-500">{item.source_name} · {item.evidence_level || '未分級'}</div>{item.summary && <p className="mt-2 text-sm text-gray-700">{item.summary}</p>}</article>)}
           {evidence.length === 0 && <Empty />}
         </Panel>
-
         <Panel title={`Clinical Trials (${trials.length})`}>
-          {trials.map((item) => (
-            <article key={item.nct_id} className="border-b py-3 last:border-0">
-              <div className="font-semibold">{item.brief_title}</div>
-              <div className="text-xs text-gray-500">{item.nct_id} · {item.overall_status || 'Status unknown'}</div>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {item.interventions.slice(0, 4).map((intervention, index) => (
-                  <span key={`${item.nct_id}-${index}`} className="rounded bg-indigo-50 px-2 py-1 text-xs text-indigo-700">
-                    {intervention.name || intervention.type || 'Intervention'}
-                  </span>
-                ))}
-              </div>
-            </article>
-          ))}
+          {trials.map((item) => <article key={item.nct_id} className="border-b py-3 last:border-0"><div className="font-semibold">{item.brief_title}</div><div className="text-xs text-gray-500">{item.nct_id} · {item.overall_status || 'Status unknown'}</div><div className="mt-2 flex flex-wrap gap-1">{item.interventions.slice(0, 4).map((intervention, index) => <span key={`${item.nct_id}-${index}`} className="rounded bg-indigo-50 px-2 py-1 text-xs text-indigo-700">{intervention.name || intervention.type || 'Intervention'}</span>)}</div></article>)}
           {trials.length === 0 && <Empty />}
         </Panel>
       </div>
@@ -177,7 +134,7 @@ export default function PTCKnowledgePage() {
   )
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+function Panel({ title, children }: { title: string; children: ReactNode }) {
   return <section className="rounded-lg border bg-white p-5 shadow-sm"><h2 className="text-lg font-bold">{title}</h2><div className="mt-3">{children}</div></section>
 }
 
