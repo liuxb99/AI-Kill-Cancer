@@ -8,17 +8,32 @@ from typing import Any
 from urllib.parse import quote
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.domain.ptc_knowledge import (
     PTCClinicalTrialModel,
     PTCEvidenceRecordModel,
     PTCTherapyModel,
+    PTCTherapyTargetModel,
 )
 
 CTGOV_STUDIES_URL = "https://clinicaltrials.gov/api/v2/studies"
 OPENFDA_LABEL_URL = "https://api.fda.gov/drug/label.json"
+
+GENE_TERMS = ("BRAF", "RET", "NTRK1", "NTRK2", "NTRK3", "RAS", "NRAS", "HRAS", "KRAS", "TERT", "TP53")
+DRUG_TARGETS: dict[str, list[tuple[str, str | None]]] = {
+    "selpercatinib": [("RET", "fusion")],
+    "pralsetinib": [("RET", "fusion")],
+    "larotrectinib": [("NTRK1", "fusion"), ("NTRK2", "fusion"), ("NTRK3", "fusion")],
+    "repotrectinib": [("NTRK1", "fusion"), ("NTRK2", "fusion"), ("NTRK3", "fusion")],
+    "dabrafenib": [("BRAF", "V600E")],
+    "trametinib": [("BRAF", "V600E")],
+    "vemurafenib": [("BRAF", "V600E")],
+    "lenvatinib": [("RET", None)],
+    "sorafenib": [("BRAF", None), ("RET", None)],
+    "cabozantinib": [("RET", None)],
+}
 
 
 def _first(value: Any) -> str | None:
@@ -30,6 +45,17 @@ def _first(value: Any) -> str | None:
 def _key(*parts: str | None) -> str:
     raw = "|".join((part or "").strip().lower() for part in parts)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def infer_target_genes(*values: Any) -> list[str]:
+    text = " ".join(str(value) for value in values if value).upper()
+    found: set[str] = set()
+    for term in GENE_TERMS:
+        if term in text:
+            found.add(term)
+    if "NTRK" in text:
+        found.update({"NTRK1", "NTRK2", "NTRK3"})
+    return sorted(found)
 
 
 class PTCKnowledgeService:
@@ -88,6 +114,13 @@ class PTCKnowledgeService:
                     }
                     for item in arms.get("interventions", [])
                 ]
+                model.target_genes = infer_target_genes(
+                    model.brief_title,
+                    model.official_title,
+                    model.conditions,
+                    model.interventions,
+                    eligibility.get("eligibilityCriteria"),
+                )
                 model.eligibility = eligibility.get("eligibilityCriteria")
                 enrollment = design.get("enrollmentInfo", {})
                 model.enrollment = enrollment.get("count")
@@ -125,10 +158,7 @@ class PTCKnowledgeService:
             count = 0
             for drug_name in sorted({name.strip() for name in drug_names if name.strip()}):
                 search = f'openfda.generic_name:"{drug_name}"'
-                response = await client.get(
-                    OPENFDA_LABEL_URL,
-                    params={"search": search, "limit": 10},
-                )
+                response = await client.get(OPENFDA_LABEL_URL, params={"search": search, "limit": 10})
                 if response.status_code == 404:
                     continue
                 response.raise_for_status()
@@ -142,9 +172,7 @@ class PTCKnowledgeService:
                         )
                     )
                     model = existing or PTCTherapyModel(
-                        therapy_key=f"openfda:{label_id}",
-                        source_name="openFDA",
-                        source_record_id=label_id,
+                        therapy_key=f"openfda:{label_id}", source_name="openFDA", source_record_id=label_id
                     )
                     model.name = _first(openfda.get("brand_name")) or drug_name
                     model.generic_name = _first(openfda.get("generic_name")) or drug_name
@@ -153,16 +181,30 @@ class PTCKnowledgeService:
                     model.indications = record.get("indications_and_usage", [])
                     model.mechanism = _first(record.get("mechanism_of_action"))
                     model.dosage_and_administration = _first(record.get("dosage_and_administration"))
-                    model.warnings = (
-                        record.get("boxed_warning", [])
-                        + record.get("warnings", [])
-                        + record.get("warnings_and_cautions", [])
-                    )
+                    model.warnings = record.get("boxed_warning", []) + record.get("warnings", []) + record.get("warnings_and_cautions", [])
                     model.source_url = f"https://api.fda.gov/drug/label.json?search=id:{quote(label_id)}"
                     model.source_version = record.get("effective_time")
                     model.retrieved_at = datetime.utcnow()
                     if existing is None:
                         self.db.add(model)
+                    await self.db.flush()
+                    await self.db.execute(delete(PTCTherapyTargetModel).where(PTCTherapyTargetModel.therapy_id == model.id))
+                    generic = (model.generic_name or drug_name).lower()
+                    targets = DRUG_TARGETS.get(generic, [])
+                    if not targets:
+                        targets = [(gene, None) for gene in infer_target_genes(model.mechanism, model.indications)]
+                    for gene, variant in targets:
+                        self.db.add(
+                            PTCTherapyTargetModel(
+                                therapy_id=model.id,
+                                gene_symbol=gene,
+                                variant=variant,
+                                target_type="molecular_target",
+                                interaction_type="inhibits_or_targets",
+                                evidence_level="label_or_curated_mapping",
+                                source_record_id=label_id,
+                            )
+                        )
                     count += 1
             await self.db.commit()
             return count
@@ -197,9 +239,7 @@ class PTCKnowledgeService:
             select(PTCEvidenceRecordModel).where(PTCEvidenceRecordModel.evidence_key == evidence_key)
         )
         model = existing or PTCEvidenceRecordModel(
-            evidence_key=evidence_key,
-            source_name=source_name,
-            source_record_id=source_record_id,
+            evidence_key=evidence_key, source_name=source_name, source_record_id=source_record_id
         )
         model.evidence_type = evidence_type
         model.title = title
@@ -222,4 +262,10 @@ class PTCKnowledgeService:
         return model
 
 
-__all__ = ["PTCKnowledgeService", "CTGOV_STUDIES_URL", "OPENFDA_LABEL_URL"]
+__all__ = [
+    "PTCKnowledgeService",
+    "CTGOV_STUDIES_URL",
+    "OPENFDA_LABEL_URL",
+    "infer_target_genes",
+    "DRUG_TARGETS",
+]
