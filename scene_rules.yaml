@@ -51,3 +51,23 @@ scenes:
       - frontend-logic: 前端邏輯修正（navigation、sample data 移除）
       - test-writer: 撰寫回歸測試驗證修正
       - reviewer: 評分代理
+
+  - id: master-plan
+    name: 大型規劃與調研
+    description: 制定大型 Master Plan、架構規劃、程式碼盤點、Gap Analysis，不修改 production code
+    roles:
+      - planner: 制定整體規劃與 Batch 拆分
+      - doc-writer: 撰寫規劃文件、盤點報告、Gap Analysis
+      - explorer: 程式碼盤點與現況調查
+      - reviewer: 評分代理
+    workflow:
+      - Step 0: 啟動子代理報到
+      - Step 1: 接收需求
+      - Step 2: 場景識別
+      - Step 3: PLANNER 制定計劃
+      - Step 4: 更新 Workflow
+      - Step 5: 執行調研與規劃（子代理產出文件）
+      - Step 6: 需求回歸檢查
+      - Step 7: REVIEWER 評分
+      - Step 8: 返工循環（必要時）
+      - Step 9: 總結報告

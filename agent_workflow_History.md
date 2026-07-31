@@ -665,3 +665,27 @@ TIME_PENDING | [v] Git Commit 54d8bd4 + Push to origin/master ✅
 2026-07-31 00:30 | [v] docs(phase3f0): add final HEAD SHA and CI run ID to summary report
 2026-07-31 00:30 | [v] 更新 agent_workflow.md 記錄 CI 結果 ✅
 2026-07-31 00:30 | [v] **Phase 3F-0：Transaction Boundary Hardening 全部完成** 🎉
+2026-07-31 07:35 | [v] Step 0 完成：task(doc-writer) -> 子代理報到完成，產出 tasks/step-0A-report.md
+2026-07-31 07:35 | [v] Step 1 完成：task(doc-writer) -> 需求已記錄到 tasks/requirements.md（Phase 4 & Phase 5 Master Plan）
+2026-07-31 07:35 | [v] Step 2 完成：task(doc-writer) -> 場景識別 master-plan，tasks/task-status.md 已更新，scene_rules.yaml 已追加
+2026-07-31 07:35 | [v] Step 3 完成：task(PLANNER) -> 計劃完成，產出 tasks/plan-Phase-4-5-Master-Plan.md（7 任務，3 階段）
+2026-07-31 07:35 | [v] Step 4 完成：agent_workflow.md 已更新，當前任務 Phase-4-5-Master-Plan
+2026-07-31 07:36 | [v] task(explorer) fleet -> T-01 盤點探索完成（3 個並行探索任務）
+2026-07-31 07:38 | [v] task(doc-writer) -> T-01 完成：產出 tasks/research/current-capability-inventory.md（29 維度盤點）
+2026-07-31 07:46 | [v] fleet(T-02+T-03+T-04) -> 並行完成：Gap Analysis（37KB）+ Phase 4 Plan（96KB）+ Phase 5 Plan（45KB）
+2026-07-31 07:49 | [v] fleet(T-05+T-07) -> 並行完成：Dependency Map（38KB）+ 6 個 ADR 文件
+2026-07-31 07:49 | [v] task(doc-writer) -> T-06 啟動：Development Roadmap
+2026-07-31 07:50 | [v] task(doc-writer) -> T-06 完成：產出 tasks/roadmap-phase4-phase5.md
+2026-07-31 07:50 | [v] ✅ 所有 7 項交付產出完成，進入 Step 6 需求回歸檢查
+2026-07-31 07:52 | [v] Step 6 需求回歸檢查完成：R1~R8 全部 PASS ✅，進入 Step 7 REVIEWER 評分
+2026-07-31 07:55 | [v] task(REVIEWER) -> 遵守流程=YES 可執行=YES 無錯誤=YES 滿足需求=YES 架構Gate=YES | 完整性22 正確性24 可執行性24 架構風險24 | 總分94 合格 ✅（6/6 Gate PASS）
+2026-07-31 07:56 | [v] Step 9：總結報告完成 ✅（tasks/summary-report-phase4-5-master-plan.md）
+2026-07-31 07:56 | [v] ⏸️ 本輪完成，等待使用者審查 Master Plan（不 commit/push）
+2026-07-31 07:57 | [v] 使用者要求直接進入返工流程
+2026-07-31 07:59 | [v] task(PLANNER) resume -> 返工第1次規劃完成，產出 tasks/plan-Phase-4-5-Master-Plan-R1.md
+2026-07-31 08:02 | [v] fleet(返工修改) -> 並行完成：Phase 4 Plan + Dependency Map + Roadmap + Gap Analysis + ADR-002 修正
+2026-07-31 08:02 | [v] 進入 Step 6 需求回歸檢查（返工第1次）
+2026-07-31 08:04 | [v] Step 6 需求回歸檢查（返工第1次）：R2~R6+R8 PASS，R1 PARTIAL（缺 Background/Deployment 盤點）、R7 PARTIAL（ADR README 矛盾）
+2026-07-31 08:04 | [v] 修復 R1：補 Inventory Background/Deployment 維度 + 修復 R7：ADR README
+2026-07-31 08:06 | [v] Step 6 需求回歸檢查（返工第1次第2輪）：R1~R8 全部 PASS ✅
+2026-07-31 08:08 | [v] task(REVIEWER) resume -> 遵守流程=YES 可執行=YES 無錯誤=YES 滿足需求=YES 架構Gate=YES | 完整性24 正確性23 可執行性25 架構風險25 | 總分97 合格 ✅（返工第1次，6/6 Gate PASS）

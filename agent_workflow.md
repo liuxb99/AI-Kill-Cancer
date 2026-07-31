@@ -1,56 +1,41 @@
-# Agent Workflow — Phase 3F-0：Transaction Boundary Hardening
+# Agent Workflow — Phase 4 & Phase 5 Master Plan
 
 ## 當前任務ID
-Phase-3F-0-Transaction-Boundary-Hardening
+Phase-4-5-Master-Plan
 
 ## 場景
-transaction-boundary-hardening（交易邊界強化）
+master-plan（大型規劃與調研）
 
 ## 循環/返工次數
-2
+0
 
 ## 評分
-100/100 ✅（返工第 2 次）
+（尚未評分）
 
-## Production Files Count
-17（Scope Gate：17 ≤ 20 ✅）
+## 當前狀態
+
+### 階段 I：專案現況盤點
+[v] T-01 程式碼盤點與現況調查 ✅ → tasks/research/current-capability-inventory.md
+
+### 階段 II：分析與規劃（可並行）
+[v] T-02 Gap Analysis ✅ → tasks/research/phase4-phase5-gap-analysis.md
+[v] T-03 Phase 4 Master Plan ✅ → tasks/plan-phase4-clinical-ai-productization.md
+[v] T-04 Phase 5 Master Plan ✅ → tasks/plan-phase5-medical-ai-platform.md
+
+### 階段 III：整合產出
+[v] T-05 Dependency Map ✅ → tasks/phase4-phase5-dependency-map.md
+[v] T-07 ADR ✅ → docs/adr/（6 個 ADR）
+[v] T-06 Development Roadmap ✅ → tasks/roadmap-phase4-phase5.md
+
+### 最終
+[v] Step 6：需求回歸檢查 ✅（R1~R8 全部 PASS）
+[v] Step 7：REVIEWER 評分 ✅（97/100 合格，6/6 Gate PASS）
+[v] Step 8：返工第 1 次 ✅（94→97 合格）
+[ ] Step 10：需求歸檔（⏸️ 暫緩 — 等待使用者審查後決定）
 
 ## Current Step
-### 第 0 輪（初次）
-[v] Step 0：子代理向使用者報到 ✅
-[v] Step 1：接收需求 ✅（tasks/requirements.md）
-[v] Step 2：場景識別 ✅（tasks/task-status.md）
-[v] Step 3：PLANNER 制定計劃 ✅（tasks/plan-Phase-3F-0.md）
-[v] Step 4：更新 Workflow ✅
-[v] Step 5：執行開發 ✅（16 production files，22 atomicity tests）
-[v] Step 6：需求回歸檢查 ✅（R1~R11 全部 PASS）
-[v] Step 7：REVIEWER 評分 → 0 分（流程遵守 NO）
-
-### 第 1 輪（返工）
-[v] Step 8：返工循環（第 1 次）✅
-[v] Step 9：總結報告 ✅
-[v] Step 6（重檢查）：需求回歸檢查（返工第 1 次）✅
-[v] Step 7（重評分）：REVIEWER 96 分 → Outbox Contract Gate FAIL → Accepted 改為 NO
-
-### 第 2 輪（返工 — Outbox event_id 修復）
-[v] Outbox event_id Contract Verification ✅ → P0 bug 確認
-[v] Step 8：返工循環（第 2 次）✅
-[v] Step 5：開發修正完成 ✅（2 檔案：treatment_plan_service.py + test_success_path_red.py）
-[v] Step 6：需求回歸檢查 ✅（273 tests passed，Outbox event_id 已修復）
-[v] Step 7：REVIEWER 重新評分 ✅（100/100，所有 Gate PASS，Accepted = YES）
-[v] Step 9：更新總結報告 ✅（tasks/summary-report-phase3f-0.md 附錄 D）
-[v] Step 10：需求歸檔 ✅（requirements.md 已歸零）
-[v] Git Commit & Push ✅（352a23d → cleanup → 7a4c889 CI metadata）
-[v] CI Run #30563262611 ✅ 全部通過（frontend + backend + migration-gate + PostgreSQL）
-
-## 狀態
-🎉 **Phase 3F-0：Transaction Boundary Hardening 全部完成！**
-🏆 REVIEWER **100/100** ✅（返工第 2 次）
-📐 Production files：**17** ≤ 20 ✅
-🟢 Outbox Contract Gate：**PASS** ✅
-🟢 All Gates：**PASS** ✅
-🟢 CI Run #30563262611：**全部通過** ✅
-🟢 **Accepted = YES** ✅
+[v] 返工第 1 次全部完成 ✅
+[ ] ⏸️ 等待使用者審查 Master Plan
 
 ## Next Step
-等待 Phase 3F-1 或其他新任務。
+等待審查後決定：開始 Phase 4 Batch 1 或進一步調整
