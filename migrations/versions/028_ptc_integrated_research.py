@@ -14,6 +14,12 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.add_column(
+        "domain_ptc_clinical_trials",
+        sa.Column("target_genes", sa.JSON(), nullable=False, server_default=sa.text("'[]'")),
+    )
+    op.alter_column("domain_ptc_clinical_trials", "target_genes", server_default=None)
+
     op.create_table(
         "domain_ptc_herbs",
         sa.Column("id", sa.String(36), primary_key=True),
@@ -117,3 +123,4 @@ def downgrade() -> None:
     op.drop_table("domain_ptc_herb_drug_interactions")
     op.drop_table("domain_ptc_herb_compounds")
     op.drop_table("domain_ptc_herbs")
+    op.drop_column("domain_ptc_clinical_trials", "target_genes")
