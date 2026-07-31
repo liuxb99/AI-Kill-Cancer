@@ -29,6 +29,12 @@ from src.backend.domain import (
 )
 from src.backend.domain.user import UserModel, TokenBlacklistModel
 from src.backend.domain.case_acl import CaseACLModel
+from src.backend.domain.ptc_research import (
+    PTCImportBatchModel,
+    PTCOutcomeModel,
+    PTCResearchCaseModel,
+    PTCVariantModel,
+)
 
 config = context.config
 # Allow override via DATABASE_URL env var (used in CI with SQLite)
