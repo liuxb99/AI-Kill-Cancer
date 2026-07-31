@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -17,6 +18,7 @@ from src.backend.domain.ptc_research import (
     PTCResearchCaseModel,
     PTCVariantInput,
 )
+from src.backend.importers.ptc_tcga.downloader import GDCClient
 from src.backend.importers.ptc_tcga.service import PTCTCGAImportService
 
 router = APIRouter(prefix="/ptc-research", tags=["ptc-research"])
@@ -28,12 +30,22 @@ class PTCImportRequest(BaseModel):
     batch_id: str | None = None
 
 
+class GDCImportRequest(BaseModel):
+    size: int = Field(default=100, ge=1, le=1000)
+    offset: int = Field(default=0, ge=0)
+
+
 class PTCImportResponse(BaseModel):
     batch_id: str
     imported_cases: int
     imported_variants: int
     imported_outcomes: int
     outbox_events: int
+
+
+class GDCImportResponse(PTCImportResponse):
+    gdc_total_cases: int
+    downloaded_cases: int
 
 
 class PTCVariantResponse(PTCVariantInput):
@@ -122,6 +134,44 @@ async def import_ptc_records(
     return PTCImportResponse(**result.__dict__)
 
 
+@router.post("/imports/gdc", response_model=GDCImportResponse, status_code=status.HTTP_201_CREATED)
+async def import_ptc_from_gdc(
+    body: GDCImportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> GDCImportResponse:
+    """Download public TCGA-THCA clinical records and persist them immediately."""
+    try:
+        download = await asyncio.to_thread(
+            GDCClient().fetch_ptc_cases,
+            size=body.size,
+            offset=body.offset,
+        )
+        result = await PTCTCGAImportService(db).import_records(
+            download.records,
+            source_version=download.source_version,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="GDC public data import failed") from exc
+    return GDCImportResponse(
+        **result.__dict__,
+        gdc_total_cases=download.total,
+        downloaded_cases=len(download.records),
+    )
+
+
+@router.get("/gdc/mutation-manifest")
+async def get_gdc_mutation_manifest(
+    size: int = Query(default=100, ge=1, le=1000),
+) -> dict[str, Any]:
+    try:
+        files = await asyncio.to_thread(GDCClient().fetch_somatic_mutation_manifest, size=size)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="GDC mutation manifest query failed") from exc
+    return {"project": "TCGA-THCA", "count": len(files), "files": files}
+
+
 @router.get("/cases", response_model=list[PTCCaseResponse])
 async def list_ptc_cases(
     skip: int = Query(default=0, ge=0),
@@ -167,7 +217,7 @@ async def get_ptc_case(case_id: str, db: AsyncSession = Depends(get_db)) -> PTCC
 async def get_ptc_case_graph_path(case_id: str, db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     case = await get_ptc_case(case_id, db)
     nodes: list[dict[str, Any]] = [
-        {"id": f"ptc:case:TCGA-THCA:{case.case_id}", "type": "PTCResearchCase", "label": case.case_id},
+        {"id": f"ptc:case:{case.source_dataset}:{case.case_id}", "type": "PTCResearchCase", "label": case.case_id},
         {"id": "disease:papillary_thyroid_carcinoma", "type": "Disease", "label": "Papillary Thyroid Carcinoma"},
     ]
     edges: list[dict[str, Any]] = [
