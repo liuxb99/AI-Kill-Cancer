@@ -17,6 +17,14 @@ vi.mock('../components/PTCProtein3D', () => ({
   default: ({ structure }: any) => <div>protein-view:{structure?.gene || 'none'}</div>,
 }))
 
+vi.mock('../components/PTCTargetingPanel', () => ({
+  default: ({ gene }: any) => <div>targeting-view:{gene || 'none'}</div>,
+}))
+
+vi.mock('../components/PTCLiteratureAssetsPanel', () => ({
+  default: ({ gene }: any) => <div>literature-view:{gene || 'none'}</div>,
+}))
+
 vi.mock('../api/ptcVisualization', () => ({
   getLatestPTCCases: vi.fn().mockResolvedValue({
     count: 2,
@@ -53,8 +61,13 @@ vi.mock('../api/ptcVisualization', () => ({
     alphafold_entry_id: 'AF-P15056-F1',
     alphafold_entry_url: 'https://alphafold.example/BRAF',
     cif_url: 'https://alphafold.example/BRAF.cif',
+    pdb_url: 'https://alphafold.example/BRAF.pdb',
+    pdb_urls: ['https://alphafold.example/BRAF.pdb'],
+    experimental_structures: [],
     experimental_pdb_ids: ['1UWH'],
     default_pdb_id: '1UWH',
+    renderer: 'builtin-threejs-pdb',
+    uses_alphafold_api: false,
     source: 'test',
     disclaimer: 'test',
   })),
@@ -90,28 +103,27 @@ describe('PTC3DExplorerPage', () => {
     window.history.replaceState({}, '', '/ptc-3d?case=TCGA-OLD-001&gene=RET&view=protein')
     render(<PTC3DExplorerPage />)
 
-    await waitFor(() => {
-      expect(screen.getByText('protein-view:RET')).toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.getByText('protein-view:RET')).toBeInTheDocument())
+    expect(screen.getByText('targeting-view:RET')).toBeInTheDocument()
+    expect(screen.getByText('literature-view:RET')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'TCGA-OLD-001' })).toBeInTheDocument()
   })
 
-  it('opens protein structure from a case gene', async () => {
+  it('opens protein, targeting and literature views from a case gene', async () => {
     render(<PTC3DExplorerPage />)
-    fireEvent.click(await screen.findByRole('button', { name: 'BRAF 结构' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'BRAF 结构与靶向链' }))
 
-    await waitFor(() => {
-      expect(screen.getByText('protein-view:BRAF')).toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.getByText('protein-view:BRAF')).toBeInTheDocument())
+    expect(screen.getByText('targeting-view:BRAF')).toBeInTheDocument()
+    expect(screen.getByText('literature-view:BRAF')).toBeInTheDocument()
     expect(window.location.search).toContain('gene=BRAF')
   })
 
-  it('opens protein structure from a cell mutation beacon', async () => {
+  it('opens the complete gene chain from a cell mutation beacon', async () => {
     render(<PTC3DExplorerPage />)
     fireEvent.click(await screen.findByText('cell-braf'))
 
-    await waitFor(() => {
-      expect(screen.getByText('protein-view:BRAF')).toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.getByText('protein-view:BRAF')).toBeInTheDocument())
+    expect(screen.getByText('literature-view:BRAF')).toBeInTheDocument()
   })
 })
