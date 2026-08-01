@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || ''
+import { apiRequest, apiUrl, withQuery } from './client'
 
 export interface PTCResearchReport {
   schema_version: string
@@ -13,63 +13,27 @@ export interface PTCResearchReport {
     pathologic_stage?: string
     vital_status?: string
     genes?: string[]
-    variants?: Array<{
-      variant_id: string
-      gene: string
-      protein_change?: string
-      classification?: string
-    }>
+    variants?: Array<{ variant_id: string; gene: string; protein_change?: string; classification?: string }>
   }
-  pathway: {
-    pathway?: string
-    protein_domain?: string
-    downstream?: string[]
-  }
-  therapies: Array<{
-    therapy_key: string
-    name: string
-    approval_status?: string
-    mechanism?: string
-    source?: string
-    url?: string
-  }>
-  evidence: Array<{
-    evidence_key: string
-    source: string
-    title?: string
-    summary?: string
-    level?: string
-    url?: string
-    figures?: unknown[]
-    tables?: unknown[]
-  }>
-  trials: Array<{
-    nct_id: string
-    title: string
-    status?: string
-    url?: string
-  }>
+  pathway: { pathway?: string; protein_domain?: string; downstream?: string[] }
+  therapies: Array<{ therapy_key: string; name: string; approval_status?: string; mechanism?: string; source?: string; url?: string }>
+  evidence: Array<{ evidence_key: string; source: string; title?: string; summary?: string; level?: string; url?: string; figures?: unknown[]; tables?: unknown[] }>
+  trials: Array<{ nct_id: string; title: string; status?: string; url?: string }>
   assets: { figures: number; tables: number }
   trace: Array<{ step: number; name: string; records: number }>
   limitations: string[]
 }
 
-function queryString(gene?: string, question?: string) {
-  const params = new URLSearchParams()
-  if (gene) params.set('gene', gene)
-  if (question) params.set('question', question)
-  const value = params.toString()
-  return value ? `?${value}` : ''
+function reportPath(caseId: string, format: 'json' | 'html', gene?: string, question?: string): string {
+  return withQuery(`/ptc-reports/case/${encodeURIComponent(caseId)}/${format}`, { gene, question })
 }
 
-export async function getPTCResearchReport(caseId: string, gene?: string, question?: string): Promise<PTCResearchReport> {
-  const response = await fetch(`${API_BASE}/api/v1/ptc-reports/case/${encodeURIComponent(caseId)}/json${queryString(gene, question)}`)
-  if (!response.ok) throw new Error(`无法生成 PTC 研究报告：HTTP ${response.status}`)
-  return response.json()
+export function getPTCResearchReport(caseId: string, gene?: string, question?: string): Promise<PTCResearchReport> {
+  return apiRequest(reportPath(caseId, 'json', gene, question))
 }
 
 export function getPTCResearchReportHtmlUrl(caseId: string, gene?: string, question?: string): string {
-  return `${API_BASE}/api/v1/ptc-reports/case/${encodeURIComponent(caseId)}/html${queryString(gene, question)}`
+  return apiUrl(reportPath(caseId, 'html', gene, question))
 }
 
 export function downloadPTCReportJson(report: PTCResearchReport) {
