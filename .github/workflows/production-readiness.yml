@@ -1,0 +1,61 @@
+name: Production Readiness and Route Smoke
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/frontend/src/api/client.ts"
+      - "src/frontend/src/api/ptcCompletion.ts"
+      - "src/frontend/src/api/ptcDataQuality.ts"
+      - "src/frontend/src/api/productionReadiness.ts"
+      - "src/frontend/src/pages/ProductionReadinessPage.tsx"
+      - "src/frontend/src/App.tsx"
+      - "src/frontend/src/test/productionReadiness.test.ts"
+      - "src/frontend/scripts/smoke-routes.mjs"
+      - "src/frontend/package.json"
+      - "src/frontend/package-lock.json"
+      - ".github/workflows/production-readiness.yml"
+  workflow_dispatch:
+
+jobs:
+  production-readiness:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - run: npm ci
+      - name: Validate readiness aggregation
+        run: npm test -- --run src/test/productionReadiness.test.ts
+      - name: Validate shared API architecture
+        run: |
+          npm test -- --run src/test/apiClient.test.ts
+          npm test -- --run src/test/apiConsolidation.test.ts
+      - name: Build production bundle
+        run: npm run build
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/ai-kill-cancer-preview.log 2>&1 &
+          echo $! > /tmp/ai-kill-cancer-preview.pid
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/ai-kill-cancer-preview.log
+          exit 1
+      - name: Smoke critical SPA routes
+        run: node scripts/smoke-routes.mjs
+      - name: Stop production preview
+        if: always()
+        run: |
+          if [ -f /tmp/ai-kill-cancer-preview.pid ]; then
+            kill "$(cat /tmp/ai-kill-cancer-preview.pid)" || true
+          fi
