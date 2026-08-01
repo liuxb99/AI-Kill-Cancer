@@ -67,8 +67,7 @@ describe('PTCDataQualityPage', () => {
     mocks.getPTCDataQuality.mockResolvedValue(response)
   })
 
-  it('shows source freshness, inventory, coverage gaps and audit trace', async () => {
-    const user = userEvent.setup()
+  it('shows database records directly without a text query input', async () => {
     render(<PTCDataQualityPage />)
 
     expect(await screen.findByText('ClinicalTrials.gov')).toBeInTheDocument()
@@ -76,13 +75,12 @@ describe('PTCDataQualityPage', () => {
     expect(screen.getByText('stale')).toBeInTheDocument()
     expect(screen.getByText('100')).toBeInTheDocument()
     expect(screen.getByText('BRAF')).toBeInTheDocument()
+    expect(screen.getByText('RET')).toBeInTheDocument()
     expect(screen.getByText('no_trial')).toBeInTheDocument()
     expect(screen.getByText(/source_stale/)).toBeInTheDocument()
     expect(screen.getByText(/emit_objective_quality_gaps/)).toBeInTheDocument()
-
-    await user.type(screen.getByPlaceholderText(/筛选 BRAF/), 'RET')
-    expect(screen.queryByText('BRAF')).not.toBeInTheDocument()
-    expect(screen.getByText('RET')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getByText(/展示 2 \/ 2 笔/)).toBeInTheDocument()
   })
 
   it('reloads with stale-only policy', async () => {
