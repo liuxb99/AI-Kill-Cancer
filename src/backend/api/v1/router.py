@@ -23,6 +23,7 @@ from src.backend.api.v1.ptc_literature import router as ptc_literature_router
 from src.backend.api.v1.ptc_readiness import router as ptc_readiness_router
 from src.backend.api.v1.ptc_reports import router as ptc_reports_router
 from src.backend.api.v1.ptc_research import router as ptc_research_router
+from src.backend.api.v1.ptc_snapshots import router as ptc_snapshots_router
 from src.backend.api.v1.ptc_targeting import router as ptc_targeting_router
 from src.backend.api.v1.ptc_timeline import router as ptc_timeline_router
 from src.backend.api.v1.ptc_trial_matching import router as ptc_trial_matching_router
@@ -78,3 +79,4 @@ router.include_router(ptc_evidence_matrix_router)
 router.include_router(ptc_timeline_router)
 router.include_router(ptc_trial_matching_router)
 router.include_router(ptc_data_quality_router)
+router.include_router(ptc_snapshots_router)
