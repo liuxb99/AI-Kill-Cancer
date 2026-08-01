@@ -89,7 +89,7 @@ export default function ProductionReadinessPage() {
             <StatusCard title="API / Runtime" ok={snapshot.health.ok} value={health?.mode || sectionLabel(snapshot.health)} detail={`版本 ${health?.version || '—'}`} />
             <StatusCard title="数据库" ok={health?.database_connected !== false && snapshot.health.ok} value={health?.database_connected === false ? '未连接' : snapshot.health.ok ? '已连接／未回报异常' : '未知'} detail="由 /health 提供" />
             <StatusCard title="模型" ok={Boolean(health?.model_loaded)} value={health?.model_loaded ? '已载入' : '未载入'} detail="影响预测功能，不影响静态研究资料浏览" />
-            <StatusCard title="PTC Research" ok={ptc?.status === 'ready'} value={ptc?.status === 'ready' ? 'Research Ready' : 'Not Ready'} detail={ptc?.engine_version ? `引擎 ${ptc.engine_version}` : '完整度与结构检查'} />
+            <StatusCard title="PTC Research" ok={ptc?.status === 'ready'} value={ptc?.status === 'ready' ? 'Research Ready' : 'Not Ready'} detail="完整度与知识图谱结构检查" />
           </section>
 
           <section className="grid gap-5 lg:grid-cols-2">
