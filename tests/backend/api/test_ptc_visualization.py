@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import json
 
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -73,6 +74,36 @@ async def test_protein_structure_returns_alphafold_and_pdb(monkeypatch):
     assert result["cif_url"].endswith("P15056.cif")
     assert result["default_pdb_id"] == "1UWH"
     assert "4MNE" in result["experimental_pdb_ids"]
+
+
+def test_alphafold_metadata_is_cached(monkeypatch):
+    calls = 0
+    payload = [{"entryId": "AF-P15056-F1", "cifUrl": "https://example.test/P15056.cif"}]
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self):
+            return json.dumps(payload).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        nonlocal calls
+        calls += 1
+        assert timeout == 8
+        return FakeResponse()
+
+    ptc_visualization._ALPHAFOLD_CACHE.clear()
+    monkeypatch.setattr(ptc_visualization, "urlopen", fake_urlopen)
+
+    first = ptc_visualization._fetch_alphafold_metadata("P15056")
+    second = ptc_visualization._fetch_alphafold_metadata("P15056")
+
+    assert first == second
+    assert calls == 1
 
 
 @pytest.mark.asyncio
