@@ -1,93 +1,126 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fetchClinicalDecisionsByPatientId, type ClinicalDecisionResponse, type ClinicalDecisionListResponse } from '../api/clinical_decision'
+
+import DualModeSelector from '../components/DualModeSelector'
+import {
+  getDatabasePatient,
+  listRecentDatabasePatients,
+  patientDisplayLabel,
+  type DatabasePatient,
+} from '../api/databasePatients'
+import {
+  fetchClinicalDecisionsByPatientId,
+  type ClinicalDecisionResponse,
+  type ClinicalDecisionListResponse,
+} from '../api/clinical_decision'
 
 function confidenceBadge(confidence: string): string {
   switch (confidence?.toLowerCase()) {
     case 'high':
-    case 'very high':
-      return 'bg-green-100 text-green-800 border-green-200'
+    case 'very high': return 'bg-green-100 text-green-800 border-green-200'
     case 'medium':
-    case 'moderate':
-      return 'bg-amber-100 text-amber-800 border-amber-200'
+    case 'moderate': return 'bg-amber-100 text-amber-800 border-amber-200'
     case 'low':
-    case 'very low':
-      return 'bg-red-100 text-red-800 border-red-200'
-    default:
-      return 'bg-gray-100 text-gray-600 border-gray-200'
+    case 'very low': return 'bg-red-100 text-red-800 border-red-200'
+    default: return 'bg-gray-100 text-gray-600 border-gray-200'
   }
 }
 
 function formatDateTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-  } catch { return iso }
+  try { return new Date(iso).toLocaleString('zh-TW') } catch { return iso }
 }
 
 export default function ClinicalDecisionListPage() {
   const navigate = useNavigate()
+  const [patients, setPatients] = useState<DatabasePatient[]>([])
   const [patientId, setPatientId] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ClinicalDecisionListResponse | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const id = patientId.trim()
-    if (!id) { setError('請輸入患者 ID'); return }
-    setLoading(true); setError(null); setResult(null)
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const response = await listRecentDatabasePatients(100)
+        setPatients(response.items)
+        const requested = new URLSearchParams(window.location.search).get('patientId')
+        const initial = response.items.find((item) => item.patient_id === requested) || response.items[0]
+        if (initial) await selectPatient(initial.patient_id)
+        else if (requested) await selectAdvancedPatient(requested)
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : '無法載入患者資料')
+      } finally {
+        setLoading(false)
+      }
+    }
+    void load()
+  }, [])
+
+  async function selectPatient(id: string) {
+    const normalized = id.trim()
+    if (!normalized) return
+    setPatientId(normalized)
+    setLoading(true)
+    setError(null)
+    setResult(null)
     try {
-      const data = await fetchClinicalDecisionsByPatientId(id)
-      setResult(data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '查詢臨床決策失敗')
-    } finally { setLoading(false) }
+      setResult(await fetchClinicalDecisionsByPatientId(normalized))
+      const url = new URL(window.location.href)
+      url.searchParams.set('patientId', normalized)
+      window.history.replaceState({}, '', url)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '查詢臨床決策失敗')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function selectAdvancedPatient(value: string) {
+    const normalized = value.trim()
+    if (!normalized) return
+    setLoading(true)
+    setError(null)
+    try {
+      const patient = await getDatabasePatient(normalized)
+      setPatients((current) => current.some((item) => item.patient_id === patient.patient_id) ? current : [patient, ...current].slice(0, 100))
+      await selectPatient(patient.patient_id)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '患者不存在')
+      setLoading(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-primary-600 text-xl">&larr;</button>
-          <h1 className="text-xl font-bold text-primary-700">臨床決策列表</h1>
-        </div>
+    <main className="mx-auto max-w-6xl px-4 py-8">
+      <header className="mb-6 flex items-center gap-4">
+        <button onClick={() => navigate(-1)} className="text-xl text-gray-400 hover:text-primary-600">←</button>
+        <div><p className="text-sm font-semibold text-primary-600">Clinical Decision</p><h1 className="text-3xl font-bold">臨床決策列表</h1><p className="mt-1 text-gray-600">最近 100 位患者快速選擇，或以完整 Patient ID 精準查詢。</p></div>
       </header>
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">患者 ID</label>
-          <div className="flex gap-3">
-            <input type="text" value={patientId} onChange={e => setPatientId(e.target.value)} placeholder="請輸入患者 ID 進行查詢" className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-            <button type="submit" disabled={loading} className="bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white rounded-lg px-6 py-2 text-sm font-medium transition">{loading ? '查詢中…' : '查詢'}</button>
-          </div>
-        </form>
-        {loading && <div className="flex flex-col items-center justify-center py-12"><svg className="animate-spin h-8 w-8 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 0 00-4 4H4z"/></svg></div>}
-        {error && !loading && <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700"><span className="font-medium">錯誤：</span>{error}</div>}
-        {!loading && !error && result && result.decisions.length === 0 && <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center"><p className="text-gray-400 text-lg">查無決策記錄</p><p className="text-gray-400 text-sm mt-1">請確認患者 ID 是否正確</p></div>}
-        {!loading && !error && result && result.decisions.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-gray-800">查詢結果</h2>
-              <span className="text-xs text-gray-400">共 {result.total ?? result.decisions.length} 筆</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><th className="px-5 py-3">決策類型</th><th className="px-5 py-3">信心等級</th><th className="px-5 py-3">患者 ID</th><th className="px-5 py-3">建立時間</th><th className="px-5 py-3">操作</th></tr></thead>
-                <tbody className="divide-y divide-gray-100">
-                  {result.decisions.map((d: ClinicalDecisionResponse) => (
-                    <tr key={d.decision_id} className="hover:bg-gray-50 transition cursor-pointer" onClick={() => navigate(`/clinical-decision/${d.decision_id}`)}>
-                      <td className="px-5 py-4 font-medium text-gray-800">{d.decision_type || '—'}</td>
-                      <td className="px-5 py-4"><span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium border ${confidenceBadge(d.confidence)}`}>{d.confidence || '—'}</span></td>
-                      <td className="px-5 py-4 font-mono text-xs text-gray-500">{d.patient_id?.length > 16 ? `${d.patient_id.slice(0, 16)}…` : d.patient_id || '—'}</td>
-                      <td className="px-5 py-4 text-gray-500">{d.created_at ? formatDateTime(d.created_at) : '—'}</td>
-                      <td className="px-5 py-4"><button onClick={e => { e.stopPropagation(); navigate(`/clinical-decision/${d.decision_id}`) }} className="text-primary-600 hover:text-primary-800 text-xs font-medium">查看詳情 &rarr;</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
+
+      <DualModeSelector
+        items={patients}
+        selectedId={patientId}
+        onSelect={(id) => void selectPatient(id)}
+        getId={(item) => item.patient_id}
+        getLabel={patientDisplayLabel}
+        listLabel="最近 100 位患者"
+        queryLabel="完整 Patient ID"
+        queryPlaceholder="輸入完整 UUID Patient ID"
+        onAdvancedQuery={selectAdvancedPatient}
+        loading={loading}
+        error={error}
+      />
+
+      {!loading && result && result.decisions.length === 0 && <section className="mt-6 rounded-xl border bg-white p-12 text-center text-gray-400">所選患者目前沒有臨床決策記錄。</section>}
+
+      {!loading && result && result.decisions.length > 0 && (
+        <section className="mt-6 overflow-hidden rounded-xl border bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b px-5 py-4"><h2 className="font-semibold">{patientId} 的決策</h2><span className="text-xs text-gray-400">最多展示 100 筆 · 共 {result.total ?? result.decisions.length} 筆</span></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th className="px-5 py-3">決策類型</th><th className="px-5 py-3">信心等級</th><th className="px-5 py-3">Patient ID</th><th className="px-5 py-3">建立時間</th><th className="px-5 py-3">操作</th></tr></thead><tbody className="divide-y">{result.decisions.slice(0, 100).map((decision: ClinicalDecisionResponse) => <tr key={decision.decision_id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/clinical-decision/${decision.decision_id}`)}><td className="px-5 py-4 font-medium">{decision.decision_type || '—'}</td><td className="px-5 py-4"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${confidenceBadge(decision.confidence)}`}>{decision.confidence || '—'}</span></td><td className="px-5 py-4 font-mono text-xs">{decision.patient_id || '—'}</td><td className="px-5 py-4 text-gray-500">{decision.created_at ? formatDateTime(decision.created_at) : '—'}</td><td className="px-5 py-4 text-primary-600">查看詳情 →</td></tr>)}</tbody></table></div>
+        </section>
+      )}
+    </main>
   )
 }
