@@ -16,6 +16,7 @@ import TreatmentPlanListPage from './pages/TreatmentPlanListPage'
 import TreatmentPlanCreatePage from './pages/TreatmentPlanCreatePage'
 import TreatmentPlanDetailPage from './pages/TreatmentPlanDetailPage'
 import TreatmentPlanRevisionPage from './pages/TreatmentPlanRevisionPage'
+import PTC3DExplorerPage from './pages/PTC3DExplorerPage'
 import PTCCommandCenterPage from './pages/PTCCommandCenterPage'
 import PTCIntegratedPage from './pages/PTCIntegratedPage'
 import PTCKnowledgePage from './pages/PTCKnowledgePage'
@@ -29,6 +30,7 @@ function AppNavbar() {
 
   const links = [
     { label: 'PTC 總控台', path: '/ptc-command-center' },
+    { label: 'PTC 3D', path: '/ptc-3d' },
     { label: 'PTC 工作台', path: '/ptc-workbench' },
     { label: 'PTC 病例', path: '/ptc-research' },
     { label: 'PTC 藥物證據', path: '/ptc-knowledge' },
@@ -73,6 +75,7 @@ function App() {
         <Route path="/research-portal" element={<ResearchPortal />} />
         <Route path="/workbench" element={<Workbench />} />
         <Route path="/ptc-command-center" element={<PTCCommandCenterPage />} />
+        <Route path="/ptc-3d" element={<PTC3DExplorerPage />} />
         <Route path="/ptc-workbench" element={<PTCIntegratedPage />} />
         <Route path="/ptc-research" element={<PTCResearchPage />} />
         <Route path="/ptc-knowledge" element={<PTCKnowledgePage />} />
