@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -10,8 +12,11 @@ from src.backend.domain.ptc_knowledge import (
     PTCTherapyTargetModel,
 )
 from src.backend.domain.ptc_research import PTCOutcomeModel, PTCResearchCaseModel, PTCVariantModel
+from src.backend.importers.ptc_tcga.downloader import GDCClient
 from src.backend.services.ptc_completion_service import PTCCompletionService
 from src.backend.services.ptc_integrated_service import PTCIntegratedService
+from src.backend.services.ptc_knowledge_service import PTCKnowledgeService
+from src.backend.services.ptc_literature_service import PTCLiteratureService
 
 
 @pytest.fixture
@@ -124,3 +129,38 @@ async def test_status_outcomes_and_full_graph(session):
     assert {"HAS_VARIANT", "AFFECTS_GENE", "TARGETS", "SUPPORTED_BY", "STUDIES_GENE", "INTERACTS_WITH"} <= relations
     assert graph["node_count"] == len(graph["nodes"])
     assert graph["edge_count"] == len(graph["edges"])
+
+
+@pytest.mark.asyncio
+async def test_sync_all_rolls_back_failed_source_and_continues(session, monkeypatch):
+    def fail_gdc(*args, **kwargs):
+        raise RuntimeError("GDC unavailable")
+
+    monkeypatch.setattr(GDCClient, "fetch_ptc_cases_with_mutations", fail_gdc)
+    monkeypatch.setattr(PTCKnowledgeService, "sync_clinical_trials", AsyncMock(return_value=0))
+    monkeypatch.setattr(PTCKnowledgeService, "sync_openfda_labels", AsyncMock(return_value=0))
+    monkeypatch.setattr(PTCLiteratureService, "sync_pubmed", AsyncMock(return_value=0))
+    monkeypatch.setattr(
+        PTCIntegratedService,
+        "bootstrap_herbal_research",
+        AsyncMock(return_value={"herbs_created": 0, "compounds_created": 0}),
+    )
+    rollback = AsyncMock(wraps=session.rollback)
+    monkeypatch.setattr(session, "rollback", rollback)
+
+    result = await PTCCompletionService(session).sync_all(
+        gdc_size=1,
+        gdc_mutation_files=1,
+        trial_size=1,
+        pubmed_size=1,
+        drug_names=["dabrafenib"],
+    )
+
+    assert result["status"] == "completed_with_errors"
+    assert result["stages"]["gdc_tcga_thca"]["status"] == "failed"
+    assert result["stages"]["clinical_trials"]["status"] == "success"
+    assert result["stages"]["openfda"]["status"] == "success"
+    assert result["stages"]["pubmed"]["status"] == "success"
+    assert result["stages"]["scientific_chinese_medicine_seed"]["status"] == "success"
+    assert rollback.await_count >= 1
+    assert result["summary"]["cases"] == 0
