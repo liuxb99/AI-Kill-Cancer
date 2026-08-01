@@ -29,6 +29,7 @@ import PTCResearchPage from './pages/PTCResearchPage'
 import PTCSnapshotPage from './pages/PTCSnapshotPage'
 import PTCTimelinePage from './pages/PTCTimelinePage'
 import PTCTrialMatchingPage from './pages/PTCTrialMatchingPage'
+import ProductionReadinessPage from './pages/ProductionReadinessPage'
 import StatusBanner from './components/StatusBanner'
 
 function AppNavbar() {
@@ -37,6 +38,7 @@ function AppNavbar() {
   if (location.pathname === '/') return null
 
   const links = [
+    { label: '生产就绪', path: '/production-readiness' },
     { label: 'PTC 總控台', path: '/ptc-command-center' },
     { label: 'PTC 資料品質', path: '/ptc-data-quality' },
     { label: 'PTC 研究快照', path: '/ptc-snapshots' },
@@ -90,6 +92,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/research-portal" element={<ResearchPortal />} />
         <Route path="/workbench" element={<Workbench />} />
+        <Route path="/production-readiness" element={<ProductionReadinessPage />} />
         <Route path="/ptc-command-center" element={<PTCCommandCenterPage />} />
         <Route path="/ptc-data-quality" element={<PTCDataQualityPage />} />
         <Route path="/ptc-snapshots" element={<PTCSnapshotPage />} />
