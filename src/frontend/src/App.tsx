@@ -26,6 +26,7 @@ import PTCKnowledgePage from './pages/PTCKnowledgePage'
 import PTCReportCenterPage from './pages/PTCReportCenterPage'
 import PTCResearchAssistantPage from './pages/PTCResearchAssistantPage'
 import PTCResearchPage from './pages/PTCResearchPage'
+import PTCSnapshotPage from './pages/PTCSnapshotPage'
 import PTCTimelinePage from './pages/PTCTimelinePage'
 import PTCTrialMatchingPage from './pages/PTCTrialMatchingPage'
 import StatusBanner from './components/StatusBanner'
@@ -38,6 +39,7 @@ function AppNavbar() {
   const links = [
     { label: 'PTC 總控台', path: '/ptc-command-center' },
     { label: 'PTC 資料品質', path: '/ptc-data-quality' },
+    { label: 'PTC 研究快照', path: '/ptc-snapshots' },
     { label: 'PTC 3D', path: '/ptc-3d' },
     { label: 'PTC Digital Thread', path: '/ptc-timeline' },
     { label: 'PTC 試驗比對', path: '/ptc-trial-matching' },
@@ -90,6 +92,7 @@ function App() {
         <Route path="/workbench" element={<Workbench />} />
         <Route path="/ptc-command-center" element={<PTCCommandCenterPage />} />
         <Route path="/ptc-data-quality" element={<PTCDataQualityPage />} />
+        <Route path="/ptc-snapshots" element={<PTCSnapshotPage />} />
         <Route path="/ptc-3d" element={<PTC3DExplorerPage />} />
         <Route path="/ptc-timeline" element={<PTCTimelinePage />} />
         <Route path="/ptc-trial-matching" element={<PTCTrialMatchingPage />} />
