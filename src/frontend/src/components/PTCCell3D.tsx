@@ -8,16 +8,7 @@ interface Props {
   onSelectGene: (gene: string) => void
 }
 
-type LayerKey =
-  | 'membrane'
-  | 'nucleus'
-  | 'mitochondria'
-  | 'endoplasmic'
-  | 'golgi'
-  | 'lysosomes'
-  | 'ribosomes'
-  | 'cytoskeleton'
-  | 'mutations'
+type LayerKey = 'membrane' | 'nucleus' | 'mitochondria' | 'endoplasmic' | 'golgi' | 'lysosomes' | 'ribosomes' | 'cytoskeleton' | 'mutations'
 
 const LAYERS: Array<{ key: LayerKey; label: string }> = [
   { key: 'membrane', label: '细胞膜' },
@@ -32,43 +23,33 @@ const LAYERS: Array<{ key: LayerKey; label: string }> = [
 ]
 
 const GENE_COLORS: Record<string, number> = {
-  BRAF: 0xf97316,
-  RET: 0x38bdf8,
-  NTRK1: 0xa78bfa,
-  NTRK2: 0x8b5cf6,
-  NTRK3: 0x7c3aed,
-  TERT: 0xf43f5e,
-  NRAS: 0x34d399,
-  HRAS: 0x10b981,
-  KRAS: 0x059669,
-  TP53: 0xfacc15,
-  AKT1: 0x22d3ee,
-  PIK3CA: 0xe879f9,
-  EGFR: 0xfb7185,
+  BRAF: 0xf97316, RET: 0x38bdf8, NTRK1: 0xa78bfa, NTRK2: 0x8b5cf6, NTRK3: 0x7c3aed,
+  TERT: 0xf43f5e, NRAS: 0x34d399, HRAS: 0x10b981, KRAS: 0x059669, TP53: 0xfacc15,
+  AKT1: 0x22d3ee, PIK3CA: 0xe879f9, EGFR: 0xfb7185,
 }
 
-function defaultVisibility(): Record<LayerKey, boolean> {
-  return Object.fromEntries(LAYERS.map((item) => [item.key, true])) as Record<LayerKey, boolean>
+function allVisible(): Record<LayerKey, boolean> {
+  return Object.fromEntries(LAYERS.map(({ key }) => [key, true])) as Record<LayerKey, boolean>
 }
 
 export default function PTCCell3D({ selectedCase, onSelectGene }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null)
-  const onSelectGeneRef = useRef(onSelectGene)
-  const layerGroupsRef = useRef<Partial<Record<LayerKey, any>>>({})
+  const callbackRef = useRef(onSelectGene)
+  const groupsRef = useRef<Partial<Record<LayerKey, any>>>({})
   const [selectedPart, setSelectedPart] = useState('癌细胞整体')
-  const [visibleLayers, setVisibleLayers] = useState<Record<LayerKey, boolean>>(defaultVisibility)
+  const [visibility, setVisibility] = useState<Record<LayerKey, boolean>>(allVisible)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    onSelectGeneRef.current = onSelectGene
+    callbackRef.current = onSelectGene
   }, [onSelectGene])
 
   useEffect(() => {
-    for (const layer of LAYERS) {
-      const group = layerGroupsRef.current[layer.key]
-      if (group) group.visible = visibleLayers[layer.key]
-    }
-  }, [visibleLayers])
+    LAYERS.forEach(({ key }) => {
+      const group = groupsRef.current[key]
+      if (group) group.visible = visibility[key]
+    })
+  }, [visibility])
 
   useEffect(() => {
     const host = hostRef.current
@@ -79,19 +60,18 @@ export default function PTCCell3D({ selectedCase, onSelectGene }: Props) {
     void loadThree().then((THREE) => {
       if (disposed || !hostRef.current) return
       setError(null)
-      const container = hostRef.current
-      const width = Math.max(container.clientWidth, 320)
-      const height = Math.max(container.clientHeight, 560)
+      const width = Math.max(host.clientWidth, 320)
+      const height = Math.max(host.clientHeight, 560)
       const scene = new THREE.Scene()
       scene.background = new THREE.Color(0x030712)
       scene.fog = new THREE.FogExp2(0x030712, 0.015)
 
       const camera = new THREE.PerspectiveCamera(48, width / height, 0.1, 1000)
       camera.position.set(0, 0, 34)
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
+      const renderer = new THREE.WebGLRenderer({ antialias: true })
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
       renderer.setSize(width, height)
-      container.replaceChildren(renderer.domElement)
+      host.replaceChildren(renderer.domElement)
 
       scene.add(new THREE.AmbientLight(0xffffff, 1.2))
       const keyLight = new THREE.PointLight(0x67e8f9, 95, 120)
@@ -103,165 +83,102 @@ export default function PTCCell3D({ selectedCase, onSelectGene }: Props) {
 
       const cell = new THREE.Group()
       scene.add(cell)
+      const groups = {} as Record<LayerKey, any>
+      LAYERS.forEach(({ key }) => {
+        groups[key] = new THREE.Group()
+        groups[key].visible = visibility[key]
+        cell.add(groups[key])
+      })
+      groupsRef.current = groups
       const interactive: any[] = []
-      const layerGroups: Partial<Record<LayerKey, any>> = {}
-      for (const layer of LAYERS) {
-        const group = new THREE.Group()
-        group.name = layer.key
-        group.visible = visibleLayers[layer.key]
-        cell.add(group)
-        layerGroups[layer.key] = group
-      }
-      layerGroupsRef.current = layerGroups
 
-      const addInteractive = (object: any, label: string, kind = 'organelle', extra: Record<string, unknown> = {}) => {
-        object.userData = { label, kind, ...extra }
+      function register(object: any, label: string, kind = 'organelle', gene?: string) {
+        object.userData = { label, kind, gene }
         interactive.push(object)
         return object
       }
 
-      const membrane = addInteractive(
-        new THREE.Mesh(
-          new THREE.SphereGeometry(10.8, 64, 48),
-          new THREE.MeshPhysicalMaterial({
-            color: 0x0891b2,
-            transparent: true,
-            opacity: 0.2,
-            roughness: 0.22,
-            transmission: 0.35,
-            side: THREE.DoubleSide,
-          }),
-        ),
-        '癌细胞膜',
-      )
+      const membrane = register(new THREE.Mesh(
+        new THREE.SphereGeometry(10.8, 64, 48),
+        new THREE.MeshPhysicalMaterial({ color: 0x0891b2, transparent: true, opacity: 0.2, roughness: 0.22, transmission: 0.35, side: THREE.DoubleSide }),
+      ), '癌细胞膜')
       membrane.scale.set(1.14, 0.92, 1)
-      layerGroups.membrane.add(membrane)
-
-      const membraneInner = new THREE.Mesh(
-        new THREE.SphereGeometry(10.45, 56, 42),
-        new THREE.MeshBasicMaterial({ color: 0x164e63, transparent: true, opacity: 0.08, side: THREE.BackSide }),
-      )
-      membraneInner.scale.copy(membrane.scale)
-      layerGroups.membrane.add(membraneInner)
+      groups.membrane.add(membrane)
 
       for (let i = 0; i < 28; i += 1) {
         const phi = Math.acos(1 - 2 * ((i + 0.5) / 28))
         const theta = Math.PI * (1 + Math.sqrt(5)) * i
-        const receptor = new THREE.Mesh(
-          new THREE.ConeGeometry(0.14, 0.85, 8),
-          new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x164e63, emissiveIntensity: 0.5 }),
-        )
-        receptor.position.set(
-          Math.sin(phi) * Math.cos(theta) * 11.4,
-          Math.cos(phi) * 9.8,
-          Math.sin(phi) * Math.sin(theta) * 10.8,
-        )
+        const receptor = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.85, 8), new THREE.MeshStandardMaterial({ color: 0x22d3ee }))
+        receptor.position.set(Math.sin(phi) * Math.cos(theta) * 11.4, Math.cos(phi) * 9.8, Math.sin(phi) * Math.sin(theta) * 10.8)
         receptor.lookAt(0, 0, 0)
         receptor.rotateX(Math.PI / 2)
-        layerGroups.membrane.add(receptor)
+        groups.membrane.add(receptor)
       }
 
-      const nucleus = addInteractive(
-        new THREE.Mesh(
-          new THREE.SphereGeometry(4.5, 48, 36),
-          new THREE.MeshPhysicalMaterial({
-            color: 0x7c3aed,
-            emissive: 0x4c1d95,
-            emissiveIntensity: 0.3,
-            transparent: true,
-            opacity: 0.78,
-            roughness: 0.38,
-          }),
-        ),
-        '细胞核／基因组',
-      )
+      const nucleus = register(new THREE.Mesh(
+        new THREE.SphereGeometry(4.5, 48, 36),
+        new THREE.MeshPhysicalMaterial({ color: 0x7c3aed, emissive: 0x4c1d95, emissiveIntensity: 0.3, transparent: true, opacity: 0.78, roughness: 0.38 }),
+      ), '细胞核／基因组')
       nucleus.position.set(-0.8, 0.2, 0)
       nucleus.scale.set(1, 0.92, 1.08)
-      layerGroups.nucleus.add(nucleus)
+      groups.nucleus.add(nucleus)
 
-      const nucleolus = addInteractive(
-        new THREE.Mesh(
-          new THREE.SphereGeometry(1.2, 32, 24),
-          new THREE.MeshStandardMaterial({ color: 0xf472b6, emissive: 0x831843, emissiveIntensity: 0.5 }),
-        ),
-        '核仁',
-      )
+      const nucleolus = register(new THREE.Mesh(
+        new THREE.SphereGeometry(1.2, 32, 24),
+        new THREE.MeshStandardMaterial({ color: 0xf472b6, emissive: 0x831843, emissiveIntensity: 0.5 }),
+      ), '核仁')
       nucleolus.position.set(-1.5, 0.7, 1.2)
-      layerGroups.nucleus.add(nucleolus)
+      groups.nucleus.add(nucleolus)
 
       const chromatinMaterial = new THREE.LineBasicMaterial({ color: 0xf9a8d4, transparent: true, opacity: 0.48 })
       for (let strand = 0; strand < 10; strand += 1) {
-        const points = []
-        for (let point = 0; point < 70; point += 1) {
-          const t = point / 69
+        const points = Array.from({ length: 70 }, (_, index) => {
+          const t = index / 69
           const angle = t * Math.PI * 5 + strand * 0.62
           const radius = 2.3 + 0.55 * Math.sin(t * Math.PI * 3 + strand)
-          points.push(new THREE.Vector3(
-            -0.8 + Math.cos(angle) * radius,
-            0.2 + (t - 0.5) * 5.8,
-            Math.sin(angle) * radius * 0.72,
-          ))
-        }
-        layerGroups.nucleus.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), chromatinMaterial))
+          return new THREE.Vector3(-0.8 + Math.cos(angle) * radius, 0.2 + (t - 0.5) * 5.8, Math.sin(angle) * radius * 0.72)
+        })
+        groups.nucleus.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), chromatinMaterial))
       }
 
-      const mitochondrialMaterial = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0x92400e, emissiveIntensity: 0.3 })
+      const mitoMaterial = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0x92400e, emissiveIntensity: 0.3 })
       for (let i = 0; i < 10; i += 1) {
         const angle = (i / 10) * Math.PI * 2
-        const mitochondrion = addInteractive(
-          new THREE.Mesh(new THREE.SphereGeometry(0.85, 24, 16), mitochondrialMaterial),
-          `粒线体 ${i + 1}`,
-        )
-        mitochondrion.scale.set(2.35, 0.72, 0.9)
-        mitochondrion.position.set(Math.cos(angle) * 7.1, Math.sin(angle) * 5.5, (i % 4 - 1.5) * 2.25)
-        mitochondrion.rotation.z = angle + Math.PI / 2
-        layerGroups.mitochondria.add(mitochondrion)
-
-        const cristae = new THREE.Mesh(
-          new THREE.TorusGeometry(0.48, 0.055, 7, 20),
-          new THREE.MeshBasicMaterial({ color: 0xfef3c7 }),
-        )
-        cristae.position.copy(mitochondrion.position)
-        cristae.rotation.copy(mitochondrion.rotation)
-        cristae.scale.set(1.8, 0.65, 0.8)
-        layerGroups.mitochondria.add(cristae)
+        const mito = register(new THREE.Mesh(new THREE.SphereGeometry(0.85, 24, 16), mitoMaterial), `粒线体 ${i + 1}`)
+        mito.scale.set(2.35, 0.72, 0.9)
+        mito.position.set(Math.cos(angle) * 7.1, Math.sin(angle) * 5.5, (i % 4 - 1.5) * 2.25)
+        mito.rotation.z = angle + Math.PI / 2
+        groups.mitochondria.add(mito)
       }
 
       const erMaterial = new THREE.MeshStandardMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.58 })
       for (let i = 0; i < 6; i += 1) {
-        const er = addInteractive(
-          new THREE.Mesh(new THREE.TorusGeometry(5 + i * 0.45, 0.09, 12, 96), erMaterial),
-          '内质网',
-        )
+        const er = register(new THREE.Mesh(new THREE.TorusGeometry(5 + i * 0.45, 0.09, 12, 96), erMaterial), '内质网')
         er.rotation.set(Math.PI / 2.8 + i * 0.14, i * 0.38, i * 0.18)
-        layerGroups.endoplasmic.add(er)
+        groups.endoplasmic.add(er)
       }
 
       const golgiMaterial = new THREE.MeshStandardMaterial({ color: 0xfb7185, transparent: true, opacity: 0.82 })
       for (let i = 0; i < 6; i += 1) {
-        const cisterna = addInteractive(
-          new THREE.Mesh(new THREE.TorusGeometry(2.1 + i * 0.18, 0.16, 10, 48, Math.PI * 1.45), golgiMaterial),
-          '高尔基体',
-        )
+        const cisterna = register(new THREE.Mesh(new THREE.TorusGeometry(2.1 + i * 0.18, 0.16, 10, 48, Math.PI * 1.45), golgiMaterial), '高尔基体')
         cisterna.position.set(4.8, -1.2 + i * 0.42, 1.4)
         cisterna.rotation.set(0.4, 0.45, -0.35)
-        layerGroups.golgi.add(cisterna)
+        groups.golgi.add(cisterna)
       }
 
       const lysosomeMaterial = new THREE.MeshStandardMaterial({ color: 0x84cc16, emissive: 0x365314, emissiveIntensity: 0.38 })
       for (let i = 0; i < 14; i += 1) {
         const angle = i * 2.39996
-        const lysosome = addInteractive(
-          new THREE.Mesh(new THREE.SphereGeometry(0.34 + (i % 3) * 0.08, 18, 14), lysosomeMaterial),
-          `溶酶体 ${i + 1}`,
-        )
+        const lysosome = register(new THREE.Mesh(new THREE.SphereGeometry(0.34 + (i % 3) * 0.08, 18, 14), lysosomeMaterial), `溶酶体 ${i + 1}`)
         lysosome.position.set(Math.cos(angle) * (5.8 + (i % 4)), Math.sin(angle) * (4 + (i % 3)), (i % 5 - 2) * 1.45)
-        layerGroups.lysosomes.add(lysosome)
+        groups.lysosomes.add(lysosome)
       }
 
-      const ribosomeGeometry = new THREE.SphereGeometry(0.105, 8, 6)
-      const ribosomeMaterial = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 })
-      const ribosomes = new THREE.InstancedMesh(ribosomeGeometry, ribosomeMaterial, 120)
+      const ribosomes = register(new THREE.InstancedMesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        new THREE.MeshBasicMaterial({ color: 0xe2e8f0 }),
+        120,
+      ), '核糖体群')
       const dummy = new THREE.Object3D()
       for (let i = 0; i < 120; i += 1) {
         const phi = Math.acos(1 - 2 * ((i + 0.5) / 120))
@@ -271,60 +188,27 @@ export default function PTCCell3D({ selectedCase, onSelectGene }: Props) {
         dummy.updateMatrix()
         ribosomes.setMatrixAt(i, dummy.matrix)
       }
-      ribosomes.userData = { label: '核糖体群', kind: 'organelle' }
-      interactive.push(ribosomes)
-      layerGroups.ribosomes.add(ribosomes)
+      groups.ribosomes.add(ribosomes)
 
       const microtubuleMaterial = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.45 })
       for (let i = 0; i < 22; i += 1) {
         const angle = (i / 22) * Math.PI * 2
-        const points = [
-          new THREE.Vector3(0, 0, 0),
-          new THREE.Vector3(Math.cos(angle) * 9.2, Math.sin(angle) * 7.1, (i % 5 - 2) * 1.4),
-        ]
-        layerGroups.cytoskeleton.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), microtubuleMaterial))
-      }
-
-      const actinMaterial = new THREE.LineBasicMaterial({ color: 0xfda4af, transparent: true, opacity: 0.32 })
-      for (let ring = 0; ring < 7; ring += 1) {
-        const actin = new THREE.LineLoop(
-          new THREE.BufferGeometry().setFromPoints(
-            Array.from({ length: 72 }, (_, i) => {
-              const a = (i / 72) * Math.PI * 2
-              return new THREE.Vector3(Math.cos(a) * (8.2 + ring * 0.25), Math.sin(a) * (6.5 + ring * 0.18), (ring - 3) * 0.55)
-            }),
-          ),
-          actinMaterial,
-        )
-        layerGroups.cytoskeleton.add(actin)
+        groups.cytoskeleton.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(Math.cos(angle) * 9.2, Math.sin(angle) * 7.1, (i % 5 - 2) * 1.4)]),
+          microtubuleMaterial,
+        ))
       }
 
       const genes = Array.from(new Set((selectedCase?.variants || []).map((item) => item.gene.toUpperCase()))).slice(0, 18)
       genes.forEach((gene, index) => {
         const angle = (index / Math.max(genes.length, 1)) * Math.PI * 2
         const radius = 5.8 + (index % 2) * 1.4
-        const beacon = addInteractive(
-          new THREE.Mesh(
-            new THREE.SphereGeometry(0.46, 24, 18),
-            new THREE.MeshStandardMaterial({
-              color: GENE_COLORS[gene] ?? 0xf8fafc,
-              emissive: GENE_COLORS[gene] ?? 0xf8fafc,
-              emissiveIntensity: 1.35,
-            }),
-          ),
-          `${gene} 突变讯号`,
-          'gene',
-          { gene },
-        )
+        const beacon = register(new THREE.Mesh(
+          new THREE.SphereGeometry(0.46, 24, 18),
+          new THREE.MeshStandardMaterial({ color: GENE_COLORS[gene] ?? 0xf8fafc, emissive: GENE_COLORS[gene] ?? 0xf8fafc, emissiveIntensity: 1.35 }),
+        ), `${gene} 突变讯号`, 'gene', gene)
         beacon.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius * 0.72, (index % 4 - 1.5) * 1.5)
-        layerGroups.mutations.add(beacon)
-
-        const halo = new THREE.Mesh(
-          new THREE.SphereGeometry(0.72, 20, 14),
-          new THREE.MeshBasicMaterial({ color: GENE_COLORS[gene] ?? 0xffffff, transparent: true, opacity: 0.16 }),
-        )
-        halo.position.copy(beacon.position)
-        layerGroups.mutations.add(halo)
+        groups.mutations.add(beacon)
       })
 
       const raycaster = new THREE.Raycaster()
@@ -332,7 +216,7 @@ export default function PTCCell3D({ selectedCase, onSelectGene }: Props) {
       let dragging = false
       let previousX = 0
       let previousY = 0
-      let animation = 0
+      let frame = 0
 
       const down = (event: PointerEvent) => {
         dragging = true
@@ -362,14 +246,13 @@ export default function PTCCell3D({ selectedCase, onSelectGene }: Props) {
         raycaster.setFromCamera(pointer, camera)
         const hit = raycaster.intersectObjects(interactive, false)[0]
         if (!hit?.object?.userData) return
-        const data = hit.object.userData
-        setSelectedPart(data.label)
-        if (data.kind === 'gene' && data.gene) onSelectGeneRef.current(data.gene)
+        setSelectedPart(hit.object.userData.label)
+        if (hit.object.userData.kind === 'gene' && hit.object.userData.gene) callbackRef.current(hit.object.userData.gene)
         else camera.position.z = Math.max(15, camera.position.z - 4)
       }
       const resize = () => {
-        const nextWidth = Math.max(container.clientWidth, 320)
-        const nextHeight = Math.max(container.clientHeight, 560)
+        const nextWidth = Math.max(host.clientWidth, 320)
+        const nextHeight = Math.max(host.clientHeight, 560)
         camera.aspect = nextWidth / nextHeight
         camera.updateProjectionMatrix()
         renderer.setSize(nextWidth, nextHeight)
@@ -384,16 +267,15 @@ export default function PTCCell3D({ selectedCase, onSelectGene }: Props) {
       window.addEventListener('resize', resize)
 
       const animate = () => {
-        animation = requestAnimationFrame(animate)
+        frame = requestAnimationFrame(animate)
         if (!dragging) cell.rotation.y += 0.0012
-        const pulse = 1 + Math.sin(performance.now() * 0.004) * 0.06
-        layerGroups.mutations.scale.setScalar(pulse)
+        groups.mutations.scale.setScalar(1 + Math.sin(performance.now() * 0.004) * 0.06)
         renderer.render(scene, camera)
       }
       animate()
 
       cleanup = () => {
-        cancelAnimationFrame(animation)
+        cancelAnimationFrame(frame)
         window.removeEventListener('resize', resize)
         renderer.domElement.removeEventListener('pointerdown', down)
         renderer.domElement.removeEventListener('pointermove', move)
@@ -407,8 +289,8 @@ export default function PTCCell3D({ selectedCase, onSelectGene }: Props) {
           else object.material?.dispose?.()
         })
         renderer.dispose()
-        layerGroupsRef.current = {}
-        container.replaceChildren()
+        groupsRef.current = {}
+        host.replaceChildren()
       }
     }).catch((reason) => {
       if (!disposed) setError(reason instanceof Error ? reason.message : '无法建立癌细胞 3D 模型')
@@ -420,15 +302,6 @@ export default function PTCCell3D({ selectedCase, onSelectGene }: Props) {
     }
   }, [selectedCase])
 
-  function toggleLayer(key: LayerKey) {
-    setVisibleLayers((current) => ({ ...current, [key]: !current[key] }))
-  }
-
-  function showAllLayers() {
-    setVisibleLayers(defaultVisibility())
-    setSelectedPart('癌细胞整体')
-  }
-
   return (
     <div className="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-xl">
       <div ref={hostRef} className="h-[680px] w-full" aria-label="PTC cancer cell multiscale 3D model" />
@@ -439,18 +312,16 @@ export default function PTCCell3D({ selectedCase, onSelectGene }: Props) {
           {LAYERS.map((layer) => (
             <button
               key={layer.key}
-              className={`pointer-events-auto rounded px-2 py-1 transition ${visibleLayers[layer.key] ? 'bg-cyan-500 text-slate-950' : 'bg-slate-700 text-slate-300'}`}
-              onClick={() => toggleLayer(layer.key)}
+              className={`rounded px-2 py-1 transition ${visibility[layer.key] ? 'bg-cyan-500 text-slate-950' : 'bg-slate-700 text-slate-300'}`}
+              onClick={() => setVisibility((current) => ({ ...current, [layer.key]: !current[layer.key] }))}
             >
               {layer.label}
             </button>
           ))}
-          <button className="pointer-events-auto rounded bg-white px-2 py-1 text-slate-900" onClick={showAllLayers}>全部显示</button>
+          <button className="rounded bg-white px-2 py-1 text-slate-900" onClick={() => { setVisibility(allVisible()); setSelectedPart('癌细胞整体') }}>全部显示</button>
         </div>
       </div>
-      <div className="absolute bottom-3 left-3 rounded bg-slate-900/90 px-3 py-2 text-sm text-white backdrop-blur">
-        当前：{selectedPart}
-      </div>
+      <div className="absolute bottom-3 left-3 rounded bg-slate-900/90 px-3 py-2 text-sm text-white backdrop-blur">当前：{selectedPart}</div>
       <div className="pointer-events-none absolute bottom-3 right-3 max-w-sm rounded bg-amber-950/80 px-3 py-2 text-xs text-amber-100 backdrop-blur">
         科学示意模型，不是患者真实细胞的显微或原子级重建；病例资料只用于驱动突变讯号层。
       </div>
