@@ -1,5 +1,5 @@
-from src.backend.api.v1.ptc_cohort import compare_cases
-from src.backend.domain.ptc_research import PTCResearchCaseModel, PTCVariantModel
+from src.backend.api.v1.ptc_cohort import OUTCOME_FIELDS_EXCLUDED, WEIGHTS, compare_cases
+from src.backend.domain.ptc_research import PTCOutcomeModel, PTCResearchCaseModel, PTCVariantModel
 
 
 def make_case(case_id: str, *, stage: str, gene: str, protein: str, t: str = "T1", n: str = "N0"):
@@ -38,24 +38,70 @@ def test_identical_molecular_case_scores_higher_than_different_case():
     close_result = compare_cases(anchor, close)
     distant_result = compare_cases(anchor, distant)
 
+    assert sum(WEIGHTS.values()) == 100.0
     assert close_result["score"] == 100.0
     assert close_result["shared_genes"] == ["BRAF"]
     assert close_result["shared_protein_variants"] == ["BRAF:P.V600E"]
-    assert close_result["components"]["genes"] == 40.0
-    assert close_result["components"]["protein_variants"] == 20.0
+    assert close_result["components"]["genes"] == 42.0
+    assert close_result["components"]["protein_variants"] == 23.0
+    assert "vital_status" not in close_result["components"]
     assert close_result["score"] > distant_result["score"]
 
 
-def test_missing_fields_do_not_create_false_similarity():
+def test_missing_pre_outcome_fields_do_not_create_false_similarity():
     anchor = make_case("A", stage="Stage I", gene="BRAF", protein="p.V600E")
     candidate = make_case("B", stage="Stage I", gene="BRAF", protein="p.V600E")
     candidate.age_range = None
     candidate.sex = None
-    candidate.vital_status = None
 
     result = compare_cases(anchor, candidate)
 
     assert result["components"]["age_range"] == 0.0
     assert result["components"]["sex"] == 0.0
-    assert result["components"]["vital_status"] == 0.0
-    assert result["score"] == 85.0
+    assert result["score"] == 90.0
+
+
+def test_outcome_changes_never_change_similarity_score():
+    anchor = make_case("A", stage="Stage I", gene="BRAF", protein="p.V600E")
+    alive = make_case("B", stage="Stage I", gene="BRAF", protein="p.V600E")
+    deceased = make_case("C", stage="Stage I", gene="BRAF", protein="p.V600E")
+
+    alive.vital_status = "Alive"
+    alive.days_to_last_follow_up = 2500
+    alive.days_to_death = None
+    alive.outcomes = [
+        PTCOutcomeModel(
+            outcome_id="B:OS",
+            case_id="B",
+            source_dataset="TCGA-THCA",
+            outcome_type="overall_survival",
+            outcome_value="censored",
+        )
+    ]
+
+    deceased.vital_status = "Dead"
+    deceased.days_to_last_follow_up = 120
+    deceased.days_to_death = 150
+    deceased.outcomes = [
+        PTCOutcomeModel(
+            outcome_id="C:OS",
+            case_id="C",
+            source_dataset="TCGA-THCA",
+            outcome_type="overall_survival",
+            outcome_value="event",
+        )
+    ]
+
+    alive_result = compare_cases(anchor, alive)
+    deceased_result = compare_cases(anchor, deceased)
+
+    assert alive_result["score"] == deceased_result["score"] == 100.0
+    assert alive_result["components"] == deceased_result["components"]
+    assert alive_result["case_facts"]["vital_status"] == "Alive"
+    assert deceased_result["case_facts"]["vital_status"] == "Dead"
+    assert set(OUTCOME_FIELDS_EXCLUDED) == {
+        "vital_status",
+        "days_to_last_follow_up",
+        "days_to_death",
+        "outcomes",
+    }
