@@ -9,7 +9,6 @@ export default function PTCResearchAssistantPage() {
   const [cases, setCases] = useState<PTCLatestCase[]>([])
   const [caseId, setCaseId] = useState('')
   const [gene, setGene] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,16 +39,6 @@ export default function PTCResearchAssistantPage() {
     () => Array.from(new Set((selectedCase?.variants || []).map((item) => item.gene.toUpperCase()))).sort(),
     [selectedCase],
   )
-  const filteredCases = useMemo(() => {
-    const needle = query.trim().toUpperCase()
-    if (!needle) return cases
-    return cases.filter((item) => {
-      const genesText = item.variants.map((variant) => variant.gene).join(' ').toUpperCase()
-      return item.case_id.toUpperCase().includes(needle)
-        || (item.pathologic_stage || '').toUpperCase().includes(needle)
-        || genesText.includes(needle)
-    })
-  }, [cases, query])
 
   function chooseCase(next: string) {
     setCaseId(next)
@@ -77,9 +66,9 @@ export default function PTCResearchAssistantPage() {
     <main className="mx-auto max-w-[1500px] px-4 py-8">
       <section className="mb-6">
         <p className="text-sm font-semibold text-indigo-600">PTC Evidence-grounded Workspace</p>
-        <h1 className="text-3xl font-bold text-gray-900">病例研究助手与可追溯问答</h1>
+        <h1 className="text-3xl font-bold text-gray-900">病例研究助手与可追溯主题分析</h1>
         <p className="mt-2 max-w-5xl text-gray-600">
-          从最近下载的 100 个 TCGA-THCA 公开病例中选择研究对象。回答直接引用已同步的药物、CIViC／PubMed 证据、PMC 图表与临床试验，并保留完整查询轨迹。
+          页面直接列出数据库最近 100 个 TCGA-THCA 公开病例。选择病例、基因与预设研究主题后，系统展示已同步的药物、CIViC／PubMed 证据、PMC 图表与临床试验。
         </p>
       </section>
 
@@ -88,19 +77,12 @@ export default function PTCResearchAssistantPage() {
       <div className="grid gap-5 xl:grid-cols-[340px_1fr]">
         <aside className="overflow-hidden rounded-xl border bg-white shadow-sm">
           <div className="bg-slate-900 p-4 text-white">
-            <div className="font-bold">选择研究病例</div>
-            <input
-              aria-label="搜索助手病例"
-              className="mt-3 w-full rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm"
-              placeholder="病例号、Stage、BRAF、RET…"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <div className="mt-2 text-xs text-slate-400">{filteredCases.length} / {cases.length} 例</div>
+            <div className="font-bold">数据库最近 100 个病例</div>
+            <div className="mt-1 text-xs text-slate-400">当前列出 {cases.length} 例，点击即可展示</div>
           </div>
-          <div className="max-h-[620px] overflow-y-auto">
+          <div className="max-h-[680px] overflow-y-auto">
             {loading && <div className="p-8 text-center text-gray-500">载入病例中…</div>}
-            {!loading && filteredCases.map((item) => (
+            {!loading && cases.map((item) => (
               <button
                 key={item.case_id}
                 className={`block w-full border-b px-4 py-3 text-left hover:bg-indigo-50 ${caseId === item.case_id ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : ''}`}
@@ -118,6 +100,7 @@ export default function PTCResearchAssistantPage() {
                 </div>
               </button>
             ))}
+            {!loading && cases.length === 0 && <div className="p-8 text-center text-gray-500">数据库尚无可展示病例。</div>}
           </div>
         </aside>
 
@@ -139,7 +122,7 @@ export default function PTCResearchAssistantPage() {
                 className={`rounded-full border px-3 py-1.5 text-sm ${gene === null ? 'border-indigo-500 bg-indigo-100 text-indigo-800' : 'border-gray-200'}`}
                 onClick={() => chooseGene(null)}
               >
-                自动选择
+                全部基因
               </button>
               {genes.map((itemGene) => (
                 <button
