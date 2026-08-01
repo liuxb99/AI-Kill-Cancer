@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
+import DualModeSelector from '../components/DualModeSelector'
+import { getPTCCase } from '../api/ptcResearch'
 import {
   bootstrapPTCHerbs,
   calculatePTCSimilarity,
@@ -18,11 +20,14 @@ export default function PTCIntegratedPage() {
   const [dashboard, setDashboard] = useState<PTCDashboard | null>(null)
   const [cases, setCases] = useState<PTCLatestCase[]>([])
   const [selectedCase, setSelectedCase] = useState('')
+  const [exactCaseId, setExactCaseId] = useState('')
+  const [advancedCase, setAdvancedCase] = useState<PTCLatestCase | null>(null)
   const [herbs, setHerbs] = useState<PTCHerb[]>([])
   const [interactions, setInteractions] = useState<PTCInteraction[]>([])
   const [recommendation, setRecommendation] = useState<PTCIntegratedRecommendation | null>(null)
   const [similar, setSimilar] = useState<Array<Record<string, any>>>([])
   const [loading, setLoading] = useState(true)
+  const [advancedLoading, setAdvancedLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,6 +69,25 @@ export default function PTCIntegratedPage() {
     }
   }
 
+  async function queryExactCase() {
+    const normalized = exactCaseId.trim()
+    if (!normalized) return
+    setAdvancedLoading(true)
+    setError(null)
+    try {
+      const record = await getPTCCase(normalized)
+      const converted = record as PTCLatestCase
+      setAdvancedCase(converted)
+      setSelectedCase(converted.case_id)
+      setRecommendation(null)
+      setSimilar([])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '資料庫找不到指定病例')
+    } finally {
+      setAdvancedLoading(false)
+    }
+  }
+
   async function analyse() {
     if (!selectedCase) return
     setLoading(true)
@@ -82,12 +106,32 @@ export default function PTCIntegratedPage() {
     }
   }
 
+  const recentContent = (
+    <div className="p-4">
+      <label className="text-sm font-medium">最近 100 個研究病例
+        <select
+          className="mt-1 w-full rounded border px-3 py-2"
+          value={advancedCase ? '' : selectedCase}
+          onChange={(event) => {
+            setAdvancedCase(null)
+            setSelectedCase(event.target.value)
+            setRecommendation(null)
+            setSimilar([])
+          }}
+        >
+          <option value="">尚無病例</option>
+          {cases.map((item) => <option key={item.case_id} value={item.case_id}>{item.case_id} · {item.pathologic_stage || 'stage unknown'}</option>)}
+        </select>
+      </label>
+    </div>
+  )
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
       <section className="mb-6">
         <p className="text-sm font-semibold text-primary-600">PTC Research Workbench</p>
         <h1 className="text-3xl font-bold">甲狀腺乳突癌整合研究工作台</h1>
-        <p className="mt-2 text-gray-600">從資料庫最近 100 個研究病例中選擇一筆，串聯變異、藥物、證據、試驗、科學中藥與相似病例。</p>
+        <p className="mt-2 text-gray-600">一般模式從最近 100 個病例中選擇；進階模式可用完整 Case ID 查詢整個資料庫，再執行同一套整合分析。</p>
       </section>
 
       {error && <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-red-700">{error}</div>}
@@ -97,18 +141,30 @@ export default function PTCIntegratedPage() {
         <Metric label="病例" value={dashboard?.case_count} /><Metric label="變異" value={dashboard?.variant_count} /><Metric label="藥物" value={dashboard?.therapy_count} /><Metric label="證據" value={dashboard?.evidence_count} /><Metric label="試驗" value={dashboard?.trial_count} /><Metric label="中藥研究" value={dashboard?.herb_count} /><Metric label="交互作用" value={dashboard?.interaction_count} />
       </section>
 
-      <section className="mt-6 rounded-lg border bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="min-w-72 flex-1 text-sm font-medium">最近 100 個研究病例
-            <select className="mt-1 w-full rounded border px-3 py-2" value={selectedCase} onChange={(event) => setSelectedCase(event.target.value)}>
-              <option value="">尚無病例</option>
-              {cases.map((item) => <option key={item.case_id} value={item.case_id}>{item.case_id} · {item.pathologic_stage || 'stage unknown'}</option>)}
-            </select>
-          </label>
-          <button className="rounded bg-primary-600 px-4 py-2 text-white disabled:opacity-50" disabled={!selectedCase || loading} onClick={() => void analyse()}>展示整合研究分析</button>
-          <button className="rounded border px-4 py-2" onClick={() => void bootstrap()}>建立固定科學中藥研究種子</button>
-        </div>
-      </section>
+      <div className="mt-6 grid gap-4 lg:grid-cols-[420px_1fr]">
+        <DualModeSelector
+          title="選擇整合分析病例"
+          description="最近 100 筆與精準 Case ID 查詢共用同一套分析引擎。"
+          recentContent={recentContent}
+          advancedLabel="完整 Case ID"
+          advancedPlaceholder="例如 TCGA-XX-YYYY"
+          advancedValue={exactCaseId}
+          onAdvancedValueChange={setExactCaseId}
+          onAdvancedSubmit={queryExactCase}
+          advancedLoading={advancedLoading}
+          advancedHelp="進階查詢不受最近 100 筆限制；後端會驗證病例是否存在。"
+        />
+
+        <section className="rounded-xl border bg-white p-5 shadow-sm">
+          <div className="text-xs text-gray-500">目前病例</div>
+          <div className="mt-1 text-xl font-bold">{selectedCase || '尚未選擇'}</div>
+          {advancedCase && <div className="mt-1 text-xs font-semibold text-indigo-600">進階精準查詢結果</div>}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button className="rounded bg-primary-600 px-4 py-2 text-white disabled:opacity-50" disabled={!selectedCase || loading} onClick={() => void analyse()}>展示整合研究分析</button>
+            <button className="rounded border px-4 py-2" onClick={() => void bootstrap()}>建立固定科學中藥研究種子</button>
+          </div>
+        </section>
+      </div>
 
       <section className="mt-6 grid gap-6 xl:grid-cols-3">
         <Panel title="高頻基因"><div className="space-y-2">{dashboard?.top_genes.slice(0, 100).map((item) => <div key={item.gene} className="flex justify-between rounded border px-3 py-2 text-sm"><span className="font-semibold">{item.gene}</span><span>{item.case_count} cases</span></div>)}</div></Panel>
