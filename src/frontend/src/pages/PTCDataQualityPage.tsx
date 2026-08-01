@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { getPTCDataQuality, type PTCDataQualityOverview } from '../api/ptcDataQuality'
 
@@ -7,7 +7,6 @@ export default function PTCDataQualityPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [staleOnly, setStaleOnly] = useState(false)
-  const [geneFilter, setGeneFilter] = useState('')
 
   useEffect(() => {
     setLoading(true)
@@ -18,11 +17,7 @@ export default function PTCDataQualityPage() {
       .finally(() => setLoading(false))
   }, [staleOnly])
 
-  const filteredGenes = useMemo(() => {
-    const query = geneFilter.trim().toUpperCase()
-    if (!data) return []
-    return query ? data.gene_coverage.filter((item) => item.gene.includes(query)) : data.gene_coverage
-  }, [data, geneFilter])
+  const displayedGenes = data?.gene_coverage.slice(0, 100) || []
 
   return (
     <main className="mx-auto max-w-[1500px] px-4 py-8">
@@ -30,21 +25,16 @@ export default function PTCDataQualityPage() {
         <p className="text-sm font-semibold text-emerald-600">PTC Data Provenance & Freshness Center</p>
         <h1 className="text-3xl font-bold">资料来源、版本、新鲜度与覆盖缺口</h1>
         <p className="mt-2 max-w-5xl text-gray-600">
-          检查 TCGA、ClinicalTrials.gov、openFDA、PubMed／PMC 与 CIViC 的持久化数量、最近更新时间、来源链接、版本字段、同步批次与基因覆盖。
+          页面直接展示数据库中的来源状态与前 100 笔基因覆盖资料，不需要输入查询条件。
         </p>
       </header>
 
-      <div className="mb-5 flex flex-wrap items-center gap-4 rounded-xl border bg-white p-4 shadow-sm">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-white p-4 shadow-sm">
         <label className="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" checked={staleOnly} onChange={(event) => setStaleOnly(event.target.checked)} />
           只显示过期或缺失来源
         </label>
-        <input
-          className="min-w-[240px] flex-1 rounded border px-3 py-2 text-sm"
-          placeholder="筛选 BRAF、RET、NTRK…"
-          value={geneFilter}
-          onChange={(event) => setGeneFilter(event.target.value)}
-        />
+        <div className="text-sm text-gray-500">数据库基因覆盖：展示 {displayedGenes.length} / {data?.gene_coverage.length || 0} 笔</div>
       </div>
 
       {loading && <div className="rounded border bg-white p-6 text-gray-500">正在稽核资料来源…</div>}
@@ -93,16 +83,16 @@ export default function PTCDataQualityPage() {
 
           <section className="overflow-hidden rounded-xl border bg-white shadow-sm">
             <div className="border-b p-5">
-              <h2 className="text-xl font-bold">基因覆盖矩阵</h2>
+              <h2 className="text-xl font-bold">数据库前 100 笔基因覆盖矩阵</h2>
               <p className="text-sm text-gray-500">4 分代表同时具备病例变异、药物靶点、Evidence 与 Clinical Trial。</p>
             </div>
-            <div className="overflow-x-auto">
+            <div className="max-h-[700px] overflow-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase text-gray-500">
+                <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-gray-500">
                   <tr><th className="px-4 py-3">Gene</th><th className="px-4 py-3">Score</th><th className="px-4 py-3">Variants</th><th className="px-4 py-3">Targets</th><th className="px-4 py-3">Evidence</th><th className="px-4 py-3">Trials</th><th className="px-4 py-3">Gaps</th></tr>
                 </thead>
                 <tbody>
-                  {filteredGenes.map((row) => (
+                  {displayedGenes.map((row) => (
                     <tr key={row.gene} className="border-t">
                       <td className="px-4 py-3 font-bold">{row.gene}</td>
                       <td className="px-4 py-3">{row.coverage_score}/4</td>
