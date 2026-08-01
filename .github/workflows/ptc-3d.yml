@@ -11,6 +11,7 @@ on:
       - "src/backend/api/v1/ptc_reports.py"
       - "src/backend/api/v1/ptc_cohort.py"
       - "src/backend/api/v1/ptc_evidence_matrix.py"
+      - "src/backend/api/v1/ptc_timeline.py"
       - "src/backend/services/ptc_literature_service.py"
       - "src/backend/api/v1/router.py"
       - "src/frontend/src/api/ptcVisualization.ts"
@@ -20,6 +21,7 @@ on:
       - "src/frontend/src/api/ptcReports.ts"
       - "src/frontend/src/api/ptcCohort.ts"
       - "src/frontend/src/api/ptcEvidenceMatrix.ts"
+      - "src/frontend/src/api/ptcTimeline.ts"
       - "src/frontend/src/components/PTCCell3D.tsx"
       - "src/frontend/src/components/PTCProtein3D.tsx"
       - "src/frontend/src/components/PTCTargetingPanel.tsx"
@@ -31,6 +33,7 @@ on:
       - "src/frontend/src/pages/PTCReportCenterPage.tsx"
       - "src/frontend/src/pages/PTCCohortPage.tsx"
       - "src/frontend/src/pages/PTCEvidenceMatrixPage.tsx"
+      - "src/frontend/src/pages/PTCTimelinePage.tsx"
       - "src/frontend/src/test/PTC3DExplorerPage.test.tsx"
       - "src/frontend/src/test/PTCProtein3D.test.tsx"
       - "src/frontend/src/test/PTCTargetingPanel.test.tsx"
@@ -39,6 +42,7 @@ on:
       - "src/frontend/src/test/PTCReportCenterPage.test.tsx"
       - "src/frontend/src/test/PTCCohortPage.test.tsx"
       - "src/frontend/src/test/PTCEvidenceMatrixPage.test.tsx"
+      - "src/frontend/src/test/PTCTimelinePage.test.tsx"
       - "src/frontend/src/test/ptcVisualizationApi.test.ts"
       - "src/frontend/src/App.tsx"
       - "tests/backend/api/test_ptc_visualization.py"
@@ -47,6 +51,7 @@ on:
       - "tests/backend/api/test_ptc_reports.py"
       - "tests/backend/api/test_ptc_cohort.py"
       - "tests/backend/api/test_ptc_evidence_matrix.py"
+      - "tests/backend/api/test_ptc_timeline.py"
       - "tests/backend/services/test_ptc_literature_assets.py"
       - ".github/workflows/ptc-3d.yml"
   workflow_dispatch:
@@ -74,6 +79,7 @@ jobs:
             src/backend/api/v1/ptc_reports.py \
             src/backend/api/v1/ptc_cohort.py \
             src/backend/api/v1/ptc_evidence_matrix.py \
+            src/backend/api/v1/ptc_timeline.py \
             src/backend/services/ptc_literature_service.py \
             tests/backend/api/test_ptc_visualization.py \
             tests/backend/api/test_ptc_targeting.py \
@@ -81,6 +87,7 @@ jobs:
             tests/backend/api/test_ptc_reports.py \
             tests/backend/api/test_ptc_cohort.py \
             tests/backend/api/test_ptc_evidence_matrix.py \
+            tests/backend/api/test_ptc_timeline.py \
             tests/backend/services/test_ptc_literature_assets.py
       - name: Run PTC backend research workbench tests
         run: |
@@ -91,6 +98,7 @@ jobs:
             tests/backend/api/test_ptc_reports.py \
             tests/backend/api/test_ptc_cohort.py \
             tests/backend/api/test_ptc_evidence_matrix.py \
+            tests/backend/api/test_ptc_timeline.py \
             tests/backend/services/test_ptc_literature_assets.py
       - name: Verify API router imports
         run: |
@@ -104,6 +112,7 @@ jobs:
           assert any('/ptc-reports' in path for path in paths)
           assert any('/ptc-cohort' in path for path in paths)
           assert any('/ptc-evidence-matrix' in path for path in paths)
+          assert any('/ptc-timeline' in path for path in paths)
           PY
 
   frontend-3d:
@@ -129,6 +138,7 @@ jobs:
           npm test -- --run src/test/PTCReportCenterPage.test.tsx
           npm test -- --run src/test/PTCCohortPage.test.tsx
           npm test -- --run src/test/PTCEvidenceMatrixPage.test.tsx
+          npm test -- --run src/test/PTCTimelinePage.test.tsx
           npm test -- --run src/test/ptcVisualizationApi.test.ts
       - name: TypeScript and production build
         run: npm run build
