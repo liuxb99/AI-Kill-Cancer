@@ -1,0 +1,38 @@
+name: PTC Deep Links and Same-Origin API
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/frontend/src/api/client.ts"
+      - "src/frontend/src/api/ptcVisualization.ts"
+      - "src/frontend/src/components/StatusBanner.tsx"
+      - "src/frontend/src/pages/PTC3DExplorerPage.tsx"
+      - "src/frontend/src/test/apiClient.test.ts"
+      - "src/frontend/src/test/ptcVisualizationApi.test.ts"
+      - "src/frontend/src/test/PTC3DExplorerPage.test.tsx"
+      - ".github/workflows/ptc-deep-links.yml"
+  workflow_dispatch:
+
+jobs:
+  deep-link-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - run: npm ci
+      - name: Validate shared API client
+        run: npm test -- --run src/test/apiClient.test.ts
+      - name: Validate visualization API same-origin contract
+        run: npm test -- --run src/test/ptcVisualizationApi.test.ts
+      - name: Validate cell protein targeting literature deep links
+        run: npm test -- --run src/test/PTC3DExplorerPage.test.tsx
+      - name: TypeScript and production build
+        run: npm run build
