@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
+import DualModeSelector from '../components/DualModeSelector'
 import {
   getPTCGeneKnowledge,
   listPTCEvidence,
@@ -19,10 +20,15 @@ export default function PTCKnowledgePage() {
   const [cases, setCases] = useState<PTCLatestCase[]>([])
   const [caseId, setCaseId] = useState('')
   const [gene, setGene] = useState('')
+  const [advancedQuery, setAdvancedQuery] = useState('')
   const [therapies, setTherapies] = useState<PTCTherapy[]>([])
   const [trials, setTrials] = useState<PTCTrial[]>([])
   const [evidence, setEvidence] = useState<PTCEvidence[]>([])
+  const [allTherapies, setAllTherapies] = useState<PTCTherapy[]>([])
+  const [allTrials, setAllTrials] = useState<PTCTrial[]>([])
+  const [allEvidence, setAllEvidence] = useState<PTCEvidence[]>([])
   const [loading, setLoading] = useState(true)
+  const [advancedLoading, setAdvancedLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -46,6 +52,9 @@ export default function PTCKnowledgePage() {
       const initial = caseRows.cases[0]
       setCaseId((current) => current || initial?.case_id || '')
       setGene((current) => current || initial?.variants[0]?.gene?.toUpperCase() || '')
+      setAllTherapies(therapyRows)
+      setAllTrials(trialRows)
+      setAllEvidence(evidenceRows)
       setTherapies(therapyRows.slice(0, 100))
       setTrials(trialRows.slice(0, 100))
       setEvidence(evidenceRows.slice(0, 100))
@@ -81,6 +90,47 @@ export default function PTCKnowledgePage() {
     }
   }
 
+  async function runAdvancedQuery() {
+    const query = advancedQuery.trim()
+    if (!query) return
+    setAdvancedLoading(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const normalized = query.toUpperCase()
+      let geneResult: Awaited<ReturnType<typeof getPTCGeneKnowledge>> | null = null
+      if (/^[A-Z0-9-]{2,16}$/.test(normalized) && !normalized.startsWith('NCT')) {
+        try {
+          geneResult = await getPTCGeneKnowledge(normalized)
+        } catch {
+          geneResult = null
+        }
+      }
+
+      const therapyRows = geneResult?.therapies.length
+        ? geneResult.therapies
+        : allTherapies.filter((item) => [item.name, item.generic_name, item.therapy_key, item.mechanism, item.source_name]
+          .filter(Boolean).join(' ').toUpperCase().includes(normalized))
+      const trialRows = geneResult?.trials.length
+        ? geneResult.trials
+        : allTrials.filter((item) => [item.nct_id, item.brief_title, item.overall_status, ...(item.conditions || []), ...(item.interventions || []).map((value) => value.name || '')]
+          .filter(Boolean).join(' ').toUpperCase().includes(normalized))
+      const evidenceRows = geneResult?.evidence.length
+        ? geneResult.evidence
+        : allEvidence.filter((item) => [item.evidence_key, item.title, item.summary, item.gene_symbol, item.variant, item.source_name, item.citation]
+          .filter(Boolean).join(' ').toUpperCase().includes(normalized))
+
+      setTherapies(therapyRows.slice(0, 100))
+      setTrials(trialRows.slice(0, 100))
+      setEvidence(evidenceRows.slice(0, 100))
+      setMessage(`進階查詢「${query}」：${therapyRows.length} therapies / ${evidenceRows.length} evidence / ${trialRows.length} trials`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '進階知識查詢失敗')
+    } finally {
+      setAdvancedLoading(false)
+    }
+  }
+
   async function syncTrials() {
     setMessage(null)
     setError(null)
@@ -105,32 +155,49 @@ export default function PTCKnowledgePage() {
     }
   }
 
+  const recentContent = (
+    <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_auto]">
+      <label className="text-sm font-medium">研究病例
+        <select className="mt-1 w-full rounded border px-3 py-2" value={caseId} onChange={(event) => { setCaseId(event.target.value); setGene('') }}>
+          {cases.map((item) => <option key={item.case_id} value={item.case_id}>{item.case_id} · {item.pathologic_stage || 'Stage —'}</option>)}
+        </select>
+      </label>
+      <label className="text-sm font-medium">病例既有基因
+        <select className="mt-1 w-full rounded border px-3 py-2" value={gene} onChange={(event) => setGene(event.target.value)}>
+          {genes.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
+      </label>
+      <div className="flex items-end gap-2">
+        <button className="rounded bg-primary-600 px-4 py-2 text-white disabled:opacity-50" disabled={!gene || loading} onClick={() => void showSelectedGene()}>
+          展示所選基因資料
+        </button>
+        <button className="rounded border px-4 py-2" onClick={() => void loadAll()}>全部前 100 筆</button>
+      </div>
+    </div>
+  )
+
   return (
     <main className="mx-auto max-w-[1500px] px-4 py-8">
       <section className="mb-6">
         <p className="text-sm font-semibold text-primary-600">PTC Precision Oncology</p>
         <h1 className="text-3xl font-bold">藥物、證據與臨床試驗</h1>
-        <p className="mt-2 text-gray-600">從資料庫最近 100 個公開病例中選擇病例與既有基因，再展示已同步的藥物、Evidence 與試驗資料。</p>
+        <p className="mt-2 text-gray-600">一般模式從最近 100 個病例選基因；進階模式可用基因、藥物名、NCT ID 或證據關鍵字查詢完整知識庫。</p>
       </section>
 
-      <section className="mb-6 grid gap-4 rounded-xl border bg-white p-5 shadow-sm lg:grid-cols-[1fr_1fr_auto]">
-        <label className="text-sm font-medium">研究病例
-          <select className="mt-1 w-full rounded border px-3 py-2" value={caseId} onChange={(event) => { setCaseId(event.target.value); setGene('') }}>
-            {cases.map((item) => <option key={item.case_id} value={item.case_id}>{item.case_id} · {item.pathologic_stage || 'Stage —'}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium">病例既有基因
-          <select className="mt-1 w-full rounded border px-3 py-2" value={gene} onChange={(event) => setGene(event.target.value)}>
-            {genes.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-        </label>
-        <div className="flex items-end gap-2">
-          <button className="rounded bg-primary-600 px-4 py-2 text-white disabled:opacity-50" disabled={!gene || loading} onClick={() => void showSelectedGene()}>
-            展示所選基因資料
-          </button>
-          <button className="rounded border px-4 py-2" onClick={() => void loadAll()}>展示全部前 100 筆</button>
-        </div>
-      </section>
+      <div className="mb-6">
+        <DualModeSelector
+          title="選擇或查詢知識資料"
+          description="兩種模式共用下方 Therapies、Evidence 與 Clinical Trials 結果區。"
+          recentContent={recentContent}
+          advancedLabel="基因／藥物／NCT ID／證據關鍵字"
+          advancedPlaceholder="例如 BRAF、dabrafenib、NCT01234567"
+          advancedValue={advancedQuery}
+          onAdvancedValueChange={setAdvancedQuery}
+          onAdvancedSubmit={runAdvancedQuery}
+          advancedLoading={advancedLoading}
+          advancedHelp="進階模式搜尋整個已持久化知識庫，不限於目前病例或最近 100 筆；結果每類最多展示 100 筆。"
+        />
+      </div>
 
       <section className="mb-6 grid gap-4 rounded-xl border bg-white p-5 shadow-sm lg:grid-cols-2">
         <div>
