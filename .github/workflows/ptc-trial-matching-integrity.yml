@@ -1,0 +1,73 @@
+name: PTC Trial Matching Scientific Integrity
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/backend/api/v1/ptc_trial_matching.py'
+      - 'tests/backend/api/test_ptc_trial_matching.py'
+      - 'src/frontend/src/api/ptcTrialMatching.ts'
+      - 'src/frontend/src/pages/PTCTrialMatchingPage.tsx'
+      - 'src/frontend/src/test/PTCTrialMatchingPage.test.tsx'
+      - '.github/workflows/ptc-trial-matching-integrity.yml'
+  pull_request:
+    paths:
+      - 'src/backend/api/v1/ptc_trial_matching.py'
+      - 'tests/backend/api/test_ptc_trial_matching.py'
+      - 'src/frontend/src/api/ptcTrialMatching.ts'
+      - 'src/frontend/src/pages/PTCTrialMatchingPage.tsx'
+      - 'src/frontend/src/test/PTCTrialMatchingPage.test.tsx'
+  workflow_dispatch:
+
+jobs:
+  trial-matching-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint trial matcher
+        run: python -m ruff check src/backend/api/v1/ptc_trial_matching.py tests/backend/api/test_ptc_trial_matching.py
+
+      - name: Run trial matching scientific tests
+        run: python -m pytest tests/backend/api/test_ptc_trial_matching.py -q
+
+      - name: Guard against eligibility scoring or claims
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('src/backend/api/v1/ptc_trial_matching.py').read_text(encoding='utf-8')
+          page = Path('src/frontend/src/pages/PTCTrialMatchingPage.tsx').read_text(encoding='utf-8')
+          assert 'eligibility_separate_from_score' in source
+          assert 'eligibility_determination": False' in source
+          assert 'RELEVANCE_WEIGHTS' in source
+          for field in ('age', 'pathologic_stage', 'sex', 'ecog_performance_status', 'organ_function', 'prior_treatment', 'exclusion_criteria'):
+              assert field in source
+          assert '资格核验（不计分）' in page
+          assert '符合资格' not in page
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: src/frontend
+        run: npm ci
+
+      - name: Run trial matching UI tests
+        working-directory: src/frontend
+        run: npm test -- --run src/test/PTCTrialMatchingPage.test.tsx src/test/apiClient.test.ts
+
+      - name: Production build
+        working-directory: src/frontend
+        run: npm run build
