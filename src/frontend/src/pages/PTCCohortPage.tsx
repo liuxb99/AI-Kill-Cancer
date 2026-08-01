@@ -2,13 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { getPTCSimilarCases, type PTCCohortResponse } from '../api/ptcCohort'
+import { getPTCCase } from '../api/ptcResearch'
 import { getLatestPTCCases, type PTCLatestCase } from '../api/ptcVisualization'
+import DualModeSelector from '../components/DualModeSelector'
 
 export default function PTCCohortPage() {
   const navigate = useNavigate()
   const [cases, setCases] = useState<PTCLatestCase[]>([])
   const [caseId, setCaseId] = useState('')
   const [query, setQuery] = useState('')
+  const [advancedCaseId, setAdvancedCaseId] = useState('')
+  const [advancedLoading, setAdvancedLoading] = useState(false)
   const [limit, setLimit] = useState(20)
   const [minScore, setMinScore] = useState(0)
   const [data, setData] = useState<PTCCohortResponse | null>(null)
@@ -19,9 +23,11 @@ export default function PTCCohortPage() {
     void getLatestPTCCases(100)
       .then((result) => {
         setCases(result.cases)
-        if (result.cases[0]) setCaseId(result.cases[0].case_id)
+        const requested = new URLSearchParams(window.location.search).get('case')
+        const initial = result.cases.find((item) => item.case_id === requested) || result.cases[0]
+        if (initial) setCaseId(initial.case_id)
       })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : '无法载入病例'))
+      .catch((reason) => setError(reason instanceof Error ? reason.message : '無法載入病例'))
   }, [])
 
   const filtered = useMemo(() => {
@@ -34,14 +40,33 @@ export default function PTCCohortPage() {
     )
   }, [cases, query])
 
+  async function selectAdvancedCase() {
+    const requested = advancedCaseId.trim()
+    if (!requested) return
+    setAdvancedLoading(true)
+    setError(null)
+    try {
+      const found = await getPTCCase(requested)
+      setCaseId(found.case_id)
+      setData(null)
+      window.history.replaceState({}, '', `/ptc-cohort?case=${encodeURIComponent(found.case_id)}`)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '找不到指定病例')
+    } finally {
+      setAdvancedLoading(false)
+    }
+  }
+
   async function compare() {
     if (!caseId) return
     setLoading(true)
     setError(null)
     try {
-      setData(await getPTCSimilarCases(caseId, limit, minScore))
+      const result = await getPTCSimilarCases(caseId, limit, minScore)
+      setData(result)
+      window.history.replaceState({}, '', `/ptc-cohort?case=${encodeURIComponent(caseId)}`)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '无法比较病例')
+      setError(reason instanceof Error ? reason.message : '無法比較病例')
     } finally {
       setLoading(false)
     }
@@ -52,73 +77,102 @@ export default function PTCCohortPage() {
     navigate(`${path}?case=${encodeURIComponent(targetCaseId)}`)
   }
 
+  const recentContent = (
+    <div className="grid gap-4 p-4 md:grid-cols-2">
+      <label className="text-sm font-medium">篩選最近病例
+        <input aria-label="搜尋隊列病例" className="mt-1 w-full rounded border px-3 py-2" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="病例號、Stage、BRAF、RET…" />
+      </label>
+      <label className="text-sm font-medium">錨點病例
+        <select className="mt-1 w-full rounded border px-3 py-2" value={caseId} onChange={(event) => { setCaseId(event.target.value); setData(null) }}>
+          {filtered.map((item) => <option key={item.case_id} value={item.case_id}>{item.case_id} · {item.pathologic_stage || 'Stage —'}</option>)}
+        </select>
+      </label>
+    </div>
+  )
+
   return (
     <main className="mx-auto max-w-[1500px] px-4 py-8">
       <header className="mb-6">
-        <p className="text-sm font-semibold text-teal-600">PTC Explainable Cohort Explorer</p>
-        <h1 className="text-3xl font-bold">PTC 相似病例与 Outcome 队列比较</h1>
+        <p className="text-sm font-semibold text-teal-600">PTC Outcome-blind Cohort Explorer</p>
+        <h1 className="text-3xl font-bold">PTC 相似病例與 Outcome 隊列比較</h1>
         <p className="mt-2 max-w-5xl text-gray-600">
-          使用可解释规则比较去识别化公开研究病例。评分来自共同基因、蛋白变异、Stage、TNM、年龄与性别，不是预测模型。
+          使用可解釋規則比較去識別化公開研究病例。相似度只使用共同基因、蛋白變異、Stage、TNM、年齡與性別；生存狀態、追蹤時間、死亡時間與 Outcome 不參與排名，只在隊列選定後描述。
         </p>
       </header>
 
       {error && <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-red-700">{error}</div>}
 
-      <section className="grid gap-4 rounded-xl border bg-white p-5 shadow-sm md:grid-cols-2 xl:grid-cols-5">
-        <label className="text-sm font-medium xl:col-span-2">病例搜索
-          <input aria-label="搜索队列病例" className="mt-1 w-full rounded border px-3 py-2" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="病例号、Stage、BRAF、RET…" />
-        </label>
-        <label className="text-sm font-medium">锚点病例
-          <select className="mt-1 w-full rounded border px-3 py-2" value={caseId} onChange={(event) => { setCaseId(event.target.value); setData(null) }}>
-            {filtered.map((item) => <option key={item.case_id} value={item.case_id}>{item.case_id} · {item.pathologic_stage || 'Stage —'}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium">返回数量
+      <DualModeSelector
+        title="選擇錨點病例"
+        description="預設從資料庫最近 100 筆選擇；也可用完整 Case ID 精準查詢全資料庫。"
+        recentContent={recentContent}
+        advancedLabel="完整 Case ID"
+        advancedPlaceholder="例如 TCGA-XX-XXXX"
+        advancedValue={advancedCaseId}
+        onAdvancedValueChange={setAdvancedCaseId}
+        onAdvancedSubmit={selectAdvancedCase}
+        advancedLoading={advancedLoading}
+        advancedHelp="精準查詢只用來定位錨點病例；相似度計算仍使用相同的 outcome-blind 方法。"
+      />
+
+      <section className="mt-4 grid gap-4 rounded-xl border bg-white p-5 shadow-sm md:grid-cols-3">
+        <label className="text-sm font-medium">返回數量
           <input className="mt-1 w-full rounded border px-3 py-2" type="number" min={1} max={100} value={limit} onChange={(event) => setLimit(Number(event.target.value))} />
         </label>
-        <label className="text-sm font-medium">最低分数
+        <label className="text-sm font-medium">最低分數
           <input className="mt-1 w-full rounded border px-3 py-2" type="number" min={0} max={100} value={minScore} onChange={(event) => setMinScore(Number(event.target.value))} />
         </label>
-        <div className="md:col-span-2 xl:col-span-5">
-          <button className="rounded bg-teal-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50" disabled={!caseId || loading} onClick={() => void compare()}>{loading ? '比较中…' : '寻找相似病例'}</button>
+        <div className="flex items-end">
+          <button className="w-full rounded bg-teal-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50" disabled={!caseId || loading} onClick={() => void compare()}>{loading ? '比較中…' : '尋找相似病例'}</button>
         </div>
       </section>
 
       {data && (
         <div className="mt-6 space-y-5">
+          <section className="rounded-xl border border-teal-200 bg-teal-50 p-5 text-sm text-teal-950">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-bold">Outcome-blind 配對已啟用</h2>
+                <p className="mt-1">評分版本：{data.methodology.scoring_version} · 候選病例窗：{data.methodology.candidate_window}</p>
+              </div>
+              <span className="rounded-full bg-teal-700 px-3 py-1 text-xs font-bold text-white">Outcome 不參與排名</span>
+            </div>
+            <p className="mt-3"><strong>排除欄位：</strong>{data.methodology.outcome_fields_excluded.join(', ')}</p>
+          </section>
+
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Metric label="相似队列" value={String(data.cohort.size)} />
-            <Metric label="平均追踪天数" value={data.cohort.mean_follow_up_days?.toFixed(0) || '—'} />
-            <Metric label="锚点基因" value={data.anchor.genes.join(', ') || '—'} />
-            <Metric label="锚点 Stage" value={data.anchor.pathologic_stage || '—'} />
+            <Metric label="相似隊列" value={String(data.cohort.size)} />
+            <Metric label="平均追蹤天數（配對後）" value={data.cohort.mean_follow_up_days?.toFixed(0) || '—'} />
+            <Metric label="錨點基因" value={data.anchor.genes.join(', ') || '—'} />
+            <Metric label="錨點 Stage" value={data.anchor.pathologic_stage || '—'} />
           </section>
 
           <section className="grid gap-5 xl:grid-cols-3">
             <Distribution title="Stage 分布" values={data.cohort.stage_distribution} />
-            <Distribution title="Vital status 分布" values={data.cohort.vital_status_distribution} />
-            <section className="rounded-xl border bg-white p-5 shadow-sm"><h2 className="font-bold">队列常见基因</h2><div className="mt-3 space-y-2">{data.cohort.top_genes.map((item) => <div key={item.gene} className="flex justify-between rounded bg-slate-50 px-3 py-2 text-sm"><strong>{item.gene}</strong><span>{item.cases} cases</span></div>)}</div></section>
+            <Distribution title="Vital status 分布（配對後描述）" values={data.cohort.vital_status_distribution} />
+            <section className="rounded-xl border bg-white p-5 shadow-sm"><h2 className="font-bold">隊列常見基因</h2><div className="mt-3 space-y-2">{data.cohort.top_genes.map((item) => <div key={item.gene} className="flex justify-between rounded bg-slate-50 px-3 py-2 text-sm"><strong>{item.gene}</strong><span>{item.cases} cases</span></div>)}</div></section>
           </section>
 
           <section className="rounded-xl border bg-white shadow-sm">
-            <div className="border-b px-5 py-4"><h2 className="text-xl font-bold">相似病例排名</h2><p className="text-sm text-gray-500">每笔结果均列出评分组成，方便核对为何被判为相似。</p></div>
+            <div className="border-b px-5 py-4"><h2 className="text-xl font-bold">相似病例排名</h2><p className="text-sm text-gray-500">每筆結果列出 outcome-blind 評分組成；Outcome 顯示不影響名次。</p></div>
             <div className="divide-y">
               {data.matches.map((item, index) => (
                 <article key={item.case_id} className="p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div><div className="text-xs text-gray-400">#{index + 1}</div><h3 className="text-lg font-bold">{item.case_id}</h3><p className="text-sm text-gray-500">{item.case_facts.pathologic_stage || 'Stage —'} · {item.case_facts.vital_status || 'Outcome —'}</p></div>
+                    <div><div className="text-xs text-gray-400">#{index + 1}</div><h3 className="text-lg font-bold">{item.case_id}</h3><p className="text-sm text-gray-500">{item.case_facts.pathologic_stage || 'Stage —'} · Outcome（排名後顯示）：{item.case_facts.vital_status || '—'}</p></div>
                     <div className="rounded-full bg-teal-100 px-4 py-2 text-lg font-bold text-teal-800">{item.score.toFixed(1)}</div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs">{Object.entries(item.components).map(([name, value]) => <span key={name} className="rounded bg-slate-100 px-2 py-1">{name}: {value.toFixed(1)}</span>)}</div>
-                  <p className="mt-3 text-sm"><strong>共同基因：</strong>{item.shared_genes.join(', ') || '无'}</p>
-                  <p className="mt-1 text-sm"><strong>共同蛋白变异：</strong>{item.shared_protein_variants.join(', ') || '无'}</p>
+                  <p className="mt-3 text-sm"><strong>共同基因：</strong>{item.shared_genes.join(', ') || '無'}</p>
+                  <p className="mt-1 text-sm"><strong>共同蛋白變異：</strong>{item.shared_protein_variants.join(', ') || '無'}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <button className="rounded border px-3 py-1.5 text-sm" onClick={() => openCase(item.case_id, '3d')}>打开 3D</button>
+                    <button className="rounded border px-3 py-1.5 text-sm" onClick={() => openCase(item.case_id, '3d')}>開啟 3D</button>
                     <button className="rounded border px-3 py-1.5 text-sm" onClick={() => openCase(item.case_id, 'assistant')}>研究助手</button>
-                    <button className="rounded border px-3 py-1.5 text-sm" onClick={() => openCase(item.case_id, 'report')}>研究报告</button>
+                    <button className="rounded border px-3 py-1.5 text-sm" onClick={() => openCase(item.case_id, 'report')}>研究報告</button>
                   </div>
                 </article>
               ))}
-              {data.matches.length === 0 && <div className="p-10 text-center text-gray-500">没有达到最低分数的病例。</div>}
+              {data.matches.length === 0 && <div className="p-10 text-center text-gray-500">沒有達到最低分數的病例。</div>}
             </div>
           </section>
 
