@@ -31,7 +31,7 @@ interface ParsedAtom {
 interface StructureSource {
   key: string
   label: string
-  url: string
+  urls: string[]
   alphafold: boolean
 }
 
@@ -65,7 +65,7 @@ function residueNumber(proteinChange?: string): number | null {
   return match ? Number(match[1]) : null
 }
 
-function parsePdb(text: string): ParsedAtom[] {
+export function parsePdb(text: string): ParsedAtom[] {
   const atoms: ParsedAtom[] = []
   for (const line of text.split(/\r?\n/)) {
     if (!line.startsWith('ATOM  ') && !line.startsWith('HETATM')) continue
@@ -108,10 +108,26 @@ function centerOfAtoms(atoms: ParsedAtom[]): { x: number; y: number; z: number }
   return { x: sum.x / atoms.length, y: sum.y / atoms.length, z: sum.z / atoms.length }
 }
 
+async function fetchFirstStructure(urls: string[], signal: AbortSignal): Promise<{ text: string; url: string }> {
+  const failures: string[] = []
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { signal })
+      if (response.ok) return { text: await response.text(), url }
+      failures.push(`${url} (HTTP ${response.status})`)
+    } catch (reason) {
+      if ((reason as Error)?.name === 'AbortError') throw reason
+      failures.push(`${url} (${reason instanceof Error ? reason.message : 'network error'})`)
+    }
+  }
+  throw new Error(`所有静态结构文件均无法下载：${failures.join('；')}`)
+}
+
 export default function PTCProtein3D({ structure, variants = [], loading }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const focusRef = useRef<(residue: number | null) => void>(() => undefined)
   const [sourceKey, setSourceKey] = useState('alphafold')
+  const [activeFileUrl, setActiveFileUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewerReady, setViewerReady] = useState(false)
   const [focusedResidue, setFocusedResidue] = useState<number | null>(null)
@@ -143,11 +159,11 @@ export default function PTCProtein3D({ structure, variants = [], loading }: Prop
   const sources = useMemo<StructureSource[]>(() => {
     if (!structure) return []
     return [
-      { key: 'alphafold', label: 'AlphaFold 全长预测', url: structure.pdb_url, alphafold: true },
+      { key: 'alphafold', label: 'AlphaFold 全长预测', urls: structure.pdb_urls, alphafold: true },
       ...structure.experimental_structures.map((item) => ({
         key: item.pdb_id,
         label: `PDB ${item.pdb_id}`,
-        url: item.pdb_url,
+        urls: [item.pdb_url],
         alphafold: false,
       })),
     ]
@@ -158,6 +174,7 @@ export default function PTCProtein3D({ structure, variants = [], loading }: Prop
   useEffect(() => {
     setSourceKey('alphafold')
     setFocusedResidue(null)
+    setActiveFileUrl(null)
     setError(null)
   }, [structure])
 
@@ -169,18 +186,17 @@ export default function PTCProtein3D({ structure, variants = [], loading }: Prop
     let cleanup = () => undefined
     setViewerReady(false)
     setError(null)
-    setDownloadProgress('下载结构坐标…')
+    setActiveFileUrl(null)
+    setDownloadProgress('下载静态结构坐标…')
 
     void Promise.all([
       loadThree(),
-      fetch(selectedSource.url, { signal: controller.signal }).then(async (response) => {
-        if (!response.ok) throw new Error(`结构文件下载失败：HTTP ${response.status}`)
-        return response.text()
-      }),
-    ]).then(([THREE, pdbText]) => {
+      fetchFirstStructure(selectedSource.urls, controller.signal),
+    ]).then(([THREE, structureFile]) => {
       if (disposed || !hostRef.current) return
-      const atoms = parsePdb(pdbText)
+      const atoms = parsePdb(structureFile.text)
       if (atoms.length === 0) throw new Error('结构文件中没有可显示的原子坐标')
+      setActiveFileUrl(structureFile.url)
       setDownloadProgress('')
       setAtomCount(atoms.length)
       setResidueCount(new Set(atoms.map((atom) => `${atom.chain}:${atom.residue}`)).size)
@@ -244,15 +260,13 @@ export default function PTCProtein3D({ structure, variants = [], loading }: Prop
         chainAtoms.sort((a, b) => a.residue - b.residue)
         const points = chainAtoms.map((atom) => new THREE.Vector3(atom.x, atom.y, atom.z))
         if (points.length > 1) {
-          const line = new THREE.Line(
+          model.add(new THREE.Line(
             new THREE.BufferGeometry().setFromPoints(points),
             new THREE.LineBasicMaterial({ color: selectedSource.alphafold ? 0xe2e8f0 : 0x67e8f9, transparent: true, opacity: 0.72 }),
-          )
-          model.add(line)
+          ))
         }
       })
 
-      const overallCenter = centerOfAtoms(centered)
       const focusResidue = (residue: number | null) => {
         const targets = residue === null ? centered : centered.filter((atom) => atom.residue === residue)
         if (targets.length === 0) {
@@ -331,7 +345,7 @@ export default function PTCProtein3D({ structure, variants = [], loading }: Prop
         host.replaceChildren()
       }
     }).catch((reason) => {
-      if (!disposed && reason?.name !== 'AbortError') {
+      if (!disposed && (reason as Error)?.name !== 'AbortError') {
         setDownloadProgress('')
         setError(reason instanceof Error ? reason.message : '无法载入蛋白质结构')
       }
@@ -404,7 +418,7 @@ export default function PTCProtein3D({ structure, variants = [], loading }: Prop
         <div className="border-t border-red-700 bg-red-950/70 p-4 text-sm text-red-100">
           {error}
           <div className="mt-2 flex flex-wrap gap-2">
-            <a className="rounded bg-slate-700 px-3 py-1.5" href={selectedSource?.url} target="_blank" rel="noreferrer">下载当前 PDB 文件</a>
+            {activeFileUrl && <a className="rounded bg-slate-700 px-3 py-1.5" href={activeFileUrl} target="_blank" rel="noreferrer">下载当前 PDB 文件</a>}
             <a className="rounded bg-cyan-700 px-3 py-1.5" href={structure.alphafold_entry_url} target="_blank" rel="noreferrer">查看 AlphaFold 来源页</a>
           </div>
         </div>
