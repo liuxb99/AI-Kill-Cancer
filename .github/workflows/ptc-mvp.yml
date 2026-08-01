@@ -15,6 +15,7 @@ on:
       - "migrations/versions/026_*.py"
       - "migrations/versions/027_*.py"
       - "migrations/versions/028_*.py"
+      - "migrations/versions/029_*.py"
       - "scripts/ptc_*.py"
       - "tests/backend/importers/**"
       - "tests/backend/services/test_ptc_*.py"
@@ -89,7 +90,7 @@ jobs:
             tests/backend/services/test_ptc_literature_service.py \
             tests/backend/services/test_ptc_completion_service.py \
             tests/backend/services/test_ptc_knowgraph_export.py
-      - name: Verify complete PTC schema
+      - name: Verify complete PTC schema and multi-gene evidence
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ptc_mvp
         run: |
@@ -100,7 +101,7 @@ jobs:
 
           async def main():
               engine = create_async_engine(os.environ["DATABASE_URL"])
-              async with engine.connect() as conn:
+              async with engine.begin() as conn:
                   rows = await conn.execute(text("""
                       SELECT table_name FROM information_schema.tables
                       WHERE table_schema='public' AND table_name LIKE 'domain_ptc_%'
@@ -116,6 +117,45 @@ jobs:
                       'domain_ptc_recommendation_snapshots',
                   }
                   assert expected.issubset(names), (names, expected)
+
+                  constraints = await conn.execute(text("""
+                      SELECT constraint_name
+                      FROM information_schema.table_constraints
+                      WHERE table_schema='public'
+                        AND table_name='domain_ptc_evidence_records'
+                        AND constraint_type='UNIQUE'
+                  """))
+                  unique_names = {row[0] for row in constraints}
+                  assert 'uq_ptc_evidence_source' not in unique_names, unique_names
+
+                  insert_sql = text("""
+                      INSERT INTO domain_ptc_evidence_records (
+                          id, evidence_key, source_name, source_record_id,
+                          title, evidence_type, gene_symbol, disease, payload,
+                          retrieved_at, created_at, updated_at
+                      ) VALUES (
+                          :id, :evidence_key, 'PubMed', 'PMID-PTC-CI',
+                          :title, 'publication', :gene, 'papillary_thyroid_carcinoma',
+                          CAST('{}' AS JSON), NOW(), NOW(), NOW()
+                      )
+                  """)
+                  await conn.execute(insert_sql, {
+                      'id': '00000000-0000-0000-0000-000000000291',
+                      'evidence_key': 'ci-pmid-braf',
+                      'title': 'BRAF assertion',
+                      'gene': 'BRAF',
+                  })
+                  await conn.execute(insert_sql, {
+                      'id': '00000000-0000-0000-0000-000000000292',
+                      'evidence_key': 'ci-pmid-ret',
+                      'title': 'RET assertion',
+                      'gene': 'RET',
+                  })
+                  count = await conn.scalar(text("""
+                      SELECT COUNT(*) FROM domain_ptc_evidence_records
+                      WHERE source_name='PubMed' AND source_record_id='PMID-PTC-CI'
+                  """))
+                  assert count == 2, count
               await engine.dispose()
           asyncio.run(main())
           PY
