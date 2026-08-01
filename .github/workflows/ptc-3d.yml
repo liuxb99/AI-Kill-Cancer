@@ -12,6 +12,7 @@ on:
       - "src/frontend/src/components/threeRuntime.ts"
       - "src/frontend/src/pages/PTC3DExplorerPage.tsx"
       - "src/frontend/src/test/PTC3DExplorerPage.test.tsx"
+      - "src/frontend/src/test/PTCProtein3D.test.tsx"
       - "src/frontend/src/App.tsx"
       - "tests/backend/api/test_ptc_visualization.py"
       - ".github/workflows/ptc-3d.yml"
@@ -52,6 +53,8 @@ jobs:
           cache-dependency-path: src/frontend/package-lock.json
       - run: npm ci
       - name: Run 3D explorer interaction tests
-        run: npm test -- --run src/test/PTC3DExplorerPage.test.tsx
+        run: |
+          npm test -- --run src/test/PTC3DExplorerPage.test.tsx
+          npm test -- --run src/test/PTCProtein3D.test.tsx
       - name: TypeScript and production build
         run: npm run build
