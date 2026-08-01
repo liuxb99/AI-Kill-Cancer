@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import PTCCell3D from '../components/PTCCell3D'
+import PTCLiteratureAssetsPanel from '../components/PTCLiteratureAssetsPanel'
 import PTCProtein3D from '../components/PTCProtein3D'
 import PTCTargetingPanel from '../components/PTCTargetingPanel'
 import {
@@ -138,7 +139,7 @@ export default function PTC3DExplorerPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">癌细胞、蛋白质与靶向治疗多尺度 3D</h1>
             <p className="mt-2 max-w-5xl text-gray-600">
-              从最近下载的 100 个 TCGA-THCA 公开研究病例进入癌细胞尺度，再深入到蛋白结构、突变残基、讯号路径、药物、证据与临床试验。
+              从最近下载的 100 个 TCGA-THCA 公开研究病例进入癌细胞尺度，再深入到蛋白结构、突变残基、讯号路径、药物、证据、临床试验以及 PMC 开放全文图表。
               癌细胞为依据病例突变资料生成的科学示意模型；蛋白结构由项目内建代码读取公开静态坐标并渲染。
             </p>
           </div>
@@ -228,10 +229,8 @@ export default function PTC3DExplorerPage() {
             <PTCProtein3D structure={protein} variants={selectedGeneVariants} loading={proteinLoading} />
           )}
 
-          <PTCTargetingPanel
-            gene={selectedGene}
-            proteinChange={selectedGeneVariants[0]?.protein_change}
-          />
+          <PTCTargetingPanel gene={selectedGene} proteinChange={selectedGeneVariants[0]?.protein_change} />
+          <PTCLiteratureAssetsPanel gene={selectedGene} />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-xl border bg-white p-5 shadow-sm">
@@ -249,7 +248,7 @@ export default function PTC3DExplorerPage() {
             <section className="rounded-xl border bg-amber-50 p-5 shadow-sm">
               <h3 className="font-bold text-amber-900">结构与治疗解释边界</h3>
               <p className="mt-2 text-sm leading-6 text-amber-900/80">
-                TCGA 提供的是去识别化病例、病理与分子变异，不包含患者癌细胞的完整显微／原子结构。细胞层是多尺度科学示意；蛋白层使用公开参考坐标。药物、证据与试验用于研究探索，不能直接作为诊断、处方或用药依据。
+                TCGA 提供的是去识别化病例、病理与分子变异，不包含患者癌细胞的完整显微／原子结构。细胞层是多尺度科学示意；蛋白层使用公开参考坐标。药物、文献图表、证据与试验用于研究探索，不能直接作为诊断、处方或用药依据。
               </p>
             </section>
           </div>
