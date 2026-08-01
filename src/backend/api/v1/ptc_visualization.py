@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -24,7 +25,6 @@ from src.backend.domain.ptc_research import PTCResearchCaseModel
 
 router = APIRouter(prefix="/ptc-visualization", tags=["ptc-visualization"])
 
-# Human UniProt accessions and representative experimental PDB entries.
 PROTEIN_CATALOG: dict[str, dict[str, Any]] = {
     "BRAF": {"uniprot": "P15056", "pdb_ids": ["1UWH", "4MNE"], "name": "B-Raf proto-oncogene kinase"},
     "RET": {"uniprot": "P07949", "pdb_ids": ["2IVU", "6NEC"], "name": "Proto-oncogene tyrosine-protein kinase receptor Ret"},
@@ -40,6 +40,10 @@ PROTEIN_CATALOG: dict[str, dict[str, Any]] = {
     "PIK3CA": {"uniprot": "P42336", "pdb_ids": ["4OVU", "7K6M"], "name": "PI3-kinase catalytic subunit alpha"},
     "EGFR": {"uniprot": "P00533", "pdb_ids": ["1M17", "5UG9"], "name": "Epidermal growth factor receptor"},
 }
+
+_ALPHAFOLD_CACHE: dict[str, tuple[float, dict[str, Any] | None]] = {}
+_ALPHAFOLD_SUCCESS_TTL_SECONDS = 6 * 60 * 60
+_ALPHAFOLD_FAILURE_TTL_SECONDS = 5 * 60
 
 
 def _case_payload(model: PTCResearchCaseModel) -> dict[str, Any]:
@@ -94,10 +98,7 @@ async def latest_cases(
 ) -> dict[str, Any]:
     result = await db.execute(
         select(PTCResearchCaseModel)
-        .options(
-            selectinload(PTCResearchCaseModel.variants),
-            selectinload(PTCResearchCaseModel.outcomes),
-        )
+        .options(selectinload(PTCResearchCaseModel.variants), selectinload(PTCResearchCaseModel.outcomes))
         .order_by(PTCResearchCaseModel.updated_at.desc(), PTCResearchCaseModel.case_id.desc())
         .limit(limit)
     )
@@ -106,18 +107,31 @@ async def latest_cases(
 
 
 def _fetch_alphafold_metadata(uniprot: str) -> dict[str, Any] | None:
+    now = time.monotonic()
+    cached = _ALPHAFOLD_CACHE.get(uniprot)
+    if cached:
+        cached_at, cached_value = cached
+        ttl = _ALPHAFOLD_SUCCESS_TTL_SECONDS if cached_value is not None else _ALPHAFOLD_FAILURE_TTL_SECONDS
+        if now - cached_at < ttl:
+            return cached_value
+
     request = Request(
         f"https://alphafold.ebi.ac.uk/api/prediction/{uniprot}",
         headers={"Accept": "application/json", "User-Agent": "AI-Kill-Cancer/PTC-3D"},
     )
+    value: dict[str, Any] | None = None
     try:
-        with urlopen(request, timeout=20) as response:  # nosec B310 - fixed official HTTPS endpoint
+        with urlopen(request, timeout=8) as response:  # nosec B310 - fixed official HTTPS endpoint
             payload = json.loads(response.read().decode("utf-8"))
+        if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+            value = payload[0]
+        elif isinstance(payload, dict):
+            value = payload
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
-        return None
-    if isinstance(payload, list) and payload:
-        return payload[0] if isinstance(payload[0], dict) else None
-    return payload if isinstance(payload, dict) else None
+        value = None
+
+    _ALPHAFOLD_CACHE[uniprot] = (now, value)
+    return value
 
 
 @router.get("/proteins/{gene}")
@@ -138,8 +152,6 @@ async def protein_structure(gene: str) -> dict[str, Any]:
         confidence_url = metadata.get("paeDocUrl") or metadata.get("pae_doc_url")
         entry_id = metadata.get("entryId") or metadata.get("entry_id")
 
-    # The API is preferred because file versions change. This fallback keeps the
-    # viewer useful during temporary API metadata outages.
     if not cif_url:
         cif_url = f"https://alphafold.ebi.ac.uk/files/AF-{entry['uniprot']}-F1-model_v4.cif"
 
@@ -163,10 +175,7 @@ async def protein_structure(gene: str) -> dict[str, Any]:
 async def protein_catalog() -> dict[str, Any]:
     return {
         "count": len(PROTEIN_CATALOG),
-        "proteins": [
-            {"gene": gene, **entry}
-            for gene, entry in sorted(PROTEIN_CATALOG.items())
-        ],
+        "proteins": [{"gene": gene, **entry} for gene, entry in sorted(PROTEIN_CATALOG.items())],
     }
 
 
