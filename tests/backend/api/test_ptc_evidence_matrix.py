@@ -1,7 +1,12 @@
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from src.backend.api.v1.ptc_evidence_matrix import get_case_evidence_matrix
+from src.backend.api.v1.ptc_evidence_matrix import (
+    OUTCOME_FIELDS_EXCLUDED,
+    SCORE_WEIGHTS,
+    SCORING_VERSION,
+    get_case_evidence_matrix,
+)
 from src.backend.database.models import Base
 from src.backend.domain.ptc_knowledge import (
     PTCClinicalTrialModel,
@@ -23,8 +28,7 @@ async def session():
     await engine.dispose()
 
 
-@pytest.mark.asyncio
-async def test_matrix_joins_variant_therapy_evidence_trial_and_cohort(session):
+async def seed_matrix(session):
     anchor = PTCResearchCaseModel(
         case_id="TCGA-MATRIX-001",
         source_dataset="TCGA-THCA",
@@ -70,6 +74,7 @@ async def test_matrix_joins_variant_therapy_evidence_trial_and_cohort(session):
         indications=["BRAF V600E"],
         source_name="openFDA",
         source_record_id="label-1",
+        source_url="https://open.fda.gov/label-1",
     )
     session.add(therapy)
     await session.flush()
@@ -107,15 +112,28 @@ async def test_matrix_joins_variant_therapy_evidence_trial_and_cohort(session):
             conditions=["Papillary Thyroid Carcinoma"],
             interventions=[{"name": "Dabrafenib"}],
             target_genes=["BRAF"],
+            source_name="ClinicalTrials.gov",
+            source_record_id="NCT-MATRIX-001",
             source_url="https://clinicaltrials.gov/study/NCT-MATRIX-001",
         )
     )
     await session.commit()
+    return comparison
+
+
+@pytest.mark.asyncio
+async def test_matrix_joins_sources_and_labels_completeness_score(session):
+    await seed_matrix(session)
 
     result = await get_case_evidence_matrix("TCGA-MATRIX-001", None, session)
 
     assert result["case_id"] == "TCGA-MATRIX-001"
-    assert result["summary"]["genes"] == 1
+    assert result["methodology"]["scoring_version"] == SCORING_VERSION
+    assert result["methodology"]["score_type"] == "data_linkage_completeness"
+    assert result["methodology"]["outcome_blind"] is True
+    assert result["methodology"]["outcome_fields_excluded"] == OUTCOME_FIELDS_EXCLUDED
+    assert sum(SCORE_WEIGHTS.values()) == 100.0
+
     row = result["rows"][0]
     assert row["gene"] == "BRAF"
     assert row["variants"][0]["protein_change"] == "p.V600E"
@@ -124,9 +142,31 @@ async def test_matrix_joins_variant_therapy_evidence_trial_and_cohort(session):
     assert row["evidence"][0]["tables"] == 1
     assert row["trials"][0]["active"] is True
     assert row["cohort"]["same_gene_cases"] == 1
+    assert row["cohort"]["excluded_from_score"] is True
+    assert row["score_type"] == "data_linkage_completeness"
+    assert "same_gene_cohort" not in row["score_components"]
+    assert "vital_status" not in row["score_components"]
     assert row["score"] > 60
     assert row["gaps"] == []
-    assert result["trace"][-1]["name"] == "score_and_rank_matrix"
+    assert result["trace"][-1]["name"] == "rank_by_completeness"
+
+
+@pytest.mark.asyncio
+async def test_cohort_outcome_changes_do_not_change_matrix_score(session):
+    comparison = await seed_matrix(session)
+    first = await get_case_evidence_matrix("TCGA-MATRIX-001", None, session)
+    first_score = first["rows"][0]["score"]
+
+    comparison.vital_status = "Dead"
+    comparison.days_to_death = 90
+    await session.commit()
+
+    second = await get_case_evidence_matrix("TCGA-MATRIX-001", None, session)
+    second_row = second["rows"][0]
+
+    assert second_row["score"] == first_score
+    assert second_row["score_components"] == first["rows"][0]["score_components"]
+    assert second_row["cohort"]["vital_status_distribution"] == {"Dead": 1}
 
 
 @pytest.mark.asyncio
