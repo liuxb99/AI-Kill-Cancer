@@ -182,7 +182,7 @@ jobs:
         run: |
           git clone https://x-access-token:${GH_TOKEN}@github.com/liuxb99/KnowGraphGo.git KnowGraphGo
           cd KnowGraphGo
-          git checkout 3680b24561960551100a3159cc0e7ea727d14954
+          git checkout b3ea3b1e19bd501100ddc8fbfa7cd5a1a18451da
       - name: Build and test KnowGraphGo PTC adapters
         working-directory: KnowGraphGo
         run: |
