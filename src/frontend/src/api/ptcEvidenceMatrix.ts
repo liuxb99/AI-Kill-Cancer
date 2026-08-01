@@ -1,9 +1,13 @@
+import { apiRequest, withQuery } from './client'
+
 export interface PTCEvidenceMatrixRow {
   gene: string
   variants: Array<{ variant_id: string; protein_change?: string; classification?: string }>
   protein_domain?: string
   pathway?: string
   score: number
+  score_type: 'data_linkage_completeness'
+  score_version: string
   score_components: Record<string, number>
   therapies: Array<{
     therapy_key: string
@@ -33,6 +37,8 @@ export interface PTCEvidenceMatrixRow {
     url?: string
   }>
   cohort: {
+    role: 'post_score_descriptive_only'
+    excluded_from_score: true
     same_gene_cases: number
     vital_status_distribution: Record<string, number>
     outcome_distribution: Record<string, number>
@@ -45,6 +51,15 @@ export interface PTCEvidenceMatrixResponse {
   case_id: string
   source_dataset: string
   pathologic_stage?: string
+  methodology: {
+    scoring_version: string
+    score_type: 'data_linkage_completeness'
+    maximum_score: number
+    weights: Record<string, number>
+    outcome_blind: boolean
+    outcome_fields_excluded: string[]
+    cohort_usage: 'post_score_descriptive_summary_only'
+  }
   rows: PTCEvidenceMatrixRow[]
   summary: {
     genes: number
@@ -58,15 +73,6 @@ export interface PTCEvidenceMatrixResponse {
   disclaimer: string
 }
 
-export async function getPTCEvidenceMatrix(caseId: string, gene?: string): Promise<PTCEvidenceMatrixResponse> {
-  const params = new URLSearchParams()
-  if (gene) params.set('gene', gene)
-  const suffix = params.toString() ? `?${params}` : ''
-  const path = `/api/v1/ptc-evidence-matrix/case/${encodeURIComponent(caseId)}${suffix}`
-  const response = await fetch(path)
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
-    throw new Error(body.detail || `Unable to load evidence matrix from ${path}`)
-  }
-  return response.json()
+export function getPTCEvidenceMatrix(caseId: string, gene?: string): Promise<PTCEvidenceMatrixResponse> {
+  return apiRequest(withQuery(`/ptc-evidence-matrix/case/${encodeURIComponent(caseId)}`, { gene }))
 }
