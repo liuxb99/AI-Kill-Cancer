@@ -11,16 +11,29 @@ import argparse
 import asyncio
 import json
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-from src.backend.database.models import Base
-from src.backend.domain.ptc_knowledge import PTCEvidenceRecordModel, PTCTherapyModel, PTCTherapyTargetModel
-from src.backend.domain.ptc_research import PTCOutcomeModel, PTCResearchCaseModel, PTCVariantModel
-from src.backend.services.ptc_integrated_service import PTCIntegratedService
-from src.backend.services.ptc_knowgraph_export import PTCKnowGraphExportService
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
+
+from src.backend.database.models import Base  # noqa: E402
+from src.backend.domain.ptc_knowledge import (  # noqa: E402
+    PTCEvidenceRecordModel,
+    PTCTherapyModel,
+    PTCTherapyTargetModel,
+)
+from src.backend.domain.ptc_research import (  # noqa: E402
+    PTCOutcomeModel,
+    PTCResearchCaseModel,
+    PTCVariantModel,
+)
+from src.backend.services.ptc_integrated_service import PTCIntegratedService  # noqa: E402
+from src.backend.services.ptc_knowgraph_export import PTCKnowGraphExportService  # noqa: E402
 
 
 async def build_graph_data() -> dict:
@@ -96,9 +109,9 @@ async def build_graph_data() -> dict:
     return graph_data
 
 
-def run_import(repo: Path, dsn: Path, payload: bytes) -> dict:
+def run_json(command: list[str], *, repo: Path, payload: bytes | None = None) -> dict:
     process = subprocess.run(
-        ["go", "run", "./cmd/ptcgraphdata", "-dsn", str(dsn)],
+        command,
         cwd=repo,
         input=payload,
         stdout=subprocess.PIPE,
@@ -106,8 +119,20 @@ def run_import(repo: Path, dsn: Path, payload: bytes) -> dict:
         check=False,
     )
     if process.returncode != 0:
-        raise RuntimeError(process.stderr.decode("utf-8", errors="replace"))
+        raise RuntimeError(
+            f"command failed ({process.returncode}): {' '.join(command)}\n"
+            f"stdout={process.stdout.decode('utf-8', errors='replace')}\n"
+            f"stderr={process.stderr.decode('utf-8', errors='replace')}"
+        )
     return json.loads(process.stdout)
+
+
+def run_import(repo: Path, dsn: Path, payload: bytes) -> dict:
+    return run_json(
+        ["go", "run", "./cmd/ptcgraphdata", "-dsn", str(dsn)],
+        repo=repo,
+        payload=payload,
+    )
 
 
 async def main() -> int:
@@ -124,19 +149,31 @@ async def main() -> int:
         dsn = Path(tmp) / "ptc-full.db"
         first = run_import(repo, dsn, payload)
         second = run_import(repo, dsn, payload)
+        nodes = run_json(
+            ["go", "run", "./cmd/knowgraph", "--dsn", str(dsn), "--json", "node", "list", "--ns", "ptc", "--limit", "10000"],
+            repo=repo,
+        )
+        relations = run_json(
+            ["go", "run", "./cmd/knowgraph", "--dsn", str(dsn), "--json", "edge", "list", "--ns", "ptc", "--limit", "10000"],
+            repo=repo,
+        )
 
-    assert first["entities_created"] == graph_data["metadata"]["entity_count"], first
-    assert first["relations_created"] == graph_data["metadata"]["relation_count"], first
+    expected_entities = graph_data["metadata"]["entity_count"]
+    expected_relations = graph_data["metadata"]["relation_count"]
+    node_count = int(nodes.get("count", len(nodes.get("nodes", []))))
+    relation_count = int(relations.get("count", len(relations.get("edges", []))))
+    assert first["entities_created"] == expected_entities, first
+    assert first["relations_created"] == expected_relations, first
     assert second["entities_created"] == 0, second
     assert second["relations_created"] == 0, second
-    assert second["entities_updated"] == graph_data["metadata"]["entity_count"], second
-    assert second["relations_updated"] == graph_data["metadata"]["relation_count"], second
+    assert node_count == expected_entities, (node_count, expected_entities)
+    assert relation_count == expected_relations, (relation_count, expected_relations)
     print(
         json.dumps(
             {
                 "status": "PASS",
-                "entities": graph_data["metadata"]["entity_count"],
-                "relations": graph_data["metadata"]["relation_count"],
+                "entities": node_count,
+                "relations": relation_count,
                 "first_import": first,
                 "replay": second,
             },
