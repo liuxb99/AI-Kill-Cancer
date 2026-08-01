@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || ''
+import { apiRequest, withQuery } from './client'
 
 export interface PTCCohortMatch {
   case_id: string
@@ -16,12 +16,7 @@ export interface PTCCohortMatch {
     days_to_last_follow_up?: number
     days_to_death?: number
     genes: string[]
-    variants: Array<{
-      variant_id: string
-      gene: string
-      protein_change?: string
-      classification?: string
-    }>
+    variants: Array<{ variant_id: string; gene: string; protein_change?: string; classification?: string }>
     outcomes: Array<{ type: string; value?: string }>
   }
 }
@@ -49,15 +44,9 @@ export interface PTCCohortResponse {
   disclaimer: string
 }
 
-export async function getPTCSimilarCases(
-  caseId: string,
-  limit = 20,
-  minScore = 0,
-): Promise<PTCCohortResponse> {
-  const params = new URLSearchParams({ limit: String(limit), min_score: String(minScore) })
-  const response = await fetch(
-    `${API_BASE}/api/v1/ptc-cohort/case/${encodeURIComponent(caseId)}/similar?${params.toString()}`,
-  )
-  if (!response.ok) throw new Error(`无法载入相似病例队列：HTTP ${response.status}`)
-  return response.json()
+export function getPTCSimilarCases(caseId: string, limit = 20, minScore = 0): Promise<PTCCohortResponse> {
+  return apiRequest(withQuery(`/ptc-cohort/case/${encodeURIComponent(caseId)}/similar`, {
+    limit,
+    min_score: minScore,
+  }))
 }
