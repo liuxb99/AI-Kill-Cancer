@@ -18,6 +18,7 @@ from src.backend.api.v1.ptc_knowledge import router as ptc_knowledge_router
 from src.backend.api.v1.ptc_literature import router as ptc_literature_router
 from src.backend.api.v1.ptc_readiness import router as ptc_readiness_router
 from src.backend.api.v1.ptc_research import router as ptc_research_router
+from src.backend.api.v1.ptc_visualization import router as ptc_visualization_router
 from src.backend.api.v1.ranking import router as ranking_router
 from src.backend.api.v1.reasoning import router as reasoning_router
 from src.backend.api.v1.recommendation import router as recommendation_router
@@ -60,3 +61,4 @@ router.include_router(ptc_integrated_router)
 router.include_router(ptc_literature_router)
 router.include_router(ptc_completion_router)
 router.include_router(ptc_readiness_router)
+router.include_router(ptc_visualization_router)
