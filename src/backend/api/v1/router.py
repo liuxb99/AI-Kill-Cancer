@@ -13,6 +13,7 @@ from src.backend.api.v1.evidence import router as evidence_router
 from src.backend.api.v1.knowledge import router as knowledge_router
 from src.backend.api.v1.patients import router as patients_router
 from src.backend.api.v1.ptc_assistant import router as ptc_assistant_router
+from src.backend.api.v1.ptc_cohort import router as ptc_cohort_router
 from src.backend.api.v1.ptc_completion import router as ptc_completion_router
 from src.backend.api.v1.ptc_integrated import router as ptc_integrated_router
 from src.backend.api.v1.ptc_knowledge import router as ptc_knowledge_router
@@ -68,3 +69,4 @@ router.include_router(ptc_visualization_router)
 router.include_router(ptc_targeting_router)
 router.include_router(ptc_assistant_router)
 router.include_router(ptc_reports_router)
+router.include_router(ptc_cohort_router)
