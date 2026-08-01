@@ -3,10 +3,12 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   getPTCCompleteGraph,
   getPTCOutcomesByGene,
+  getPTCReadiness,
   getPTCSourceStatus,
   syncPTCCompletePipeline,
   type PTCCompleteGraph,
   type PTCOutcomeByGene,
+  type PTCReadinessResult,
   type PTCSourceStatus,
   type PTCSyncResult,
 } from '../api/ptcCompletion'
@@ -18,6 +20,7 @@ const DEFAULT_DRUGS = [
 
 export default function PTCCommandCenterPage() {
   const [status, setStatus] = useState<PTCSourceStatus | null>(null)
+  const [readiness, setReadiness] = useState<PTCReadinessResult | null>(null)
   const [outcomes, setOutcomes] = useState<PTCOutcomeByGene[]>([])
   const [graph, setGraph] = useState<PTCCompleteGraph | null>(null)
   const [syncResult, setSyncResult] = useState<PTCSyncResult | null>(null)
@@ -35,12 +38,14 @@ export default function PTCCommandCenterPage() {
     setLoading(true)
     setError(null)
     try {
-      const [sourceStatus, outcomeRows, graphSnapshot] = await Promise.all([
+      const [sourceStatus, readinessResult, outcomeRows, graphSnapshot] = await Promise.all([
         getPTCSourceStatus(),
+        getPTCReadiness(),
         getPTCOutcomesByGene(),
         getPTCCompleteGraph(500),
       ])
       setStatus(sourceStatus)
+      setReadiness(readinessResult)
       setOutcomes(outcomeRows)
       setGraph(graphSnapshot)
     } catch (err) {
@@ -92,7 +97,30 @@ export default function PTCCommandCenterPage() {
 
       {error && <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-red-700">{error}</div>}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section className={`rounded-lg border p-5 shadow-sm ${readiness?.demo_ready ? 'border-emerald-300 bg-emerald-50' : 'border-amber-300 bg-amber-50'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Objective Readiness Gate</p>
+            <h2 className="text-xl font-bold">{readiness?.demo_ready ? 'PTC Demo 已可使用' : 'PTC Demo 尚未就緒'}</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              研究資料規模：{readiness?.research_ready ? '已達門檻' : '尚未達門檻'}；圖譜懸空關係：{readiness?.graph.dangling_edge_count ?? 0}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Badge ok={Boolean(readiness?.demo_ready)} label="Demo" />
+            <Badge ok={Boolean(readiness?.research_ready)} label="Research" />
+          </div>
+        </div>
+        {!!readiness?.blockers.length && (
+          <div className="mt-3 text-sm text-amber-800">目前阻塞：{readiness.blockers.join('、')}</div>
+        )}
+        {!readiness?.blockers.length && !!readiness?.research_gaps.length && (
+          <div className="mt-3 text-sm text-gray-600">下一步擴充：{readiness.research_gaps.join('、')}</div>
+        )}
+        <p className="mt-2 text-xs text-gray-500">{readiness?.disclaimer}</p>
+      </section>
+
+      <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Metric label="病例" value={status?.cases} />
         <Metric label="變異" value={status?.variants} />
         <Metric label="藥物" value={status?.therapies} />
@@ -192,6 +220,10 @@ export default function PTCCommandCenterPage() {
       </section>
     </main>
   )
+}
+
+function Badge({ ok, label }: { ok: boolean; label: string }) {
+  return <span className={`rounded-full px-3 py-1 text-xs font-semibold ${ok ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-900'}`}>{label}: {ok ? 'READY' : 'NOT READY'}</span>
 }
 
 function Metric({ label, value }: { label: string; value?: number }) {
