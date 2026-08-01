@@ -30,6 +30,13 @@ export interface PTCCohortResponse {
     genes: string[]
     protein_variants: string[]
   }
+  methodology: {
+    scoring_version: string
+    outcome_blind: boolean
+    outcome_fields_excluded: string[]
+    outcome_usage: 'post_match_descriptive_summary_only'
+    candidate_window: number
+  }
   weights: Record<string, number>
   matches: PTCCohortMatch[]
   cohort: {
@@ -39,6 +46,7 @@ export interface PTCCohortResponse {
     top_genes: Array<{ gene: string; cases: number }>
     outcome_distribution: Record<string, number>
     mean_follow_up_days?: number
+    outcomes_used_for_ranking: boolean
   }
   trace: Array<{ step: number; name: string; records: number }>
   disclaimer: string
