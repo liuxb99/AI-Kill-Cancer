@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import PTCCell3D from '../components/PTCCell3D'
 import PTCLiteratureAssetsPanel from '../components/PTCLiteratureAssetsPanel'
@@ -11,7 +11,14 @@ import {
   type PTCProteinStructure,
 } from '../api/ptcVisualization'
 
-function updateExplorerUrl(caseId?: string, gene?: string, view?: 'cell' | 'protein') {
+type ExplorerView = 'cell' | 'protein' | 'targeting' | 'literature'
+
+function parseExplorerView(value: string | null): ExplorerView {
+  if (value === 'protein' || value === 'targeting' || value === 'literature') return value
+  return 'cell'
+}
+
+function updateExplorerUrl(caseId?: string, gene?: string, view?: ExplorerView) {
   const url = new URL(window.location.href)
   if (caseId) url.searchParams.set('case', caseId)
   else url.searchParams.delete('case')
@@ -27,12 +34,14 @@ export default function PTC3DExplorerPage() {
   const [selectedCase, setSelectedCase] = useState<PTCLatestCase | null>(null)
   const [selectedGene, setSelectedGene] = useState<string | null>(null)
   const [protein, setProtein] = useState<PTCProteinStructure | null>(null)
-  const [view, setView] = useState<'cell' | 'protein'>('cell')
+  const [view, setView] = useState<ExplorerView>('cell')
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [proteinLoading, setProteinLoading] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const targetingRef = useRef<HTMLDivElement>(null)
+  const literatureRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function load() {
@@ -44,30 +53,37 @@ export default function PTC3DExplorerPage() {
         const params = new URLSearchParams(window.location.search)
         const caseId = params.get('case')
         const requestedGene = params.get('gene')?.toUpperCase() || null
-        const requestedView = params.get('view') === 'protein' ? 'protein' : 'cell'
+        const requestedView = parseExplorerView(params.get('view'))
         const initialCase = result.cases.find((item) => item.case_id === caseId) || result.cases[0] || null
         setSelectedCase(initialCase)
+        setSelectedGene(requestedGene)
         setView(requestedView)
-        if (initialCase && requestedGene) {
-          setSelectedGene(requestedGene)
+
+        if (initialCase && requestedGene && requestedView === 'protein') {
           setProteinLoading(true)
           try {
             setProtein(await getPTCProteinStructure(requestedGene))
-          } catch {
+          } catch (reason) {
             setProtein(null)
-            setView('cell')
+            setError(reason instanceof Error ? reason.message : `${requestedGene} 尚無可用結構映射`)
           } finally {
             setProteinLoading(false)
           }
         }
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : '无法载入最近 100 个 PTC 病例')
+        setError(reason instanceof Error ? reason.message : '無法載入最近 100 個 PTC 病例')
       } finally {
         setLoading(false)
       }
     }
     void load()
   }, [])
+
+  useEffect(() => {
+    if (loading) return
+    if (view === 'targeting') targetingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (view === 'literature') literatureRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [view, loading, selectedGene])
 
   const genes = useMemo(
     () => Array.from(new Set((selectedCase?.variants || []).map((item) => item.gene.toUpperCase()))).sort(),
@@ -91,18 +107,20 @@ export default function PTC3DExplorerPage() {
     })
   }, [cases, query])
 
-  async function selectGene(gene: string) {
+  async function selectGene(gene: string, nextView: ExplorerView = 'protein') {
     const normalized = gene.toUpperCase()
     setSelectedGene(normalized)
-    setProteinLoading(true)
     setError(null)
-    setView('protein')
-    updateExplorerUrl(selectedCase?.case_id, normalized, 'protein')
+    setView(nextView)
+    updateExplorerUrl(selectedCase?.case_id, normalized, nextView)
+
+    if (nextView !== 'protein') return
+    setProteinLoading(true)
     try {
       setProtein(await getPTCProteinStructure(normalized))
     } catch (reason) {
       setProtein(null)
-      setError(reason instanceof Error ? reason.message : `${normalized} 尚无可用结构映射`)
+      setError(reason instanceof Error ? reason.message : `${normalized} 尚無可用結構映射`)
     } finally {
       setProteinLoading(false)
     }
@@ -116,9 +134,24 @@ export default function PTC3DExplorerPage() {
     updateExplorerUrl(item.case_id, undefined, 'cell')
   }
 
-  function switchView(next: 'cell' | 'protein') {
+  async function switchView(next: ExplorerView) {
+    const gene = next === 'cell' ? undefined : selectedGene || genes[0]
+    if (gene && gene !== selectedGene) setSelectedGene(gene)
     setView(next)
-    updateExplorerUrl(selectedCase?.case_id, next === 'protein' ? selectedGene || undefined : undefined, next)
+    updateExplorerUrl(selectedCase?.case_id, gene, next)
+
+    if (next === 'protein' && gene) {
+      setProteinLoading(true)
+      setError(null)
+      try {
+        setProtein(await getPTCProteinStructure(gene))
+      } catch (reason) {
+        setProtein(null)
+        setError(reason instanceof Error ? reason.message : `${gene} 尚無可用結構映射`)
+      } finally {
+        setProteinLoading(false)
+      }
+    }
   }
 
   async function copyLink() {
@@ -127,7 +160,7 @@ export default function PTC3DExplorerPage() {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1600)
     } catch {
-      setError('浏览器不允许复制链接，请从地址栏手动复制。')
+      setError('瀏覽器不允許複製連結，請從網址列手動複製。')
     }
   }
 
@@ -137,14 +170,13 @@ export default function PTC3DExplorerPage() {
         <p className="text-sm font-semibold text-cyan-600">PTC Multi-scale 3D Explorer</p>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">癌细胞、蛋白质与靶向治疗多尺度 3D</h1>
+            <h1 className="text-3xl font-bold text-gray-900">癌細胞、蛋白質與靶向治療多尺度 3D</h1>
             <p className="mt-2 max-w-5xl text-gray-600">
-              从最近下载的 100 个 TCGA-THCA 公开研究病例进入癌细胞尺度，再深入到蛋白结构、突变残基、讯号路径、药物、证据、临床试验以及 PMC 开放全文图表。
-              癌细胞为依据病例突变资料生成的科学示意模型；蛋白结构由项目内建代码读取公开静态坐标并渲染。
+              從最近 100 個 TCGA-THCA 公開研究病例進入癌細胞尺度，再深入蛋白結構、突變殘基、訊號路徑、藥物、證據、臨床試驗與 PMC 開放全文圖表。
             </p>
           </div>
           <button className="rounded border border-cyan-300 bg-white px-4 py-2 text-sm font-semibold text-cyan-700 hover:bg-cyan-50" onClick={() => void copyLink()}>
-            {copied ? '链接已复制' : '复制当前 3D 视图链接'}
+            {copied ? '連結已複製' : '複製目前視圖連結'}
           </button>
         </div>
       </section>
@@ -154,19 +186,19 @@ export default function PTC3DExplorerPage() {
       <div className="grid gap-5 xl:grid-cols-[350px_1fr]">
         <aside className="overflow-hidden rounded-xl border bg-white shadow-sm">
           <div className="border-b bg-slate-900 px-4 py-3 text-white">
-            <div className="font-bold">最近下载病例</div>
-            <div className="text-xs text-slate-300">按入库更新时间排序 · 最多 100 例</div>
+            <div className="font-bold">最近 100 個病例</div>
+            <div className="text-xs text-slate-300">依入庫更新時間排序</div>
             <input
-              aria-label="搜索最近 PTC 病例"
+              aria-label="搜尋最近 PTC 病例"
               className="mt-3 w-full rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-400"
-              placeholder="病例号、Stage、BRAF、RET…"
+              placeholder="病例號、Stage、BRAF、RET…"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <div className="mt-2 text-[11px] text-slate-400">显示 {filteredCases.length} / {cases.length} 例</div>
+            <div className="mt-2 text-[11px] text-slate-400">顯示 {filteredCases.length} / {cases.length} 例</div>
           </div>
           <div className="max-h-[860px] overflow-y-auto">
-            {loading && <div className="p-8 text-center text-gray-500">载入中…</div>}
+            {loading && <div className="p-8 text-center text-gray-500">載入中…</div>}
             {!loading && filteredCases.map((item) => {
               const originalIndex = cases.findIndex((candidate) => candidate.case_id === item.case_id)
               return (
@@ -180,13 +212,10 @@ export default function PTC3DExplorerPage() {
                     <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{item.variants.length} variants</span>
                   </div>
                   <div className="mt-1 text-xs text-gray-500">{item.pathologic_stage || 'Stage 未提供'} · {item.vital_status || 'Outcome 未提供'}</div>
-                  <div className="mt-1 truncate text-[11px] text-gray-400">{item.updated_at ? `更新 ${new Date(item.updated_at).toLocaleString()}` : item.source_dataset}</div>
                 </button>
               )
             })}
-            {!loading && filteredCases.length === 0 && (
-              <div className="p-8 text-center text-gray-500">{cases.length === 0 ? '尚未下载病例，请先在 PTC 总控台执行同步。' : '没有符合搜索条件的病例。'}</div>
-            )}
+            {!loading && filteredCases.length === 0 && <div className="p-8 text-center text-gray-500">資料庫目前沒有符合條件的病例。</div>}
           </div>
         </aside>
 
@@ -194,61 +223,64 @@ export default function PTC3DExplorerPage() {
           <div className="rounded-xl border bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold">{selectedCase?.case_id || '请选择病例'}</h2>
+                <h2 className="text-2xl font-bold">{selectedCase?.case_id || '請選擇病例'}</h2>
                 <p className="text-sm text-gray-500">{selectedCase?.source_dataset || 'TCGA-THCA'}</p>
               </div>
-              <div className="flex gap-2">
-                <button className={`rounded px-4 py-2 text-sm font-semibold ${view === 'cell' ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-700'}`} onClick={() => switchView('cell')}>癌细胞 3D</button>
-                <button className={`rounded px-4 py-2 text-sm font-semibold ${view === 'protein' ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-700'}`} onClick={() => switchView('protein')}>蛋白折叠 3D</button>
+              <div className="flex flex-wrap gap-2">
+                <ViewButton active={view === 'cell'} onClick={() => void switchView('cell')}>癌細胞 3D</ViewButton>
+                <ViewButton active={view === 'protein'} onClick={() => void switchView('protein')}>蛋白折疊 3D</ViewButton>
+                <ViewButton active={view === 'targeting'} onClick={() => void switchView('targeting')}>靶向鏈</ViewButton>
+                <ViewButton active={view === 'literature'} onClick={() => void switchView('literature')}>文獻圖表</ViewButton>
               </div>
             </div>
             <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
               <Info label="病理分期" value={selectedCase?.pathologic_stage} />
               <Info label="TNM" value={[selectedCase?.t_status, selectedCase?.n_status, selectedCase?.m_status].filter(Boolean).join(' / ')} />
-              <Info label="性别" value={selectedCase?.sex} />
-              <Info label="年龄区间" value={selectedCase?.age_range} />
-              <Info label="生存状态" value={selectedCase?.vital_status} />
+              <Info label="性別" value={selectedCase?.sex} />
+              <Info label="年齡區間" value={selectedCase?.age_range} />
+              <Info label="生存狀態" value={selectedCase?.vital_status} />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {genes.map((gene) => (
                 <button
                   key={gene}
                   className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${selectedGene === gene ? 'border-violet-500 bg-violet-100 text-violet-800' : 'border-gray-200 bg-white text-gray-700 hover:border-violet-300 hover:bg-violet-50'}`}
-                  onClick={() => void selectGene(gene)}
+                  onClick={() => void selectGene(gene, view === 'cell' ? 'protein' : view)}
                 >
-                  {gene} 结构与靶向链
+                  {gene}
                 </button>
               ))}
-              {selectedCase && genes.length === 0 && <span className="text-sm text-gray-500">该病例尚无已导入基因变异。</span>}
+              {selectedCase && genes.length === 0 && <span className="text-sm text-gray-500">此病例尚無已匯入基因變異。</span>}
             </div>
           </div>
 
-          {view === 'cell' ? (
-            <PTCCell3D selectedCase={selectedCase} onSelectGene={(gene) => void selectGene(gene)} />
-          ) : (
-            <PTCProtein3D structure={protein} variants={selectedGeneVariants} loading={proteinLoading} />
-          )}
+          {view === 'cell' && <PTCCell3D selectedCase={selectedCase} onSelectGene={(gene) => void selectGene(gene)} />}
+          {view === 'protein' && <PTCProtein3D structure={protein} variants={selectedGeneVariants} loading={proteinLoading} />}
 
-          <PTCTargetingPanel gene={selectedGene} proteinChange={selectedGeneVariants[0]?.protein_change} />
-          <PTCLiteratureAssetsPanel gene={selectedGene} />
+          <div ref={targetingRef} className={`scroll-mt-5 rounded-xl ${view === 'targeting' ? 'ring-2 ring-indigo-400 ring-offset-2' : ''}`}>
+            <PTCTargetingPanel gene={selectedGene} proteinChange={selectedGeneVariants[0]?.protein_change} />
+          </div>
+          <div ref={literatureRef} className={`scroll-mt-5 rounded-xl ${view === 'literature' ? 'ring-2 ring-emerald-400 ring-offset-2' : ''}`}>
+            <PTCLiteratureAssetsPanel gene={selectedGene} />
+          </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-xl border bg-white p-5 shadow-sm">
-              <h3 className="font-bold">病例变异明细</h3>
+              <h3 className="font-bold">病例變異明細</h3>
               <div className="mt-3 max-h-80 overflow-auto">
                 {(selectedCase?.variants || []).map((variant) => (
                   <button key={variant.variant_id} className="flex w-full items-center justify-between gap-3 border-b py-2 text-left text-sm hover:bg-gray-50" onClick={() => void selectGene(variant.gene)}>
                     <span><strong>{variant.gene}</strong> · {variant.protein_change || variant.variant_id}</span>
-                    <span className="text-xs text-gray-500">{variant.classification || '未分类'}</span>
+                    <span className="text-xs text-gray-500">{variant.classification || '未分類'}</span>
                   </button>
                 ))}
-                {!selectedCase?.variants.length && <div className="py-6 text-sm text-gray-500">尚无变异资料。</div>}
+                {!selectedCase?.variants.length && <div className="py-6 text-sm text-gray-500">尚無變異資料。</div>}
               </div>
             </section>
             <section className="rounded-xl border bg-amber-50 p-5 shadow-sm">
-              <h3 className="font-bold text-amber-900">结构与治疗解释边界</h3>
+              <h3 className="font-bold text-amber-900">結構與治療解釋邊界</h3>
               <p className="mt-2 text-sm leading-6 text-amber-900/80">
-                TCGA 提供的是去识别化病例、病理与分子变异，不包含患者癌细胞的完整显微／原子结构。细胞层是多尺度科学示意；蛋白层使用公开参考坐标。药物、文献图表、证据与试验用于研究探索，不能直接作为诊断、处方或用药依据。
+                TCGA 提供去識別化病例、病理與分子變異，不包含患者癌細胞的完整顯微或原子結構。細胞層為科學示意，蛋白層使用公開參考座標；藥物、證據與試驗僅供研究探索。
               </p>
             </section>
           </div>
@@ -256,6 +288,10 @@ export default function PTC3DExplorerPage() {
       </div>
     </main>
   )
+}
+
+function ViewButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button className={`rounded px-4 py-2 text-sm font-semibold ${active ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`} onClick={onClick}>{children}</button>
 }
 
 function Info({ label, value }: { label: string; value?: string | null }) {
