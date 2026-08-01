@@ -2,7 +2,7 @@ import '@testing-library/jest-dom'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import PTCProtein3D from '../components/PTCProtein3D'
+import PTCProtein3D, { parsePdb } from '../components/PTCProtein3D'
 
 vi.mock('../components/threeRuntime', () => ({
   loadThree: vi.fn(() => new Promise(() => undefined)),
@@ -13,9 +13,17 @@ const structure = {
   name: 'B-Raf proto-oncogene kinase',
   uniprot: 'P15056',
   alphafold_entry_id: 'AF-P15056-F1',
-  alphafold_entry_url: 'https://alphafold.ebi.ac.uk/entry/P15056',
-  cif_url: 'https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v4.cif',
-  pdb_url: 'https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v4.pdb',
+  alphafold_entry_url: 'https://alphafold.com/entry/AF-P15056-F1',
+  cif_url: 'https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v6.cif',
+  cif_urls: [
+    'https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v6.cif',
+    'https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v4.cif',
+  ],
+  pdb_url: 'https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v6.pdb',
+  pdb_urls: [
+    'https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v6.pdb',
+    'https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v4.pdb',
+  ],
   experimental_structures: [
     {
       pdb_id: '1UWH',
@@ -36,6 +44,17 @@ beforeEach(() => {
 })
 
 describe('PTCProtein3D built-in renderer', () => {
+  it('parses PDB atom coordinates with internal code', () => {
+    const pdb = [
+      'ATOM      1  N   VAL A 600      10.000  11.000  12.000  1.00 95.00           N  ',
+      'ATOM      2  CA  VAL A 600      11.000  12.000  13.000  1.00 95.00           C  ',
+    ].join('\n')
+
+    const atoms = parsePdb(pdb)
+    expect(atoms).toHaveLength(2)
+    expect(atoms[1]).toEqual(expect.objectContaining({ atomName: 'CA', residue: 600, element: 'C', confidence: 95 }))
+  })
+
   it('shows the internal renderer and case mutation residue without Molstar', () => {
     render(
       <PTCProtein3D
@@ -50,11 +69,11 @@ describe('PTCProtein3D built-in renderer', () => {
     expect((window as any).PDBeMolstarPlugin).toBeUndefined()
   })
 
-  it('uses deterministic static AlphaFold and RCSB files', () => {
+  it('starts with deterministic AlphaFold v6 and exposes experimental PDB', () => {
     render(<PTCProtein3D structure={structure} variants={[]} />)
 
     expect(fetch).toHaveBeenCalledWith(
-      'https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v4.pdb',
+      'https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v6.pdb',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
 
