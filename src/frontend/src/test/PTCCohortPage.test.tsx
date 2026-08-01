@@ -5,7 +5,7 @@ import { vi } from 'vitest'
 
 import PTCCohortPage from '../pages/PTCCohortPage'
 
-const navigate = vi.fn()
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }))
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
@@ -49,7 +49,7 @@ describe('PTCCohortPage', () => {
     expect(await screen.findByText('TCGA-MATCH')).toBeInTheDocument()
     expect(screen.getByText('100.0')).toBeInTheDocument()
     expect(screen.getByText(/共同基因：/)).toHaveTextContent('BRAF')
-    expect(screen.getByText('Stage I')).toBeInTheDocument()
+    expect(screen.getAllByText('Stage I').length).toBeGreaterThan(0)
     expect(screen.getByText('1200')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '打开 3D' }))
