@@ -1,12 +1,26 @@
 import type { PTCResearchCase } from './ptcResearch'
 
-const API_BASE = import.meta.env.VITE_API_URL || ''
+/**
+ * PTC pages are served by the same Vercel deployment as the API proxy.
+ * Always use a same-origin relative URL here. A malformed VITE_API_URL (for
+ * example a quoted value or a value containing whitespace) makes iOS Safari
+ * throw `The string did not match the expected pattern.` before fetch starts.
+ */
+const API_PREFIX = '/api/v1'
 
 async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}/api/v1${path}`)
+  const url = `${API_PREFIX}${path.startsWith('/') ? path : `/${path}`}`
+  let response: Response
+  try {
+    response = await fetch(url)
+  } catch (reason) {
+    const message = reason instanceof Error ? reason.message : String(reason)
+    throw new Error(`PTC API request failed (${url}): ${message}`)
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
-    throw new Error(body.detail || `HTTP ${response.status}`)
+    const detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail || body)
+    throw new Error(detail || `HTTP ${response.status}`)
   }
   return response.json()
 }
