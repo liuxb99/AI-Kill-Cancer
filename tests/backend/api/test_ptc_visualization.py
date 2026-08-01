@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timedelta
 
 import pytest
@@ -55,55 +54,23 @@ async def test_latest_cases_are_sorted_by_update_time(session):
 
 
 @pytest.mark.asyncio
-async def test_protein_structure_returns_alphafold_and_pdb(monkeypatch):
-    monkeypatch.setattr(
-        ptc_visualization,
-        "_fetch_alphafold_metadata",
-        lambda accession: {
-            "entryId": f"AF-{accession}-F1",
-            "cifUrl": f"https://example.test/{accession}.cif",
-            "pdbUrl": f"https://example.test/{accession}.pdb",
-            "paeDocUrl": f"https://example.test/{accession}.json",
-        },
-    )
-
+async def test_protein_structure_uses_static_files_and_builtin_renderer():
     result = await ptc_visualization.protein_structure("braf")
 
     assert result["gene"] == "BRAF"
     assert result["uniprot"] == "P15056"
-    assert result["cif_url"].endswith("P15056.cif")
+    assert result["pdb_url"] == "https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v4.pdb"
+    assert result["cif_url"] == "https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v4.cif"
+    assert result["renderer"] == "builtin-threejs-pdb"
+    assert result["uses_alphafold_api"] is False
     assert result["default_pdb_id"] == "1UWH"
+    assert result["experimental_structures"][0]["pdb_url"].endswith("/1UWH.pdb")
     assert "4MNE" in result["experimental_pdb_ids"]
 
 
-def test_alphafold_metadata_is_cached(monkeypatch):
-    calls = 0
-    payload = [{"entryId": "AF-P15056-F1", "cifUrl": "https://example.test/P15056.cif"}]
-
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, traceback):
-            return False
-
-        def read(self):
-            return json.dumps(payload).encode("utf-8")
-
-    def fake_urlopen(request, timeout):
-        nonlocal calls
-        calls += 1
-        assert timeout == 8
-        return FakeResponse()
-
-    ptc_visualization._ALPHAFOLD_CACHE.clear()
-    monkeypatch.setattr(ptc_visualization, "urlopen", fake_urlopen)
-
-    first = ptc_visualization._fetch_alphafold_metadata("P15056")
-    second = ptc_visualization._fetch_alphafold_metadata("P15056")
-
-    assert first == second
-    assert calls == 1
+def test_visualization_module_has_no_alphafold_api_client():
+    assert not hasattr(ptc_visualization, "_fetch_alphafold_metadata")
+    assert not hasattr(ptc_visualization, "_ALPHAFOLD_CACHE")
 
 
 @pytest.mark.asyncio
