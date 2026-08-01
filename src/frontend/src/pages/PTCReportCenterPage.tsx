@@ -12,7 +12,6 @@ export default function PTCReportCenterPage() {
   const [cases, setCases] = useState<PTCLatestCase[]>([])
   const [selectedCaseId, setSelectedCaseId] = useState('')
   const [gene, setGene] = useState('')
-  const [question, setQuestion] = useState('')
   const [report, setReport] = useState<PTCResearchReport | null>(null)
   const [loadingCases, setLoadingCases] = useState(true)
   const [loadingReport, setLoadingReport] = useState(false)
@@ -22,8 +21,15 @@ export default function PTCReportCenterPage() {
     void getLatestPTCCases(100)
       .then((result) => {
         setCases(result.cases)
-        const first = result.cases[0]
-        if (first) setSelectedCaseId(first.case_id)
+        const params = new URLSearchParams(window.location.search)
+        const requestedCase = params.get('case')
+        const requestedGene = params.get('gene')?.toUpperCase() || ''
+        const initial = result.cases.find((item) => item.case_id === requestedCase) || result.cases[0]
+        if (initial) {
+          setSelectedCaseId(initial.case_id)
+          const availableGenes = Array.from(new Set(initial.variants.map((item) => item.gene.toUpperCase()))).sort()
+          setGene(availableGenes.includes(requestedGene) ? requestedGene : availableGenes[0] || '')
+        }
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : '无法载入病例'))
       .finally(() => setLoadingCases(false))
@@ -48,7 +54,7 @@ export default function PTCReportCenterPage() {
     setLoadingReport(true)
     setError(null)
     try {
-      setReport(await getPTCResearchReport(selectedCaseId, gene || undefined, question || undefined))
+      setReport(await getPTCResearchReport(selectedCaseId, gene || undefined, undefined))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '无法生成报告')
     } finally {
@@ -58,7 +64,7 @@ export default function PTCReportCenterPage() {
 
   function openPrintable() {
     if (!selectedCaseId) return
-    window.open(getPTCResearchReportHtmlUrl(selectedCaseId, gene || undefined, question || undefined), '_blank', 'noopener,noreferrer')
+    window.open(getPTCResearchReportHtmlUrl(selectedCaseId, gene || undefined, undefined), '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -67,17 +73,16 @@ export default function PTCReportCenterPage() {
         <p className="text-sm font-semibold text-indigo-600">PTC Traceable Research Reports</p>
         <h1 className="text-3xl font-bold text-gray-900">PTC 可追溯研究报告中心</h1>
         <p className="mt-2 max-w-4xl text-gray-600">
-          从去识别化 TCGA-THCA 病例生成包含突变、蛋白路径、候选研究药物、Evidence、临床试验、PMC 图表与计算轨迹的报告。
-          HTML 版本可直接使用浏览器打印或另存 PDF。
+          从数据库最近 100 个去识别化 TCGA-THCA 病例中选择一笔，再选择病例已有基因，系统自动生成包含突变、蛋白路径、候选研究药物、Evidence、临床试验、PMC 图表与计算轨迹的报告。
         </p>
       </header>
 
       {error && <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-red-700">{error}</div>}
 
       <section className="rounded-xl border bg-white p-5 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm font-medium text-gray-700">
-            研究病例
+            数据库最近 100 个研究病例
             <select
               className="mt-1 w-full rounded border px-3 py-2"
               value={selectedCaseId}
@@ -87,25 +92,19 @@ export default function PTCReportCenterPage() {
                 setReport(null)
               }}
             >
-              {cases.map((item) => <option key={item.case_id} value={item.case_id}>{item.case_id} · {item.pathologic_stage || 'Stage —'}</option>)}
+              {cases.map((item) => <option key={item.case_id} value={item.case_id}>{item.case_id} · {item.pathologic_stage || 'Stage —'} · {item.variants.length} variants</option>)}
             </select>
           </label>
           <label className="text-sm font-medium text-gray-700">
-            分子焦点
-            <select className="mt-1 w-full rounded border px-3 py-2" value={gene} onChange={(event) => setGene(event.target.value)}>
+            病例已有基因
+            <select className="mt-1 w-full rounded border px-3 py-2" value={gene} onChange={(event) => { setGene(event.target.value); setReport(null) }}>
               <option value="">全部基因</option>
               {genes.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
-          <label className="text-sm font-medium text-gray-700 md:col-span-2">
-            报告问题／研究重点
-            <input
-              className="mt-1 w-full rounded border px-3 py-2"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              placeholder="例如：整理 BRAF V600E 的结构、候选药物、论文图表与临床试验证据"
-            />
-          </label>
+        </div>
+        <div className="mt-4 rounded border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-800">
+          报告研究重点由所选病例与基因自动决定，不接受自由文字查询。
         </div>
         <div className="mt-4 flex flex-wrap gap-3">
           <button className="rounded bg-indigo-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50" disabled={!selectedCaseId || loadingReport} onClick={() => void generate()}>
@@ -122,7 +121,7 @@ export default function PTCReportCenterPage() {
 
       {!report && !loadingReport && (
         <section className="mt-6 rounded-xl border border-dashed bg-slate-50 p-12 text-center text-slate-500">
-          选择病例与基因后生成报告。当前数据库共有 {cases.length} 个最近病例可选。
+          从数据库最近 {cases.length} 个病例中选择一笔，再选择病例已有基因后生成报告。
         </section>
       )}
 
