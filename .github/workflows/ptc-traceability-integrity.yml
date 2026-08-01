@@ -1,0 +1,55 @@
+name: PTC Traceability Integrity
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/frontend/src/api/ptcTimeline.ts'
+      - 'src/frontend/src/api/ptcSnapshots.ts'
+      - 'src/frontend/src/pages/ClinicalGraphPage.tsx'
+      - 'src/frontend/src/test/ptcTraceabilityApis.test.ts'
+      - 'src/frontend/src/test/LegacyDualModePages.test.tsx'
+      - '.github/workflows/ptc-traceability-integrity.yml'
+  pull_request:
+    paths:
+      - 'src/frontend/src/api/ptcTimeline.ts'
+      - 'src/frontend/src/api/ptcSnapshots.ts'
+      - 'src/frontend/src/pages/ClinicalGraphPage.tsx'
+      - 'src/frontend/src/test/ptcTraceabilityApis.test.ts'
+      - 'src/frontend/src/test/LegacyDualModePages.test.tsx'
+  workflow_dispatch:
+
+jobs:
+  traceability-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - run: npm ci
+      - name: Timeline and snapshot API contracts
+        run: npm test -- --run src/test/ptcTraceabilityApis.test.ts src/test/apiClient.test.ts
+      - name: Clinical graph dual-mode regression
+        run: npm test -- --run src/test/LegacyDualModePages.test.tsx
+      - name: Shared-client static guard
+        run: |
+          node - <<'NODE'
+          const fs = require('fs')
+          for (const file of [
+            'src/api/ptcTimeline.ts',
+            'src/api/ptcSnapshots.ts',
+            'src/pages/ClinicalGraphPage.tsx',
+          ]) {
+            const source = fs.readFileSync(file, 'utf8')
+            if (source.includes('VITE_API_URL')) throw new Error(`${file}: VITE_API_URL is forbidden`)
+            if (/fetch\s*\(\s*[`'\"]\/api\/v1/.test(source)) throw new Error(`${file}: direct /api/v1 fetch is forbidden`)
+          }
+          NODE
+      - name: TypeScript and production build
+        run: npm run build
