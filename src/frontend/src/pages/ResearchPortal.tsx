@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   listResearchUploads,
@@ -164,6 +164,6 @@ export default function ResearchPortal() {
   )
 }
 
-function Field({ label, className = '', children }: { label: string; className?: string; children: React.ReactNode }) {
+function Field({ label, className = '', children }: { label: string; className?: string; children: ReactNode }) {
   return <label className={`block text-sm font-medium text-gray-700 ${className}`}>{label}<div className="mt-1">{children}</div></label>
 }
