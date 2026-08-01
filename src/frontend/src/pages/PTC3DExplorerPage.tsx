@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import PTCCell3D from '../components/PTCCell3D'
 import PTCProtein3D from '../components/PTCProtein3D'
+import PTCTargetingPanel from '../components/PTCTargetingPanel'
 import {
   getLatestPTCCases,
   getPTCProteinStructure,
@@ -135,10 +136,10 @@ export default function PTC3DExplorerPage() {
         <p className="text-sm font-semibold text-cyan-600">PTC Multi-scale 3D Explorer</p>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">癌细胞与蛋白质多尺度 3D 展示</h1>
+            <h1 className="text-3xl font-bold text-gray-900">癌细胞、蛋白质与靶向治疗多尺度 3D</h1>
             <p className="mt-2 max-w-5xl text-gray-600">
-              从最近下载的 100 个 TCGA-THCA 公开研究病例进入癌细胞尺度，再深入到 BRAF、RET、NTRK、TERT、RAS 等蛋白结构。
-              癌细胞为依据病例突变资料生成的科学示意模型；蛋白结构来自 AlphaFold DB 预测与 PDB 实验结构。
+              从最近下载的 100 个 TCGA-THCA 公开研究病例进入癌细胞尺度，再深入到蛋白结构、突变残基、讯号路径、药物、证据与临床试验。
+              癌细胞为依据病例突变资料生成的科学示意模型；蛋白结构由项目内建代码读取公开静态坐标并渲染。
             </p>
           </div>
           <button className="rounded border border-cyan-300 bg-white px-4 py-2 text-sm font-semibold text-cyan-700 hover:bg-cyan-50" onClick={() => void copyLink()}>
@@ -214,7 +215,7 @@ export default function PTC3DExplorerPage() {
                   className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${selectedGene === gene ? 'border-violet-500 bg-violet-100 text-violet-800' : 'border-gray-200 bg-white text-gray-700 hover:border-violet-300 hover:bg-violet-50'}`}
                   onClick={() => void selectGene(gene)}
                 >
-                  {gene} 结构
+                  {gene} 结构与靶向链
                 </button>
               ))}
               {selectedCase && genes.length === 0 && <span className="text-sm text-gray-500">该病例尚无已导入基因变异。</span>}
@@ -226,6 +227,11 @@ export default function PTC3DExplorerPage() {
           ) : (
             <PTCProtein3D structure={protein} variants={selectedGeneVariants} loading={proteinLoading} />
           )}
+
+          <PTCTargetingPanel
+            gene={selectedGene}
+            proteinChange={selectedGeneVariants[0]?.protein_change}
+          />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-xl border bg-white p-5 shadow-sm">
@@ -241,9 +247,9 @@ export default function PTC3DExplorerPage() {
               </div>
             </section>
             <section className="rounded-xl border bg-amber-50 p-5 shadow-sm">
-              <h3 className="font-bold text-amber-900">结构解释边界</h3>
+              <h3 className="font-bold text-amber-900">结构与治疗解释边界</h3>
               <p className="mt-2 text-sm leading-6 text-amber-900/80">
-                TCGA 提供的是去识别化病例、病理与分子变异，不包含一颗患者癌细胞的完整显微／原子结构。因此细胞层是多尺度科学示意；蛋白层则使用真实实验 PDB 或 AlphaFold 预测坐标。两者用于研究探索，不能直接作为诊断或用药依据。
+                TCGA 提供的是去识别化病例、病理与分子变异，不包含患者癌细胞的完整显微／原子结构。细胞层是多尺度科学示意；蛋白层使用公开参考坐标。药物、证据与试验用于研究探索，不能直接作为诊断、处方或用药依据。
               </p>
             </section>
           </div>
