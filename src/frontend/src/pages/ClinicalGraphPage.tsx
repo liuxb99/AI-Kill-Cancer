@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 
-import DualModeSelector from '../components/DualModeSelector'
+import { apiRequest } from '../api/client'
 import {
   getDatabasePatient,
   listRecentDatabasePatients,
   patientDisplayLabel,
   type DatabasePatient,
 } from '../api/databasePatients'
+import DualModeSelector from '../components/DualModeSelector'
 
 interface Entity {
   id: string
@@ -33,8 +34,10 @@ interface ThreadResponse {
 export default function ClinicalGraphPage() {
   const [patients, setPatients] = useState<DatabasePatient[]>([])
   const [patientId, setPatientId] = useState('')
+  const [advancedPatientId, setAdvancedPatientId] = useState('')
   const [data, setData] = useState<ThreadResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [advancedLoading, setAdvancedLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -50,6 +53,7 @@ export default function ClinicalGraphPage() {
           setPatientId(initial.patient_id)
           await loadGraph(initial.patient_id)
         } else if (requested) {
+          setAdvancedPatientId(requested)
           await selectAdvancedPatient(requested)
         }
       } catch (reason) {
@@ -68,15 +72,7 @@ export default function ClinicalGraphPage() {
     setError(null)
     setData(null)
     try {
-      const token = localStorage.getItem('auth_token')
-      const response = await fetch(`/api/v1/clinical-graph/patient/${encodeURIComponent(normalized)}/thread`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
-        throw new Error(body.detail || 'Patient graph data not found or projection pending')
-      }
-      setData(await response.json())
+      setData(await apiRequest<ThreadResponse>(`/clinical-graph/patient/${encodeURIComponent(normalized)}/thread`))
       const url = new URL(window.location.href)
       url.searchParams.set('patientId', normalized)
       window.history.replaceState({}, '', url)
@@ -87,19 +83,22 @@ export default function ClinicalGraphPage() {
     }
   }
 
-  async function selectAdvancedPatient(value: string) {
+  async function selectAdvancedPatient(value = advancedPatientId) {
     const normalized = value.trim()
     if (!normalized) return
-    setLoading(true)
+    setAdvancedLoading(true)
     setError(null)
     try {
       const patient = await getDatabasePatient(normalized)
       setPatientId(patient.patient_id)
-      setPatients((current) => current.some((item) => item.patient_id === patient.patient_id) ? current : [patient, ...current].slice(0, 100))
+      setPatients((current) => current.some((item) => item.patient_id === patient.patient_id)
+        ? current
+        : [patient, ...current].slice(0, 100))
       await loadGraph(patient.patient_id)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '患者不存在')
-      setLoading(false)
+    } finally {
+      setAdvancedLoading(false)
     }
   }
 
@@ -111,19 +110,43 @@ export default function ClinicalGraphPage() {
         <p className="mt-2 text-gray-600">預設從資料庫最近 100 位患者中選擇；也可輸入完整 Patient ID 精準查詢整個資料庫。</p>
       </header>
 
+      {error && <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-red-700">{error}</div>}
+
       <DualModeSelector
-        items={patients}
-        selectedId={patientId}
-        onSelect={(id) => { setPatientId(id); void loadGraph(id) }}
-        getId={(item) => item.patient_id}
-        getLabel={patientDisplayLabel}
-        listLabel="最近 100 位患者"
-        queryLabel="完整 Patient ID"
-        queryPlaceholder="輸入完整 UUID Patient ID"
-        onAdvancedQuery={selectAdvancedPatient}
-        loading={loading}
-        error={error}
+        title="選擇患者"
+        description="一般模式顯示最近 100 位患者；進階模式可用完整 Patient ID 查詢整個資料庫。"
+        recentContent={(
+          <div className="p-4">
+            <label className="block text-sm font-medium text-slate-700">
+              最近 100 位患者
+              <select
+                aria-label="最近 100 位患者"
+                className="mt-2 w-full rounded-lg border px-3 py-2"
+                value={patientId}
+                disabled={loading || patients.length === 0}
+                onChange={(event) => {
+                  setPatientId(event.target.value)
+                  void loadGraph(event.target.value)
+                }}
+              >
+                {patients.map((patient) => (
+                  <option key={patient.patient_id} value={patient.patient_id}>{patientDisplayLabel(patient)}</option>
+                ))}
+              </select>
+            </label>
+            {patients.length === 0 && !loading && <p className="mt-2 text-sm text-slate-500">目前沒有患者資料。</p>}
+          </div>
+        )}
+        advancedLabel="完整 Patient ID"
+        advancedPlaceholder="輸入完整 UUID Patient ID"
+        advancedValue={advancedPatientId}
+        onAdvancedValueChange={setAdvancedPatientId}
+        onAdvancedSubmit={() => selectAdvancedPatient()}
+        advancedLoading={advancedLoading}
+        advancedHelp="精準查詢成功後會載入同一個知識圖譜結果區，並同步 patientId 到網址。"
       />
+
+      {loading && !data && <div className="mt-6 rounded-xl border bg-white p-10 text-center text-gray-500">載入中…</div>}
 
       {data && (
         <section className="mt-6 space-y-5 rounded-xl border bg-white p-6 shadow-sm">
