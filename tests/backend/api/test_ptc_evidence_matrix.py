@@ -112,8 +112,6 @@ async def seed_matrix(session):
             conditions=["Papillary Thyroid Carcinoma"],
             interventions=[{"name": "Dabrafenib"}],
             target_genes=["BRAF"],
-            source_name="ClinicalTrials.gov",
-            source_record_id="NCT-MATRIX-001",
             source_url="https://clinicaltrials.gov/study/NCT-MATRIX-001",
         )
     )
