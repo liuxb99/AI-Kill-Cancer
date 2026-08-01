@@ -1,3 +1,5 @@
+import { apiRequest, withQuery } from './client'
+
 interface RawDatabasePatient {
   id: string
   external_id?: string | null
@@ -36,20 +38,6 @@ export interface DatabasePatientList {
   limit: number
 }
 
-function authHeaders(): HeadersInit {
-  const token = localStorage.getItem('auth_token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`/api/v1${path}`, { headers: authHeaders() })
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
-    throw new Error(body.detail || `HTTP ${response.status}`)
-  }
-  return response.json()
-}
-
 function normalizePatient(patient: RawDatabasePatient): DatabasePatient {
   return {
     patient_id: patient.id,
@@ -65,12 +53,15 @@ function normalizePatient(patient: RawDatabasePatient): DatabasePatient {
 }
 
 export async function listRecentDatabasePatients(limit = 100): Promise<DatabasePatientList> {
-  const result = await request<RawDatabasePatientList>(`/patients?skip=0&limit=${Math.min(Math.max(limit, 1), 100)}`)
+  const result = await apiRequest<RawDatabasePatientList>(withQuery('/patients', {
+    skip: 0,
+    limit: Math.min(Math.max(limit, 1), 100),
+  }))
   return { ...result, items: result.items.map(normalizePatient) }
 }
 
 export async function getDatabasePatient(patientId: string): Promise<DatabasePatient> {
-  return normalizePatient(await request<RawDatabasePatient>(`/patients/${encodeURIComponent(patientId.trim())}`))
+  return normalizePatient(await apiRequest<RawDatabasePatient>(`/patients/${encodeURIComponent(patientId.trim())}`))
 }
 
 export function patientDisplayLabel(patient: DatabasePatient): string {
