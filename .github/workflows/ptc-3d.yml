@@ -35,6 +35,7 @@ on:
       - "src/frontend/src/test/PTCResearchAssistant.test.tsx"
       - "src/frontend/src/test/PTCReportCenterPage.test.tsx"
       - "src/frontend/src/test/PTCCohortPage.test.tsx"
+      - "src/frontend/src/test/ptcVisualizationApi.test.ts"
       - "src/frontend/src/App.tsx"
       - "tests/backend/api/test_ptc_visualization.py"
       - "tests/backend/api/test_ptc_targeting.py"
@@ -118,5 +119,6 @@ jobs:
           npm test -- --run src/test/PTCResearchAssistant.test.tsx
           npm test -- --run src/test/PTCReportCenterPage.test.tsx
           npm test -- --run src/test/PTCCohortPage.test.tsx
+          npm test -- --run src/test/ptcVisualizationApi.test.ts
       - name: TypeScript and production build
         run: npm run build
