@@ -66,6 +66,9 @@ class PTCCompletionService:
                     value = asdict(value)
                 stages[name] = {"status": "success", "result": value}
             except Exception as exc:  # public sources are isolated by design
+                # A failed flush/commit leaves AsyncSession unusable until rollback.
+                # Always reset the transaction so later public sources can continue.
+                await self.db.rollback()
                 stages[name] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
 
         async def import_gdc() -> dict[str, Any]:
