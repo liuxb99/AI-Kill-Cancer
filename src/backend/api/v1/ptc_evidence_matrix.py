@@ -1,9 +1,9 @@
 """Explainable PTC evidence matrix for de-identified research cases.
 
 The matrix joins imported variants with persisted therapies, evidence records,
-clinical trials, open-full-text assets, and same-gene cohort observations. It is
-research navigation only and never emits a prescription or clinical eligibility
-claim.
+clinical trials, open-full-text assets, and same-gene cohort observations. Its
+score measures data linkage and provenance completeness only. Cohort outcomes
+are descriptive after the score is calculated and never affect ranking.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from src.backend.domain.ptc_research import PTCResearchCaseModel
 
 router = APIRouter(prefix="/ptc-evidence-matrix", tags=["ptc-evidence-matrix"])
 
+SCORING_VERSION = "ptc-evidence-linkage-v2"
 EVIDENCE_LEVEL_SCORES = {
     "A": 30.0,
     "B": 24.0,
@@ -34,6 +35,20 @@ EVIDENCE_LEVEL_SCORES = {
     "D": 12.0,
     "E": 6.0,
 }
+SCORE_WEIGHTS = {
+    "variant_present": 20.0,
+    "persisted_therapies": 20.0,
+    "best_evidence_level": 30.0,
+    "active_trials": 15.0,
+    "open_full_text_assets": 10.0,
+    "source_provenance": 5.0,
+}
+OUTCOME_FIELDS_EXCLUDED = [
+    "vital_status",
+    "days_to_last_follow_up",
+    "days_to_death",
+    "outcomes",
+]
 
 
 def _level_score(level: str | None) -> float:
@@ -59,6 +74,24 @@ def _trial_is_active(status: str | None) -> bool:
 def _evidence_assets(item: PTCEvidenceRecordModel) -> tuple[int, int]:
     payload = item.payload if isinstance(item.payload, dict) else {}
     return len(payload.get("figures") or []), len(payload.get("tables") or [])
+
+
+def _provenance_score(
+    therapies: list[PTCTherapyModel],
+    evidence: list[PTCEvidenceRecordModel],
+    trials: list[PTCClinicalTrialModel],
+) -> float:
+    linked = [*therapies, *evidence, *trials]
+    if not linked:
+        return 0.0
+    complete = sum(
+        1
+        for item in linked
+        if getattr(item, "source_name", None)
+        and getattr(item, "source_record_id", None)
+        and getattr(item, "source_url", None)
+    )
+    return round(SCORE_WEIGHTS["source_provenance"] * complete / len(linked), 3)
 
 
 async def _load_case(db: AsyncSession, case_id: str) -> PTCResearchCaseModel:
@@ -104,7 +137,6 @@ async def get_case_evidence_matrix(
         .scalars()
         .unique()
     )
-
     all_cases = list(
         (
             await db.execute(
@@ -177,14 +209,17 @@ async def get_case_evidence_matrix(
         best_evidence = max((_level_score(item.evidence_level) for item in evidence), default=0.0)
         active_trials = sum(1 for item in trials if _trial_is_active(item.overall_status))
         score_components = {
-            "variant_present": 20.0,
-            "persisted_therapies": min(20.0, len(therapies) * 5.0),
+            "variant_present": SCORE_WEIGHTS["variant_present"],
+            "persisted_therapies": min(SCORE_WEIGHTS["persisted_therapies"], len(therapies) * 5.0),
             "best_evidence_level": best_evidence,
-            "active_trials": min(15.0, active_trials * 5.0),
-            "open_full_text_assets": min(10.0, (figure_count + table_count) * 2.0),
-            "same_gene_cohort": min(5.0, len(same_gene_cases) * 0.5),
+            "active_trials": min(SCORE_WEIGHTS["active_trials"], active_trials * 5.0),
+            "open_full_text_assets": min(
+                SCORE_WEIGHTS["open_full_text_assets"],
+                (figure_count + table_count) * 2.0,
+            ),
+            "source_provenance": _provenance_score(therapies, evidence, trials),
         }
-        total_score = round(sum(score_components.values()), 2)
+        completeness_score = round(sum(score_components.values()), 2)
         gaps = []
         if not therapies:
             gaps.append("No persisted therapy linked to this gene")
@@ -194,6 +229,8 @@ async def get_case_evidence_matrix(
             gaps.append("No active matching clinical trial")
         if figure_count + table_count == 0:
             gaps.append("No extracted open-full-text figure or table")
+        if score_components["source_provenance"] < SCORE_WEIGHTS["source_provenance"]:
+            gaps.append("Some linked records lack complete source provenance")
         if not same_gene_cases:
             gaps.append("No same-gene comparison case in the imported cohort")
 
@@ -211,7 +248,9 @@ async def get_case_evidence_matrix(
                 ],
                 "protein_domain": catalog.get("protein_domain"),
                 "pathway": catalog.get("pathway"),
-                "score": total_score,
+                "score": completeness_score,
+                "score_type": "data_linkage_completeness",
+                "score_version": SCORING_VERSION,
                 "score_components": score_components,
                 "therapies": [
                     {
@@ -250,6 +289,8 @@ async def get_case_evidence_matrix(
                     for item in trials[:20]
                 ],
                 "cohort": {
+                    "role": "post_score_descriptive_only",
+                    "excluded_from_score": True,
                     "same_gene_cases": len(same_gene_cases),
                     "vital_status_distribution": dict(vital_statuses),
                     "outcome_distribution": dict(outcome_values),
@@ -269,26 +310,49 @@ async def get_case_evidence_matrix(
         "case_id": case.case_id,
         "source_dataset": case.source_dataset,
         "pathologic_stage": case.pathologic_stage,
+        "methodology": {
+            "scoring_version": SCORING_VERSION,
+            "score_type": "data_linkage_completeness",
+            "maximum_score": 100.0,
+            "weights": SCORE_WEIGHTS,
+            "outcome_blind": True,
+            "outcome_fields_excluded": OUTCOME_FIELDS_EXCLUDED,
+            "cohort_usage": "post_score_descriptive_summary_only",
+        },
         "rows": rows,
         "summary": {
             "genes": len(rows),
             "therapies": sum(len(item["therapies"]) for item in rows),
             "evidence": sum(len(item["evidence"]) for item in rows),
             "trials": sum(len(item["trials"]) for item in rows),
-            "open_full_text_assets": sum(item["assets"]["figures"] + item["assets"]["tables"] for item in rows),
+            "open_full_text_assets": sum(
+                item["assets"]["figures"] + item["assets"]["tables"] for item in rows
+            ),
             "unresolved_gaps": sum(len(item["gaps"]) for item in rows),
         },
         "trace": [
-            {"step": 1, "name": "resolve_case_variants", "records": sum(len(item) for item in variants_by_gene.values())},
+            {
+                "step": 1,
+                "name": "resolve_case_variants",
+                "records": sum(len(item) for item in variants_by_gene.values()),
+            },
             {"step": 2, "name": "join_therapies_evidence_trials", "records": len(rows)},
-            {"step": 3, "name": "aggregate_same_gene_cohort", "records": len(all_cases)},
-            {"step": 4, "name": "score_and_rank_matrix", "records": len(rows)},
+            {"step": 3, "name": "score_linkage_without_outcomes", "records": len(rows)},
+            {"step": 4, "name": "aggregate_post_score_cohort_outcomes", "records": len(all_cases)},
+            {"step": 5, "name": "rank_by_completeness", "records": len(rows)},
         ],
         "disclaimer": (
-            "Research evidence navigation only. Matrix scores reflect imported data completeness and linkage, "
-            "not clinical benefit, prognosis, prescribing priority, or trial eligibility."
+            "Research evidence navigation only. Scores measure imported data linkage and provenance "
+            "completeness, not clinical benefit, prognosis, prescribing priority, or trial eligibility. "
+            "Cohort outcomes are excluded from scoring and shown only after ranking."
         ),
     }
 
 
-__all__ = ["router", "EVIDENCE_LEVEL_SCORES"]
+__all__ = [
+    "router",
+    "EVIDENCE_LEVEL_SCORES",
+    "SCORE_WEIGHTS",
+    "SCORING_VERSION",
+    "OUTCOME_FIELDS_EXCLUDED",
+]
