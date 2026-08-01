@@ -1,3 +1,5 @@
+import { apiRequest, withQuery } from './client'
+
 export interface PTCSnapshot {
   schema: string
   generated_at: string
@@ -27,23 +29,13 @@ export interface PTCSnapshotVerification {
   reason?: string | null
 }
 
-async function parse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
-    throw new Error(body.detail || `HTTP ${response.status}`)
-  }
-  return response.json()
+export function createPTCSnapshot(caseId: string, gene?: string): Promise<PTCSnapshot> {
+  return apiRequest(withQuery(`/ptc-snapshots/case/${encodeURIComponent(caseId)}`, { gene }))
 }
 
-export async function createPTCSnapshot(caseId: string, gene?: string): Promise<PTCSnapshot> {
-  const query = gene ? `?gene=${encodeURIComponent(gene)}` : ''
-  return parse(fetch(`/api/v1/ptc-snapshots/case/${encodeURIComponent(caseId)}${query}`))
-}
-
-export async function verifyPTCSnapshot(document: unknown): Promise<PTCSnapshotVerification> {
-  return parse(fetch('/api/v1/ptc-snapshots/verify', {
+export function verifyPTCSnapshot(document: unknown): Promise<PTCSnapshotVerification> {
+  return apiRequest('/ptc-snapshots/verify', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(document),
-  }))
+  })
 }
