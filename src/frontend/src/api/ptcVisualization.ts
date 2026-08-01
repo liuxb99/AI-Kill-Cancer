@@ -22,6 +22,12 @@ export interface PTCLatestCasesResponse {
   cases: PTCLatestCase[]
 }
 
+export interface PTCExperimentalStructure {
+  pdb_id: string
+  pdb_url: string
+  entry_url: string
+}
+
 export interface PTCProteinStructure {
   gene: string
   name: string
@@ -29,10 +35,12 @@ export interface PTCProteinStructure {
   alphafold_entry_id: string
   alphafold_entry_url: string
   cif_url: string
-  pdb_url?: string
-  confidence_url?: string
+  pdb_url: string
+  experimental_structures: PTCExperimentalStructure[]
   experimental_pdb_ids: string[]
   default_pdb_id?: string
+  renderer: 'builtin-threejs-pdb'
+  uses_alphafold_api: false
   source: string
   disclaimer: string
 }
