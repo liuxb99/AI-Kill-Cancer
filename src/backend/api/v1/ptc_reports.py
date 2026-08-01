@@ -28,7 +28,7 @@ DEFAULT_QUESTION = (
 
 
 def _safe(value: Any) -> str:
-    return html.escape("" if value is None else str(value))
+    return html.escape("" if value is None else str(value), quote=True)
 
 
 def _report_payload(answer: dict[str, Any]) -> dict[str, Any]:
@@ -61,6 +61,8 @@ def _report_payload(answer: dict[str, Any]) -> dict[str, Any]:
 
 def render_ptc_report_html(report: dict[str, Any]) -> str:
     facts = report.get("case_facts", {})
+    pathway = report.get("pathway", {})
+    assets = report.get("assets", {})
     variants = facts.get("variants", [])
     therapies = report.get("therapies", [])
     evidence = report.get("evidence", [])
@@ -68,16 +70,22 @@ def render_ptc_report_html(report: dict[str, Any]) -> str:
     trace = report.get("trace", [])
 
     variant_rows = "".join(
-        f"<tr><td>{_safe(item.get('gene'))}</td><td>{_safe(item.get('protein_change') or item.get('variant_id'))}</td>"
-        f"<td>{_safe(item.get('classification'))}</td></tr>" for item in variants
+        f"<tr><td>{_safe(item.get('gene'))}</td>"
+        f"<td>{_safe(item.get('protein_change') or item.get('variant_id'))}</td>"
+        f"<td>{_safe(item.get('classification'))}</td></tr>"
+        for item in variants
     ) or '<tr><td colspan="3">No imported variants</td></tr>'
     therapy_rows = "".join(
-        f"<tr><td>{_safe(item.get('name'))}</td><td>{_safe(item.get('approval_status'))}</td>"
-        f"<td>{_safe(item.get('source'))}</td></tr>" for item in therapies
+        f"<tr><td>{_safe(item.get('name'))}</td>"
+        f"<td>{_safe(item.get('approval_status'))}</td>"
+        f"<td>{_safe(item.get('source'))}</td></tr>"
+        for item in therapies
     ) or '<tr><td colspan="3">No persisted therapy records</td></tr>'
     trial_rows = "".join(
-        f"<tr><td>{_safe(item.get('nct_id'))}</td><td>{_safe(item.get('title'))}</td>"
-        f"<td>{_safe(item.get('status'))}</td></tr>" for item in trials
+        f"<tr><td>{_safe(item.get('nct_id'))}</td>"
+        f"<td>{_safe(item.get('title'))}</td>"
+        f"<td>{_safe(item.get('status'))}</td></tr>"
+        for item in trials
     ) or '<tr><td colspan="3">No matching trials</td></tr>'
     evidence_cards = "".join(
         "<article class='evidence'>"
@@ -86,14 +94,17 @@ def render_ptc_report_html(report: dict[str, Any]) -> str:
         f"<p>{_safe(item.get('summary'))}</p>"
         f"<p>Figures: {len(item.get('figures') or [])} · Tables: {len(item.get('tables') or [])}</p>"
         f"<p><a href='{_safe(item.get('url'))}'>Source</a></p>"
-        "</article>" for item in evidence
+        "</article>"
+        for item in evidence
     ) or "<p>No linked evidence records.</p>"
     trace_rows = "".join(
-        f"<tr><td>{_safe(item.get('step'))}</td><td>{_safe(item.get('name'))}</td>"
-        f"<td>{_safe(item.get('records'))}</td></tr>" for item in trace
+        f"<tr><td>{_safe(item.get('step'))}</td>"
+        f"<td>{_safe(item.get('name'))}</td>"
+        f"<td>{_safe(item.get('records'))}</td></tr>"
+        for item in trace
     )
     limitations = "".join(f"<li>{_safe(item)}</li>" for item in report.get("limitations", []))
-    report_json = html.escape(json.dumps(report, ensure_ascii=False))
+    report_json = json.dumps(report, ensure_ascii=False).replace("</", "<\\/")
 
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -111,11 +122,11 @@ button{{border:0;border-radius:7px;padding:9px 14px;background:var(--accent);col
 </style></head><body><main>
 <div class="actions"><button onclick="window.print()">Print / Save PDF</button></div>
 <p>AI-Kill-Cancer · PTC Research Report</p><h1>{_safe(report.get('case_id'))}</h1>
-<div class="meta"><div class="card"><small>Generated</small><br>{_safe(report.get('generated_at'))}</div><div class="card"><small>Gene</small><br>{_safe(report.get('selected_gene') or 'All')}</div><div class="card"><small>Figures</small><br>{_safe(report.get('assets',{{}}).get('figures'))}</div><div class="card"><small>Tables</small><br>{_safe(report.get('assets',{{}}).get('tables'))}</div></div>
+<div class="meta"><div class="card"><small>Generated</small><br>{_safe(report.get('generated_at'))}</div><div class="card"><small>Gene</small><br>{_safe(report.get('selected_gene') or 'All')}</div><div class="card"><small>Figures</small><br>{_safe(assets.get('figures'))}</div><div class="card"><small>Tables</small><br>{_safe(assets.get('tables'))}</div></div>
 <section><h2>Executive summary</h2><p>{_safe(report.get('executive_summary'))}</p></section>
 <section><h2>Research case facts</h2><p>Source: {_safe(facts.get('source_dataset'))} · Stage: {_safe(facts.get('pathologic_stage'))} · Vital status: {_safe(facts.get('vital_status'))}</p>
 <table><thead><tr><th>Gene</th><th>Variant</th><th>Classification</th></tr></thead><tbody>{variant_rows}</tbody></table></section>
-<section><h2>Molecular pathway</h2><div class="card"><strong>{_safe(report.get('selected_gene'))}</strong> · {_safe(report.get('pathway',{{}}).get('pathway'))}<br>{_safe(report.get('pathway',{{}}).get('protein_domain'))}</div></section>
+<section><h2>Molecular pathway</h2><div class="card"><strong>{_safe(report.get('selected_gene'))}</strong> · {_safe(pathway.get('pathway'))}<br>{_safe(pathway.get('protein_domain'))}</div></section>
 <section><h2>Candidate research therapies</h2><table><thead><tr><th>Therapy</th><th>Status</th><th>Source</th></tr></thead><tbody>{therapy_rows}</tbody></table></section>
 <section><h2>Evidence and open-full-text assets</h2>{evidence_cards}</section>
 <section><h2>Clinical trials</h2><table><thead><tr><th>NCT</th><th>Title</th><th>Status</th></tr></thead><tbody>{trial_rows}</tbody></table></section>
