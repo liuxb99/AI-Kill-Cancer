@@ -1,34 +1,4 @@
-/**
- * Treatment Plan API client.
- * Connects to the backend v1 treatment-plans endpoints.
- */
-
-const API_BASE = import.meta.env.VITE_API_URL || ''
-
-interface RequestOptions {
-  method?: string
-  body?: unknown
-  headers?: Record<string, string>
-}
-
-async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, headers = {} } = opts
-  const res = await fetch(`${API_BASE}/api/v1${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }))
-    throw new Error(err.detail || err.message || `HTTP ${res.status}`)
-  }
-  return res.json()
-}
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { apiRequest, withQuery } from './client'
 
 export interface TreatmentPlanResponse {
   plan_id: string
@@ -88,53 +58,50 @@ export interface ReviseTreatmentPlanRequest {
   revision_reason: string
 }
 
-// ─── API Functions ───────────────────────────────────────────────────────────
-
 export function createTreatmentPlan(data: CreateTreatmentPlanRequest): Promise<TreatmentPlanResponse> {
-  return request('/treatment-plans', { method: 'POST', body: data })
+  return apiRequest('/treatment-plans', { method: 'POST', body: JSON.stringify(data) })
 }
 
 export function getTreatmentPlan(planId: string): Promise<TreatmentPlanResponse> {
-  return request(`/treatment-plans/${planId}`)
+  return apiRequest(`/treatment-plans/${encodeURIComponent(planId)}`)
 }
 
 export function listTreatmentPlans(patientId: string, skip = 0, limit = 20): Promise<TreatmentPlanListItem[]> {
-  const params = new URLSearchParams({ patient_id: patientId, skip: String(skip), limit: String(limit) })
-  return request(`/treatment-plans?${params}`)
+  return apiRequest(withQuery('/treatment-plans', { patient_id: patientId, skip, limit }))
 }
 
 export function getPlanVersions(planId: string): Promise<TreatmentPlanResponse[]> {
-  return request(`/treatment-plans/${planId}/versions`)
+  return apiRequest(`/treatment-plans/${encodeURIComponent(planId)}/versions`)
 }
 
 export function getPlanTrace(planId: string): Promise<Record<string, any>[]> {
-  return request(`/treatment-plans/${planId}/trace`)
+  return apiRequest(`/treatment-plans/${encodeURIComponent(planId)}/trace`)
 }
 
 export function submitPlan(planId: string): Promise<TreatmentPlanResponse> {
-  return request(`/treatment-plans/${planId}/submit`, { method: 'POST' })
+  return apiRequest(`/treatment-plans/${encodeURIComponent(planId)}/submit`, { method: 'POST' })
 }
 
 export function approvePlan(planId: string): Promise<TreatmentPlanResponse> {
-  return request(`/treatment-plans/${planId}/approve`, { method: 'POST' })
+  return apiRequest(`/treatment-plans/${encodeURIComponent(planId)}/approve`, { method: 'POST' })
 }
 
 export function activatePlan(planId: string): Promise<TreatmentPlanResponse> {
-  return request(`/treatment-plans/${planId}/activate`, { method: 'POST' })
+  return apiRequest(`/treatment-plans/${encodeURIComponent(planId)}/activate`, { method: 'POST' })
 }
 
 export function pausePlan(planId: string): Promise<TreatmentPlanResponse> {
-  return request(`/treatment-plans/${planId}/pause`, { method: 'POST' })
+  return apiRequest(`/treatment-plans/${encodeURIComponent(planId)}/pause`, { method: 'POST' })
 }
 
 export function completePlan(planId: string): Promise<TreatmentPlanResponse> {
-  return request(`/treatment-plans/${planId}/complete`, { method: 'POST' })
+  return apiRequest(`/treatment-plans/${encodeURIComponent(planId)}/complete`, { method: 'POST' })
 }
 
 export function cancelPlan(planId: string): Promise<TreatmentPlanResponse> {
-  return request(`/treatment-plans/${planId}/cancel`, { method: 'POST' })
+  return apiRequest(`/treatment-plans/${encodeURIComponent(planId)}/cancel`, { method: 'POST' })
 }
 
 export function revisePlan(planId: string, data: ReviseTreatmentPlanRequest): Promise<TreatmentPlanResponse> {
-  return request(`/treatment-plans/${planId}/revise`, { method: 'POST', body: data })
+  return apiRequest(`/treatment-plans/${encodeURIComponent(planId)}/revise`, { method: 'POST', body: JSON.stringify(data) })
 }
