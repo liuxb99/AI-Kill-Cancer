@@ -20,6 +20,7 @@ import PTC3DExplorerPage from './pages/PTC3DExplorerPage'
 import PTCCommandCenterPage from './pages/PTCCommandCenterPage'
 import PTCIntegratedPage from './pages/PTCIntegratedPage'
 import PTCKnowledgePage from './pages/PTCKnowledgePage'
+import PTCReportCenterPage from './pages/PTCReportCenterPage'
 import PTCResearchAssistantPage from './pages/PTCResearchAssistantPage'
 import PTCResearchPage from './pages/PTCResearchPage'
 import StatusBanner from './components/StatusBanner'
@@ -33,6 +34,7 @@ function AppNavbar() {
     { label: 'PTC 總控台', path: '/ptc-command-center' },
     { label: 'PTC 3D', path: '/ptc-3d' },
     { label: 'PTC 研究助手', path: '/ptc-assistant' },
+    { label: 'PTC 研究報告', path: '/ptc-reports' },
     { label: 'PTC 工作台', path: '/ptc-workbench' },
     { label: 'PTC 病例', path: '/ptc-research' },
     { label: 'PTC 藥物證據', path: '/ptc-knowledge' },
@@ -79,6 +81,7 @@ function App() {
         <Route path="/ptc-command-center" element={<PTCCommandCenterPage />} />
         <Route path="/ptc-3d" element={<PTC3DExplorerPage />} />
         <Route path="/ptc-assistant" element={<PTCResearchAssistantPage />} />
+        <Route path="/ptc-reports" element={<PTCReportCenterPage />} />
         <Route path="/ptc-workbench" element={<PTCIntegratedPage />} />
         <Route path="/ptc-research" element={<PTCResearchPage />} />
         <Route path="/ptc-knowledge" element={<PTCKnowledgePage />} />
