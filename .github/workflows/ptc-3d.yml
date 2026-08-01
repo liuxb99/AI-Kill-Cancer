@@ -6,20 +6,26 @@ on:
     paths:
       - "src/backend/api/v1/ptc_visualization.py"
       - "src/backend/api/v1/ptc_targeting.py"
+      - "src/backend/api/v1/ptc_literature.py"
+      - "src/backend/services/ptc_literature_service.py"
       - "src/backend/api/v1/router.py"
       - "src/frontend/src/api/ptcVisualization.ts"
       - "src/frontend/src/api/ptcTargeting.ts"
+      - "src/frontend/src/api/ptcLiterature.ts"
       - "src/frontend/src/components/PTCCell3D.tsx"
       - "src/frontend/src/components/PTCProtein3D.tsx"
       - "src/frontend/src/components/PTCTargetingPanel.tsx"
+      - "src/frontend/src/components/PTCLiteratureAssetsPanel.tsx"
       - "src/frontend/src/components/threeRuntime.ts"
       - "src/frontend/src/pages/PTC3DExplorerPage.tsx"
       - "src/frontend/src/test/PTC3DExplorerPage.test.tsx"
       - "src/frontend/src/test/PTCProtein3D.test.tsx"
       - "src/frontend/src/test/PTCTargetingPanel.test.tsx"
+      - "src/frontend/src/test/PTCLiteratureAssetsPanel.test.tsx"
       - "src/frontend/src/App.tsx"
       - "tests/backend/api/test_ptc_visualization.py"
       - "tests/backend/api/test_ptc_targeting.py"
+      - "tests/backend/services/test_ptc_literature_assets.py"
       - ".github/workflows/ptc-3d.yml"
   workflow_dispatch:
 
@@ -36,18 +42,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r src/backend/requirements-api.txt
           pip install pytest pytest-asyncio ruff aiosqlite
-      - name: Lint visualization and targeting APIs
+      - name: Lint visualization targeting and literature code
         run: |
           ruff check \
             src/backend/api/v1/ptc_visualization.py \
             src/backend/api/v1/ptc_targeting.py \
+            src/backend/api/v1/ptc_literature.py \
+            src/backend/services/ptc_literature_service.py \
             tests/backend/api/test_ptc_visualization.py \
-            tests/backend/api/test_ptc_targeting.py
-      - name: Run visualization and targeting API tests
+            tests/backend/api/test_ptc_targeting.py \
+            tests/backend/services/test_ptc_literature_assets.py
+      - name: Run visualization targeting and literature tests
         run: |
           pytest -v --tb=short \
             tests/backend/api/test_ptc_visualization.py \
-            tests/backend/api/test_ptc_targeting.py
+            tests/backend/api/test_ptc_targeting.py \
+            tests/backend/services/test_ptc_literature_assets.py
       - name: Verify API router imports
         run: |
           python - <<'PY'
@@ -55,6 +65,7 @@ jobs:
           paths = {route.path for route in router.routes}
           assert any('/ptc-visualization' in path for path in paths)
           assert any('/ptc-targeting' in path for path in paths)
+          assert any('/ptc-literature' in path for path in paths)
           PY
 
   frontend-3d:
@@ -75,5 +86,6 @@ jobs:
           npm test -- --run src/test/PTC3DExplorerPage.test.tsx
           npm test -- --run src/test/PTCProtein3D.test.tsx
           npm test -- --run src/test/PTCTargetingPanel.test.tsx
+          npm test -- --run src/test/PTCLiteratureAssetsPanel.test.tsx
       - name: TypeScript and production build
         run: npm run build
