@@ -68,6 +68,7 @@ jobs:
             src/backend/api/v1/ptc_completion.py \
             scripts/import_ptc_tcga.py \
             scripts/ptc_cross_repo_e2e.py \
+            scripts/ptc_full_graph_e2e.py \
             tests/backend/importers/ \
             tests/backend/services/test_ptc_knowledge_service.py \
             tests/backend/services/test_ptc_integrated_service.py \
@@ -181,15 +182,18 @@ jobs:
         run: |
           git clone https://x-access-token:${GH_TOKEN}@github.com/liuxb99/KnowGraphGo.git KnowGraphGo
           cd KnowGraphGo
-          git checkout 96c569bae1d4bb02c05d8557ec2ee0a5a0a28b63
-      - name: Build and test KnowGraphGo PTC adapter
+          git checkout 3680b24561960551100a3159cc0e7ea727d14954
+      - name: Build and test KnowGraphGo PTC adapters
         working-directory: KnowGraphGo
         run: |
-          go test ./adapter/ptc/... -v
+          go test ./adapter/ptc/... ./adapter/ptcfull/... ./cmd/ptcgraphdata/... -v
           go build ./cmd/ptcgraph
+          go build ./cmd/ptcgraphdata
           go build ./cmd/knowgraph
-      - name: Run cross-repository PTC E2E and replay
+      - name: Run event projection E2E and replay
         run: python scripts/ptc_cross_repo_e2e.py --knowgraph-repo KnowGraphGo
+      - name: Run complete GraphData E2E and replay
+        run: python scripts/ptc_full_graph_e2e.py --knowgraph-repo KnowGraphGo
 
   ptc-frontend:
     runs-on: ubuntu-latest
