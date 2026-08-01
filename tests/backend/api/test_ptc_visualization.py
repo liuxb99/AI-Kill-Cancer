@@ -59,8 +59,12 @@ async def test_protein_structure_uses_static_files_and_builtin_renderer():
 
     assert result["gene"] == "BRAF"
     assert result["uniprot"] == "P15056"
-    assert result["pdb_url"] == "https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v4.pdb"
-    assert result["cif_url"] == "https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v4.cif"
+    assert result["pdb_url"] == "https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v6.pdb"
+    assert result["pdb_urls"] == [
+        "https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v6.pdb",
+        "https://alphafold.ebi.ac.uk/files/AF-P15056-F1-model_v4.pdb",
+    ]
+    assert result["cif_url"].endswith("model_v6.cif")
     assert result["renderer"] == "builtin-threejs-pdb"
     assert result["uses_alphafold_api"] is False
     assert result["default_pdb_id"] == "1UWH"
