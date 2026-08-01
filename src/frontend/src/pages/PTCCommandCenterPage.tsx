@@ -22,6 +22,7 @@ export default function PTCCommandCenterPage() {
   const [graph, setGraph] = useState<PTCCompleteGraph | null>(null)
   const [syncResult, setSyncResult] = useState<PTCSyncResult | null>(null)
   const [gdcSize, setGdcSize] = useState(100)
+  const [gdcMutationFiles, setGdcMutationFiles] = useState(1)
   const [trialSize, setTrialSize] = useState(100)
   const [pubmedSize, setPubmedSize] = useState(100)
   const [drugText, setDrugText] = useState(DEFAULT_DRUGS.join(', '))
@@ -57,6 +58,7 @@ export default function PTCCommandCenterPage() {
     try {
       const result = await syncPTCCompletePipeline({
         gdc_size: gdcSize,
+        gdc_mutation_files: gdcMutationFiles,
         trial_size: trialSize,
         pubmed_size: pubmedSize,
         drug_names: drugText.split(',').map((item) => item.trim()).filter(Boolean),
@@ -83,7 +85,7 @@ export default function PTCCommandCenterPage() {
         <p className="text-sm font-semibold text-primary-600">PTC Complete Product Skeleton</p>
         <h1 className="text-3xl font-bold">甲狀腺乳突癌資料與知識總控台</h1>
         <p className="mt-2 text-gray-600">
-          一次串聯 TCGA-THCA、ClinicalTrials.gov、openFDA、PubMed、CIViC 與科學中藥研究資料，
+          一次串聯 TCGA-THCA 臨床與公開突變資料、ClinicalTrials.gov、openFDA、PubMed、CIViC 與科學中藥研究資料，
           並產生完整病例—變異—基因—藥物—證據—試驗—中藥圖譜。僅供研究與決策支援。
         </p>
       </section>
@@ -105,11 +107,15 @@ export default function PTCCommandCenterPage() {
 
       <section className="mt-6 rounded-lg border bg-white p-5 shadow-sm">
         <h2 className="text-xl font-bold">一鍵完成全部公開資料同步</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <NumberField label="GDC 病例數" value={gdcSize} setValue={setGdcSize} />
-          <NumberField label="臨床試驗數" value={trialSize} setValue={setTrialSize} />
-          <NumberField label="PubMed 文獻數" value={pubmedSize} setValue={setPubmedSize} />
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <NumberField label="GDC 病例數" value={gdcSize} setValue={setGdcSize} max={1000} />
+          <NumberField label="公開 Mutation MAF 檔案數" value={gdcMutationFiles} setValue={setGdcMutationFiles} max={20} />
+          <NumberField label="臨床試驗數" value={trialSize} setValue={setTrialSize} max={1000} />
+          <NumberField label="PubMed 文獻數" value={pubmedSize} setValue={setPubmedSize} max={500} />
         </div>
+        <p className="mt-2 text-xs text-gray-500">
+          Mutation MAF 會依 TCGA participant barcode 合併至病例並去重；增加檔案數會延長同步時間。
+        </p>
         <label className="mt-4 block text-sm font-medium">
           PTC 相關藥物
           <textarea className="mt-1 min-h-24 w-full rounded border px-3 py-2" value={drugText} onChange={(e) => setDrugText(e.target.value)} />
@@ -136,6 +142,11 @@ export default function PTCCommandCenterPage() {
                 <div className="font-semibold">{name}</div>
                 <div className={stage.status === 'success' ? 'text-emerald-700' : stage.status === 'failed' ? 'text-red-700' : 'text-gray-500'}>{stage.status}</div>
                 {stage.error && <div className="mt-1 break-words text-xs text-red-600">{stage.error}</div>}
+                {stage.result !== undefined && (
+                  <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-2 text-[11px] text-gray-600">
+                    {JSON.stringify(stage.result, null, 2)}
+                  </pre>
+                )}
               </div>
             ))}
           </div>
@@ -187,8 +198,8 @@ function Metric({ label, value }: { label: string; value?: number }) {
   return <div className="rounded-lg border bg-white p-4 shadow-sm"><div className="text-xs text-gray-500">{label}</div><div className="mt-1 text-2xl font-bold">{value ?? 0}</div></div>
 }
 
-function NumberField({ label, value, setValue }: { label: string; value: number; setValue: (value: number) => void }) {
-  return <label className="text-sm font-medium">{label}<input className="mt-1 w-full rounded border px-3 py-2" type="number" min={1} max={1000} value={value} onChange={(e) => setValue(Number(e.target.value))} /></label>
+function NumberField({ label, value, setValue, max }: { label: string; value: number; setValue: (value: number) => void; max: number }) {
+  return <label className="text-sm font-medium">{label}<input className="mt-1 w-full rounded border px-3 py-2" type="number" min={1} max={max} value={value} onChange={(e) => setValue(Math.min(max, Math.max(1, Number(e.target.value) || 1)))} /></label>
 }
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
