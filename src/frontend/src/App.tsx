@@ -25,6 +25,7 @@ import PTCKnowledgePage from './pages/PTCKnowledgePage'
 import PTCReportCenterPage from './pages/PTCReportCenterPage'
 import PTCResearchAssistantPage from './pages/PTCResearchAssistantPage'
 import PTCResearchPage from './pages/PTCResearchPage'
+import PTCTimelinePage from './pages/PTCTimelinePage'
 import StatusBanner from './components/StatusBanner'
 
 function AppNavbar() {
@@ -35,6 +36,7 @@ function AppNavbar() {
   const links = [
     { label: 'PTC 總控台', path: '/ptc-command-center' },
     { label: 'PTC 3D', path: '/ptc-3d' },
+    { label: 'PTC Digital Thread', path: '/ptc-timeline' },
     { label: 'PTC 證據矩陣', path: '/ptc-evidence-matrix' },
     { label: 'PTC 相似隊列', path: '/ptc-cohort' },
     { label: 'PTC 研究助手', path: '/ptc-assistant' },
@@ -84,6 +86,7 @@ function App() {
         <Route path="/workbench" element={<Workbench />} />
         <Route path="/ptc-command-center" element={<PTCCommandCenterPage />} />
         <Route path="/ptc-3d" element={<PTC3DExplorerPage />} />
+        <Route path="/ptc-timeline" element={<PTCTimelinePage />} />
         <Route path="/ptc-evidence-matrix" element={<PTCEvidenceMatrixPage />} />
         <Route path="/ptc-cohort" element={<PTCCohortPage />} />
         <Route path="/ptc-assistant" element={<PTCResearchAssistantPage />} />
