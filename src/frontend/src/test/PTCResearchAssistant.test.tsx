@@ -61,9 +61,10 @@ vi.mock('../api/ptcAssistant', () => ({
 }))
 
 describe('PTCResearchAssistant', () => {
-  it('shows an auditable answer, citations, trace and 3D action', async () => {
+  it('runs a selected preset topic and shows auditable evidence', async () => {
     render(<PTCResearchAssistant caseId="TCGA-ASSIST-001" gene="BRAF" onOpenGene={onOpenGene} />)
 
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '为什么这个病例要关注当前突变？' }))
 
     expect(await screen.findByText(/This de-identified research case contains BRAF/)).toBeInTheDocument()
@@ -80,8 +81,9 @@ describe('PTCResearchAssistant', () => {
     await waitFor(() => expect(onOpenGene).toHaveBeenCalledWith('BRAF'))
   })
 
-  it('disables questions when no case is selected', () => {
+  it('disables every preset topic when no case is selected', () => {
     render(<PTCResearchAssistant caseId={null} gene={null} />)
-    expect(screen.getByRole('button', { name: '提问' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '为什么这个病例要关注当前突变？' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '有哪些相关药物与证据？' })).toBeDisabled()
   })
 })
