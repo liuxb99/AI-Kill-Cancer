@@ -56,6 +56,15 @@ export interface PTCCompleteGraph {
   edges: Array<{ id: string; source: string; target: string; relation: string; properties: Record<string, unknown> }>
 }
 
+export interface PTCCompleteSyncPayload {
+  gdc_size: number
+  gdc_mutation_files: number
+  trial_size: number
+  pubmed_size: number
+  drug_names: string[]
+  include_civic: boolean
+}
+
 export function getPTCSourceStatus(): Promise<PTCSourceStatus> {
   return request('/ptc-completion/status')
 }
@@ -68,12 +77,6 @@ export function getPTCCompleteGraph(caseLimit = 500): Promise<PTCCompleteGraph> 
   return request(`/ptc-completion/graph?case_limit=${caseLimit}`)
 }
 
-export function syncPTCCompletePipeline(payload: {
-  gdc_size: number
-  trial_size: number
-  pubmed_size: number
-  drug_names: string[]
-  include_civic: boolean
-}): Promise<PTCSyncResult> {
+export function syncPTCCompletePipeline(payload: PTCCompleteSyncPayload): Promise<PTCSyncResult> {
   return request('/ptc-completion/sync-all', { method: 'POST', body: JSON.stringify(payload) })
 }
