@@ -1,0 +1,44 @@
+name: PTC Database Selection UI
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/frontend/src/api/ptcResearch.ts"
+      - "src/frontend/src/pages/PTCKnowledgePage.tsx"
+      - "src/frontend/src/pages/PTCIntegratedPage.tsx"
+      - "src/frontend/src/pages/PTCResearchAssistantPage.tsx"
+      - "src/frontend/src/components/PTCResearchAssistant.tsx"
+      - "src/frontend/src/pages/PTCReportCenterPage.tsx"
+      - "src/frontend/src/pages/PTCDataQualityPage.tsx"
+      - "src/frontend/src/test/PTCKnowledgeSelectionPage.test.tsx"
+      - "src/frontend/src/test/PTCIntegratedSelectionPage.test.tsx"
+      - "src/frontend/src/test/PTCResearchAssistant.test.tsx"
+      - "src/frontend/src/test/PTCReportCenterPage.test.tsx"
+      - "src/frontend/src/test/PTCDataQualityPage.test.tsx"
+      - ".github/workflows/ptc-selection-ui.yml"
+  workflow_dispatch:
+
+jobs:
+  selection-ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - run: npm ci
+      - name: Run selection-only interaction tests
+        run: |
+          npm test -- --run src/test/PTCKnowledgeSelectionPage.test.tsx
+          npm test -- --run src/test/PTCIntegratedSelectionPage.test.tsx
+          npm test -- --run src/test/PTCResearchAssistant.test.tsx
+          npm test -- --run src/test/PTCReportCenterPage.test.tsx
+          npm test -- --run src/test/PTCDataQualityPage.test.tsx
+      - name: TypeScript and production build
+        run: npm run build
