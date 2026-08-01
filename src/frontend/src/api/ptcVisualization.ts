@@ -35,7 +35,9 @@ export interface PTCProteinStructure {
   alphafold_entry_id: string
   alphafold_entry_url: string
   cif_url: string
+  cif_urls: string[]
   pdb_url: string
+  pdb_urls: string[]
   experimental_structures: PTCExperimentalStructure[]
   experimental_pdb_ids: string[]
   default_pdb_id?: string
