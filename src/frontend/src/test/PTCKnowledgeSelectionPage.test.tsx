@@ -24,7 +24,7 @@ vi.mock('../api/ptcResearch', () => ({
   syncPTCOpenFDA: mocks.syncPTCOpenFDA,
 }))
 
-describe('PTCKnowledgePage selection-only workflow', () => {
+describe('PTCKnowledgePage dual-mode workflow', () => {
   beforeEach(() => {
     mocks.getLatestPTCCases.mockResolvedValue({
       count: 1,
@@ -39,16 +39,21 @@ describe('PTCKnowledgePage selection-only workflow', () => {
     mocks.syncPTCOpenFDA.mockResolvedValue({ status: 'ok', records: 5 })
   })
 
-  it('lists the latest database cases and existing genes without text query inputs', async () => {
+  it('supports latest-100 selection and advanced exact query', async () => {
     render(<PTCKnowledgePage />)
 
     expect(await screen.findByDisplayValue('TCGA-KNOW-001')).toBeInTheDocument()
     expect(screen.getByDisplayValue('BRAF')).toBeInTheDocument()
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(mocks.getLatestPTCCases).toHaveBeenCalledWith(100)
 
     fireEvent.click(screen.getByRole('button', { name: '展示所選基因資料' }))
     await waitFor(() => expect(mocks.getPTCGeneKnowledge).toHaveBeenCalledWith('BRAF'))
+
+    fireEvent.click(screen.getByRole('button', { name: '進階精準查詢' }))
+    const textbox = screen.getByPlaceholderText(/BRAF、dabrafenib/)
+    fireEvent.change(textbox, { target: { value: 'BRAF' } })
+    fireEvent.click(screen.getByRole('button', { name: '精準查詢' }))
+    await waitFor(() => expect(mocks.getPTCGeneKnowledge).toHaveBeenLastCalledWith('BRAF'))
   })
 
   it('syncs only the fixed openFDA research drug set', async () => {
