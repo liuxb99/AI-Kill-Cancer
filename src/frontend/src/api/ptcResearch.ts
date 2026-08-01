@@ -1,17 +1,4 @@
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`/api/v1${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-  })
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
-    throw new Error(body.detail || `HTTP ${response.status}`)
-  }
-  return response.json()
-}
+import { apiRequest, withQuery } from './client'
 
 export interface PTCVariant {
   variant_id?: string
@@ -99,22 +86,19 @@ export interface PTCEvidence {
 }
 
 export function listPTCCases(gene?: string): Promise<PTCResearchCase[]> {
-  const params = new URLSearchParams()
-  if (gene) params.set('gene', gene)
-  const suffix = params.toString() ? `?${params}` : ''
-  return request(`/ptc-research/cases${suffix}`)
+  return apiRequest(withQuery('/ptc-research/cases', { gene }))
 }
 
 export function getPTCCase(caseId: string): Promise<PTCResearchCase> {
-  return request(`/ptc-research/cases/${encodeURIComponent(caseId)}`)
+  return apiRequest(`/ptc-research/cases/${encodeURIComponent(caseId)}`)
 }
 
 export function getPTCGraphPath(caseId: string): Promise<PTCGraphPath> {
-  return request(`/ptc-research/cases/${encodeURIComponent(caseId)}/graph-path`)
+  return apiRequest(`/ptc-research/cases/${encodeURIComponent(caseId)}/graph-path`)
 }
 
 export function importPTCRecords(records: unknown[], sourceVersion?: string) {
-  return request<{
+  return apiRequest<{
     batch_id: string
     imported_cases: number
     imported_variants: number
@@ -127,19 +111,15 @@ export function importPTCRecords(records: unknown[], sourceVersion?: string) {
 }
 
 export function listPTCTherapies(gene?: string): Promise<PTCTherapy[]> {
-  const params = new URLSearchParams()
-  if (gene) params.set('gene', gene)
-  return request(`/ptc-knowledge/therapies${params.toString() ? `?${params}` : ''}`)
+  return apiRequest(withQuery('/ptc-knowledge/therapies', { gene }))
 }
 
 export function listPTCTrials(recruitingOnly = false): Promise<PTCTrial[]> {
-  return request(`/ptc-knowledge/trials?recruiting_only=${recruitingOnly}`)
+  return apiRequest(withQuery('/ptc-knowledge/trials', { recruiting_only: recruitingOnly }))
 }
 
 export function listPTCEvidence(gene?: string): Promise<PTCEvidence[]> {
-  const params = new URLSearchParams()
-  if (gene) params.set('gene', gene)
-  return request(`/ptc-knowledge/evidence${params.toString() ? `?${params}` : ''}`)
+  return apiRequest(withQuery('/ptc-knowledge/evidence', { gene }))
 }
 
 export function getPTCGeneKnowledge(gene: string): Promise<{
@@ -148,15 +128,18 @@ export function getPTCGeneKnowledge(gene: string): Promise<{
   trials: PTCTrial[]
   evidence: PTCEvidence[]
 }> {
-  return request(`/ptc-knowledge/gene/${encodeURIComponent(gene)}`)
+  return apiRequest(`/ptc-knowledge/gene/${encodeURIComponent(gene)}`)
 }
 
 export function syncPTCClinicalTrials(pageSize = 100) {
-  return request<{ status: string; records: number }>(`/ptc-knowledge/sync/clinical-trials?page_size=${pageSize}`, { method: 'POST' })
+  return apiRequest<{ status: string; records: number }>(
+    withQuery('/ptc-knowledge/sync/clinical-trials', { page_size: pageSize }),
+    { method: 'POST' },
+  )
 }
 
 export function syncPTCOpenFDA(drugNames: string[]) {
-  return request<{ status: string; records: number }>('/ptc-knowledge/sync/openfda', {
+  return apiRequest<{ status: string; records: number }>('/ptc-knowledge/sync/openfda', {
     method: 'POST',
     body: JSON.stringify({ drug_names: drugNames }),
   })
