@@ -24,15 +24,22 @@ export function withQuery(path: string, params: Record<string, string | number |
 }
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const url = apiUrl(path)
   const hasBody = options.body !== undefined && options.body !== null
-  const response = await fetch(apiUrl(path), {
-    ...options,
-    headers: {
-      ...authHeaders(),
-      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.headers || {}),
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        ...authHeaders(),
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.headers || {}),
+      },
+    })
+  } catch (reason) {
+    const message = reason instanceof Error ? reason.message : String(reason)
+    throw new Error(`API request failed (${url}): ${message}`)
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` })) as ApiErrorBody
     throw new Error(body.detail || body.message || `HTTP ${response.status}`)
