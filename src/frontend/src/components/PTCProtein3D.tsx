@@ -1,15 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { PTCProteinStructure } from '../api/ptcVisualization'
 import type { PTCVariant } from '../api/ptcResearch'
 
 const MOLSTAR_VERSION = '3.3.0'
-const MOLSTAR_SCRIPT = `https://cdn.jsdelivr.net/npm/pdbe-molstar@${MOLSTAR_VERSION}/build/pdbe-molstar-component.js`
+const MOLSTAR_SCRIPT = `https://cdn.jsdelivr.net/npm/pdbe-molstar@${MOLSTAR_VERSION}/build/pdbe-molstar-plugin.js`
 const MOLSTAR_STYLE = `https://cdn.jsdelivr.net/npm/pdbe-molstar@${MOLSTAR_VERSION}/build/pdbe-molstar.css`
 let loader: Promise<void> | null = null
 
-function loadMolstar(): Promise<void> {
-  if (customElements.get('pdbe-molstar')) return Promise.resolve()
+declare global {
+  interface Window {
+    PDBeMolstarPlugin?: new () => any
+  }
+}
+
+function loadMolstarPlugin(): Promise<void> {
+  if (window.PDBeMolstarPlugin) return Promise.resolve()
   if (loader) return loader
   loader = new Promise((resolve, reject) => {
     if (!document.querySelector(`link[href="${MOLSTAR_STYLE}"]`)) {
@@ -21,7 +27,7 @@ function loadMolstar(): Promise<void> {
     }
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${MOLSTAR_SCRIPT}"]`)
     const script = existing || document.createElement('script')
-    const loaded = () => customElements.whenDefined('pdbe-molstar').then(() => resolve())
+    const loaded = () => window.PDBeMolstarPlugin ? resolve() : reject(new Error('PDBe Mol* 插件未正确初始化'))
     const failed = () => reject(new Error('PDBe Mol* 载入失败'))
     script.addEventListener('load', loaded, { once: true })
     script.addEventListener('error', failed, { once: true })
@@ -41,6 +47,12 @@ interface Props {
   loading?: boolean
 }
 
+interface MutationResidue {
+  key: string
+  label: string
+  residue: number
+}
+
 function residueNumber(proteinChange?: string): number | null {
   if (!proteinChange) return null
   const match = proteinChange.match(/(?:p\.)?[A-Za-z*]+(\d+)/)
@@ -49,60 +61,138 @@ function residueNumber(proteinChange?: string): number | null {
 
 export default function PTCProtein3D({ structure, variants = [], loading }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null)
+  const viewerRef = useRef<any>(null)
   const [mode, setMode] = useState<'alphafold' | 'pdb'>('alphafold')
   const [pdbId, setPdbId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [viewerReady, setViewerReady] = useState(false)
+  const [focusedResidue, setFocusedResidue] = useState<number | null>(null)
 
-  const geneVariants = structure
-    ? variants.filter((item) => item.gene.toUpperCase() === structure.gene.toUpperCase())
-    : []
+  const geneVariants = useMemo(
+    () => structure
+      ? variants.filter((item) => item.gene.toUpperCase() === structure.gene.toUpperCase())
+      : [],
+    [structure, variants],
+  )
+
+  const mutationResidues = useMemo<MutationResidue[]>(() => {
+    const seen = new Set<number>()
+    return geneVariants.flatMap((variant) => {
+      const residue = residueNumber(variant.protein_change)
+      if (!residue || seen.has(residue)) return []
+      seen.add(residue)
+      return [{
+        key: variant.variant_id || `${variant.gene}:${residue}`,
+        label: variant.protein_change || `${variant.gene} residue ${residue}`,
+        residue,
+      }]
+    })
+  }, [geneVariants])
 
   useEffect(() => {
     setPdbId(structure?.default_pdb_id || null)
     setMode('alphafold')
     setError(null)
+    setFocusedResidue(null)
   }, [structure])
 
   useEffect(() => {
     const host = hostRef.current
     if (!host || !structure) return
     let disposed = false
-    void loadMolstar().then(() => {
-      if (disposed || !hostRef.current) return
+    let instance: any = null
+    setViewerReady(false)
+
+    void loadMolstarPlugin().then(async () => {
+      if (disposed || !hostRef.current || !window.PDBeMolstarPlugin) return
       setError(null)
-      const viewer = document.createElement('pdbe-molstar')
-      viewer.setAttribute('hide-controls', 'false')
-      viewer.setAttribute('sequence-panel', 'true')
-      viewer.setAttribute('landscape', 'true')
-      viewer.setAttribute('reactive', 'true')
-      viewer.setAttribute('loading-overlay', 'true')
-      viewer.setAttribute('select-interaction', 'true')
-      viewer.setAttribute('visual-style', 'cartoon')
-      viewer.setAttribute('bg-color-r', '7')
-      viewer.setAttribute('bg-color-g', '17')
-      viewer.setAttribute('bg-color-b', '31')
-      viewer.setAttribute('select-color-r', '251')
-      viewer.setAttribute('select-color-g', '146')
-      viewer.setAttribute('select-color-b', '60')
-      viewer.style.display = 'block'
-      viewer.style.width = '100%'
-      viewer.style.height = '620px'
-      if (mode === 'pdb' && pdbId) {
-        viewer.setAttribute('molecule-id', pdbId.toLowerCase())
-      } else {
-        viewer.setAttribute('custom-data-url', structure.cif_url)
-        viewer.setAttribute('custom-data-format', 'cif')
-        viewer.setAttribute('alphafold-view', 'true')
+      host.replaceChildren()
+      instance = new window.PDBeMolstarPlugin()
+      viewerRef.current = instance
+      const options: Record<string, unknown> = {
+        hideControls: false,
+        sequencePanel: true,
+        landscape: true,
+        reactive: true,
+        loadingOverlay: true,
+        selectInteraction: true,
+        visualStyle: 'cartoon',
+        bgColor: { r: 7, g: 17, b: 31 },
+        selectColor: '#fb923c',
+        highlightColor: '#fde047',
+        granularity: 'residue',
       }
-      host.replaceChildren(viewer)
+      if (mode === 'pdb' && pdbId) {
+        options.moleculeId = pdbId.toLowerCase()
+      } else {
+        options.customData = { url: structure.cif_url, format: 'cif' }
+        options.alphafoldView = true
+      }
+      await instance.render(host, options)
+      if (disposed) return
+      setViewerReady(true)
+
+      if (mutationResidues.length > 0) {
+        await instance.visual.select({
+          data: mutationResidues.map((item, index) => ({
+            residue_number: item.residue,
+            color: index === 0 ? '#f97316' : '#facc15',
+            focus: index === 0,
+            sideChain: true,
+            representation: 'ball-and-stick',
+            representationColor: index === 0 ? '#fb923c' : '#fde047',
+          })),
+          nonSelectedColor: '#64748b',
+        })
+        setFocusedResidue(mutationResidues[0].residue)
+      }
     }).catch((reason) => {
       if (!disposed) setError(reason instanceof Error ? reason.message : '无法载入蛋白质 3D 结构')
     })
+
     return () => {
       disposed = true
+      setViewerReady(false)
+      viewerRef.current = null
+      if (instance?.clear) void instance.clear()
       host.replaceChildren()
     }
-  }, [structure, mode, pdbId])
+  }, [structure, mode, pdbId, mutationResidues])
+
+  async function focusMutation(item: MutationResidue) {
+    const viewer = viewerRef.current
+    if (!viewer?.visual) return
+    setFocusedResidue(item.residue)
+    try {
+      await viewer.visual.select({
+        data: [{
+          residue_number: item.residue,
+          color: '#f97316',
+          focus: true,
+          sideChain: true,
+          representation: 'ball-and-stick',
+          representationColor: '#fb923c',
+        }],
+        nonSelectedColor: '#64748b',
+      })
+      await viewer.visual.highlight({
+        data: [{ residue_number: item.residue }],
+        color: '#fde047',
+        focus: true,
+      })
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : `无法聚焦 residue ${item.residue}`)
+    }
+  }
+
+  async function resetStructure() {
+    const viewer = viewerRef.current
+    if (!viewer?.visual) return
+    await viewer.visual.clearHighlight()
+    await viewer.visual.clearSelection()
+    await viewer.visual.reset({ camera: true, theme: true })
+    setFocusedResidue(null)
+  }
 
   if (loading) {
     return <div className="grid h-[620px] place-items-center rounded-xl border bg-slate-950 text-slate-300">蛋白结构载入中…</div>
@@ -137,23 +227,30 @@ export default function PTCProtein3D({ structure, variants = [], loading }: Prop
               PDB {id}
             </button>
           ))}
+          <button className="rounded bg-slate-700 px-3 py-1.5" onClick={() => void resetStructure()} disabled={!viewerReady}>
+            重置视图
+          </button>
         </div>
       </div>
 
-      {geneVariants.length > 0 && (
+      {mutationResidues.length > 0 && (
         <div className="border-b border-slate-700 bg-amber-950/50 px-4 py-3 text-xs text-amber-100">
-          <div className="font-semibold">当前病例的 {structure.gene} 变异</div>
+          <div className="font-semibold">当前病例的 {structure.gene} 突变残基</div>
           <div className="mt-2 flex flex-wrap gap-2">
-            {geneVariants.map((variant) => {
-              const residue = residueNumber(variant.protein_change)
-              return (
-                <span key={variant.variant_id} className="rounded-full border border-amber-500/50 bg-amber-900/50 px-3 py-1">
-                  {variant.protein_change || variant.variant_id}{residue ? ` · residue ${residue}` : ''}
-                </span>
-              )
-            })}
+            {mutationResidues.map((item) => (
+              <button
+                key={item.key}
+                className={`rounded-full border px-3 py-1 transition ${focusedResidue === item.residue ? 'border-orange-300 bg-orange-500 text-slate-950' : 'border-amber-500/50 bg-amber-900/50 hover:bg-amber-800/70'}`}
+                onClick={() => void focusMutation(item)}
+                disabled={!viewerReady}
+              >
+                {item.label} · residue {item.residue} · 聚焦
+              </button>
+            ))}
           </div>
-          <p className="mt-2 text-amber-200/70">可在序列面板中定位对应残基；不同 PDB 结构可能只覆盖蛋白的一部分区域。</p>
+          <p className="mt-2 text-amber-200/70">
+            AlphaFold 使用 UniProt 全长残基编号；实验 PDB 可能只覆盖局部结构，若该残基不在所选 PDB 中请切回 AlphaFold。
+          </p>
         </div>
       )}
 
@@ -174,7 +271,7 @@ export default function PTCProtein3D({ structure, variants = [], loading }: Prop
 
       <div className="border-t border-slate-700 bg-slate-900 px-4 py-3 text-xs text-slate-300">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span>左键旋转 · 右键／滚轮缩放 · 点击原子或残基聚焦 · 可切换 AlphaFold 与实验 PDB</span>
+          <span>左键旋转 · 右键／滚轮缩放 · 点击残基聚焦 · 橙色为病例突变位点</span>
           <a className="text-cyan-300 hover:underline" href={structure.alphafold_entry_url} target="_blank" rel="noreferrer">打开 AlphaFold DB</a>
         </div>
         <p className="mt-1 text-amber-300">{structure.disclaimer}</p>
