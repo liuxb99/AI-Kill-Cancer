@@ -58,7 +58,7 @@ vi.mock('../api/ptcEvidenceMatrix', () => ({
       variants: [{ variant_id: 'v1', protein_change: 'p.V600E', classification: 'Missense_Mutation' }],
       protein_domain: 'Kinase domain',
       pathway: 'MAPK / ERK',
-      score: 84,
+      score: 69,
       score_type: 'data_linkage_completeness',
       score_version: 'ptc-evidence-linkage-v2',
       score_components: { variant_present: 20, persisted_therapies: 5, best_evidence_level: 30, active_trials: 5, open_full_text_assets: 4, source_provenance: 5 },
@@ -88,7 +88,7 @@ describe('PTCEvidenceMatrixPage', () => {
     expect(screen.getByText('BRAF evidence')).toBeInTheDocument()
     expect(screen.getByText('NCT-MATRIX-001')).toBeInTheDocument()
     expect(screen.getByText('12 cases')).toBeInTheDocument()
-    expect(screen.getByText('84.0')).toBeInTheDocument()
+    expect(screen.getByText('69.0')).toBeInTheDocument()
     expect(screen.getByText('資料鏈結完整度')).toBeInTheDocument()
     expect(screen.getByText(/Outcome-blind：是/)).toBeInTheDocument()
     expect(screen.getByText(/Vital status，不參與分數/)).toBeInTheDocument()
@@ -104,6 +104,6 @@ describe('PTCEvidenceMatrixPage', () => {
     fireEvent.change(screen.getByPlaceholderText('例如 TCGA-XX-XXXX'), { target: { value: 'TCGA-MATRIX-999' } })
     fireEvent.click(screen.getByRole('button', { name: '精準查詢' }))
 
-    await waitFor(() => expect(screen.getByDisplayValue('TCGA-MATRIX-999')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByDisplayValue('TCGA-MATRIX-999')).toHaveLength(2))
   })
 })
