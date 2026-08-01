@@ -1,0 +1,60 @@
+name: PTC Cohort Scientific Integrity
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/backend/api/v1/ptc_cohort.py"
+      - "tests/backend/api/test_ptc_cohort.py"
+      - "src/frontend/src/api/ptcCohort.ts"
+      - "src/frontend/src/api/ptcResearch.ts"
+      - "src/frontend/src/pages/PTCCohortPage.tsx"
+      - "src/frontend/src/test/PTCCohortPage.test.tsx"
+      - ".github/workflows/ptc-cohort-integrity.yml"
+  workflow_dispatch:
+
+jobs:
+  backend-outcome-blind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r src/backend/requirements-api.txt
+          pip install pytest pytest-asyncio ruff aiosqlite
+      - name: Lint cohort implementation
+        run: ruff check src/backend/api/v1/ptc_cohort.py tests/backend/api/test_ptc_cohort.py
+      - name: Run outcome-blind cohort tests
+        run: pytest -v --tb=short tests/backend/api/test_ptc_cohort.py
+      - name: Guard against outcome leakage
+        run: |
+          python - <<'PY'
+          from src.backend.api.v1.ptc_cohort import OUTCOME_FIELDS_EXCLUDED, WEIGHTS
+          assert sum(WEIGHTS.values()) == 100.0
+          assert 'vital_status' not in WEIGHTS
+          assert {'vital_status', 'days_to_last_follow_up', 'days_to_death', 'outcomes'} <= set(OUTCOME_FIELDS_EXCLUDED)
+          PY
+
+  frontend-cohort-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - run: npm ci
+      - name: Run cohort interaction test
+        run: npm test -- --run src/test/PTCCohortPage.test.tsx
+      - name: Run shared client regression
+        run: npm test -- --run src/test/apiClient.test.ts src/test/apiConsolidation.test.ts
+      - name: TypeScript and production build
+        run: npm run build
