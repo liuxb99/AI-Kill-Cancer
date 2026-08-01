@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || ''
+import { apiRequest } from './client'
 
 export interface PTCTargetTherapy {
   therapy_key: string
@@ -10,12 +10,7 @@ export interface PTCTargetTherapy {
   indications: string[]
   source_name: string
   source_url?: string
-  matched_targets: Array<{
-    gene: string
-    variant?: string
-    interaction_type?: string
-    evidence_level?: string
-  }>
+  matched_targets: Array<{ gene: string; variant?: string; interaction_type?: string; evidence_level?: string }>
 }
 
 export interface PTCTargetingResponse {
@@ -52,8 +47,6 @@ export interface PTCTargetingResponse {
   disclaimer: string
 }
 
-export async function getPTCTargeting(gene: string): Promise<PTCTargetingResponse> {
-  const response = await fetch(`${API_BASE}/api/v1/ptc-targeting/gene/${encodeURIComponent(gene)}`)
-  if (!response.ok) throw new Error(`无法载入 ${gene} 靶向治疗链：HTTP ${response.status}`)
-  return response.json()
+export function getPTCTargeting(gene: string): Promise<PTCTargetingResponse> {
+  return apiRequest(`/ptc-targeting/gene/${encodeURIComponent(gene)}`)
 }
