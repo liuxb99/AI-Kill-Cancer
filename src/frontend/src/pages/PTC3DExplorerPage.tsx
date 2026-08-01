@@ -41,6 +41,11 @@ export default function PTC3DExplorerPage() {
     [selectedCase],
   )
 
+  const selectedGeneVariants = useMemo(
+    () => (selectedCase?.variants || []).filter((item) => item.gene.toUpperCase() === selectedGene?.toUpperCase()),
+    [selectedCase, selectedGene],
+  )
+
   async function selectGene(gene: string) {
     setSelectedGene(gene)
     setProteinLoading(true)
@@ -142,7 +147,7 @@ export default function PTC3DExplorerPage() {
           {view === 'cell' ? (
             <PTCCell3D selectedCase={selectedCase} onSelectGene={(gene) => void selectGene(gene)} />
           ) : (
-            <PTCProtein3D structure={protein} loading={proteinLoading} />
+            <PTCProtein3D structure={protein} variants={selectedGeneVariants} loading={proteinLoading} />
           )}
 
           <div className="grid gap-4 lg:grid-cols-2">
