@@ -76,6 +76,16 @@ def _evidence_assets(item: PTCEvidenceRecordModel) -> tuple[int, int]:
     return len(payload.get("figures") or []), len(payload.get("tables") or [])
 
 
+def _has_complete_provenance(item: object) -> bool:
+    if isinstance(item, PTCClinicalTrialModel):
+        return bool(item.nct_id and item.source_url)
+    return bool(
+        getattr(item, "source_name", None)
+        and getattr(item, "source_record_id", None)
+        and getattr(item, "source_url", None)
+    )
+
+
 def _provenance_score(
     therapies: list[PTCTherapyModel],
     evidence: list[PTCEvidenceRecordModel],
@@ -84,13 +94,7 @@ def _provenance_score(
     linked = [*therapies, *evidence, *trials]
     if not linked:
         return 0.0
-    complete = sum(
-        1
-        for item in linked
-        if getattr(item, "source_name", None)
-        and getattr(item, "source_record_id", None)
-        and getattr(item, "source_url", None)
-    )
+    complete = sum(1 for item in linked if _has_complete_provenance(item))
     return round(SCORE_WEIGHTS["source_provenance"] * complete / len(linked), 3)
 
 
