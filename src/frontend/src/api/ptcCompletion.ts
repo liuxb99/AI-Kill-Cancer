@@ -1,16 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || ''
-
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}/api/v1${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-  })
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
-    throw new Error(body.detail || `HTTP ${response.status}`)
-  }
-  return response.json()
-}
+import { apiRequest, withQuery } from './client'
 
 export interface PTCSourceStatus {
   cases: number
@@ -89,21 +77,21 @@ export interface PTCCompleteSyncPayload {
 }
 
 export function getPTCSourceStatus(): Promise<PTCSourceStatus> {
-  return request('/ptc-completion/status')
+  return apiRequest('/ptc-completion/status')
 }
 
 export function getPTCReadiness(): Promise<PTCReadinessResult> {
-  return request('/ptc-readiness')
+  return apiRequest('/ptc-readiness')
 }
 
 export function getPTCOutcomesByGene(): Promise<PTCOutcomeByGene[]> {
-  return request('/ptc-completion/outcomes/by-gene')
+  return apiRequest('/ptc-completion/outcomes/by-gene')
 }
 
 export function getPTCCompleteGraph(caseLimit = 500): Promise<PTCCompleteGraph> {
-  return request(`/ptc-completion/graph?case_limit=${caseLimit}`)
+  return apiRequest(withQuery('/ptc-completion/graph', { case_limit: caseLimit }))
 }
 
 export function syncPTCCompletePipeline(payload: PTCCompleteSyncPayload): Promise<PTCSyncResult> {
-  return request('/ptc-completion/sync-all', { method: 'POST', body: JSON.stringify(payload) })
+  return apiRequest('/ptc-completion/sync-all', { method: 'POST', body: JSON.stringify(payload) })
 }
