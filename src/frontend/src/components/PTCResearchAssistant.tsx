@@ -16,26 +16,24 @@ const QUICK_QUESTIONS = [
 ]
 
 export default function PTCResearchAssistant({ caseId, gene, onOpenGene }: Props) {
-  const [question, setQuestion] = useState(QUICK_QUESTIONS[0])
+  const [selectedQuestion, setSelectedQuestion] = useState(QUICK_QUESTIONS[0])
   const [result, setResult] = useState<PTCAssistantResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expandedEvidence, setExpandedEvidence] = useState<string | null>(null)
 
-  const ready = Boolean(caseId && question.trim().length >= 2)
   const summary = useMemo(() => {
     if (!result) return null
     return `${result.case_facts.variants.length} variants · ${result.therapies.length} therapies · ${result.evidence.length} evidence · ${result.trials.length} trials`
   }, [result])
 
-  async function submit(nextQuestion?: string) {
-    const text = (nextQuestion || question).trim()
-    if (!caseId || text.length < 2) return
-    setQuestion(text)
+  async function submit(question: string) {
+    if (!caseId) return
+    setSelectedQuestion(question)
     setLoading(true)
     setError(null)
     try {
-      setResult(await askPTCAssistant(caseId, text, gene))
+      setResult(await askPTCAssistant(caseId, question, gene))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '无法生成可追溯研究回答')
     } finally {
@@ -59,9 +57,9 @@ export default function PTCResearchAssistant({ caseId, gene, onOpenGene }: Props
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Evidence-grounded Research Assistant</p>
-          <h3 className="text-xl font-bold text-gray-900">病例研究问答与证据追踪</h3>
+          <h3 className="text-xl font-bold text-gray-900">病例研究主题与证据追踪</h3>
           <p className="mt-1 text-sm text-gray-600">
-            回答仅来自当前公开研究病例、数据库药物、试验与文献资产；不调用外部 LLM，也不生成处方。
+            先从数据库病例与基因清单选择对象，再选择预设研究主题。系统不要求输入查询文字，也不调用外部 LLM。
           </p>
         </div>
         <div className="rounded bg-white px-3 py-2 text-xs text-gray-500 shadow-sm">
@@ -69,11 +67,11 @@ export default function PTCResearchAssistant({ caseId, gene, onOpenGene }: Props
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
         {QUICK_QUESTIONS.map((item) => (
           <button
             key={item}
-            className="rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100"
+            className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${selectedQuestion === item ? 'border-indigo-500 bg-indigo-100 text-indigo-900' : 'border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50'}`}
             disabled={!caseId || loading}
             onClick={() => void submit(item)}
           >
@@ -82,23 +80,13 @@ export default function PTCResearchAssistant({ caseId, gene, onOpenGene }: Props
         ))}
       </div>
 
-      <div className="mt-4 flex gap-2">
-        <textarea
-          aria-label="PTC 研究问题"
-          className="min-h-24 flex-1 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
-          placeholder="例如：为什么这个 BRAF V600E 病例值得关注？有哪些药物、试验和论文图表？"
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-        />
-        <button
-          className="self-stretch rounded-lg bg-indigo-600 px-5 font-semibold text-white disabled:bg-gray-300"
-          disabled={!ready || loading}
-          onClick={() => void submit()}
-        >
-          {loading ? '整理证据中…' : '提问'}
-        </button>
-      </div>
+      {!result && caseId && (
+        <div className="mt-4 rounded border border-dashed border-indigo-200 bg-white p-5 text-center text-sm text-gray-500">
+          从上方四个研究主题中选择一个，系统会直接整理当前病例的数据库证据。
+        </div>
+      )}
 
+      {loading && <div className="mt-4 rounded bg-indigo-100 p-3 text-sm text-indigo-800">正在整理数据库证据…</div>}
       {error && <div className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       {result && (
