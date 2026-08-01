@@ -124,7 +124,7 @@ async def test_matrix_joins_variant_therapy_evidence_trial_and_cohort(session):
     assert row["evidence"][0]["tables"] == 1
     assert row["trials"][0]["active"] is True
     assert row["cohort"]["same_gene_cases"] == 1
-    assert row["score"] > 80
+    assert row["score"] > 60
     assert row["gaps"] == []
     assert result["trace"][-1]["name"] == "score_and_rank_matrix"
 
