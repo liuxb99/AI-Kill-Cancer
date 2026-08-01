@@ -56,6 +56,29 @@ export interface PTCCompleteGraph {
   edges: Array<{ id: string; source: string; target: string; relation: string; properties: Record<string, unknown> }>
 }
 
+export interface PTCReadinessResult {
+  status: 'ready' | 'not_ready'
+  demo_ready: boolean
+  research_ready: boolean
+  counts: PTCSourceStatus
+  graph: {
+    nodes: number
+    relations: number
+    dangling_edge_count: number
+    dangling_edges: string[]
+    knowgraph_entities: number
+    knowgraph_relations: number
+  }
+  checks: {
+    demo: Record<string, boolean>
+    research: Record<string, boolean>
+    structural: Record<string, boolean>
+  }
+  blockers: string[]
+  research_gaps: string[]
+  disclaimer: string
+}
+
 export interface PTCCompleteSyncPayload {
   gdc_size: number
   gdc_mutation_files: number
@@ -67,6 +90,10 @@ export interface PTCCompleteSyncPayload {
 
 export function getPTCSourceStatus(): Promise<PTCSourceStatus> {
   return request('/ptc-completion/status')
+}
+
+export function getPTCReadiness(): Promise<PTCReadinessResult> {
+  return request('/ptc-readiness')
 }
 
 export function getPTCOutcomesByGene(): Promise<PTCOutcomeByGene[]> {
