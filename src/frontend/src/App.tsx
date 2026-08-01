@@ -19,6 +19,7 @@ import TreatmentPlanRevisionPage from './pages/TreatmentPlanRevisionPage'
 import PTC3DExplorerPage from './pages/PTC3DExplorerPage'
 import PTCCohortPage from './pages/PTCCohortPage'
 import PTCCommandCenterPage from './pages/PTCCommandCenterPage'
+import PTCDataQualityPage from './pages/PTCDataQualityPage'
 import PTCEvidenceMatrixPage from './pages/PTCEvidenceMatrixPage'
 import PTCIntegratedPage from './pages/PTCIntegratedPage'
 import PTCKnowledgePage from './pages/PTCKnowledgePage'
@@ -36,6 +37,7 @@ function AppNavbar() {
 
   const links = [
     { label: 'PTC 總控台', path: '/ptc-command-center' },
+    { label: 'PTC 資料品質', path: '/ptc-data-quality' },
     { label: 'PTC 3D', path: '/ptc-3d' },
     { label: 'PTC Digital Thread', path: '/ptc-timeline' },
     { label: 'PTC 試驗比對', path: '/ptc-trial-matching' },
@@ -87,6 +89,7 @@ function App() {
         <Route path="/research-portal" element={<ResearchPortal />} />
         <Route path="/workbench" element={<Workbench />} />
         <Route path="/ptc-command-center" element={<PTCCommandCenterPage />} />
+        <Route path="/ptc-data-quality" element={<PTCDataQualityPage />} />
         <Route path="/ptc-3d" element={<PTC3DExplorerPage />} />
         <Route path="/ptc-timeline" element={<PTCTimelinePage />} />
         <Route path="/ptc-trial-matching" element={<PTCTrialMatchingPage />} />
