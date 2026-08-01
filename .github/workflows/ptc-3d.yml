@@ -7,24 +7,30 @@ on:
       - "src/backend/api/v1/ptc_visualization.py"
       - "src/backend/api/v1/ptc_targeting.py"
       - "src/backend/api/v1/ptc_literature.py"
+      - "src/backend/api/v1/ptc_assistant.py"
       - "src/backend/services/ptc_literature_service.py"
       - "src/backend/api/v1/router.py"
       - "src/frontend/src/api/ptcVisualization.ts"
       - "src/frontend/src/api/ptcTargeting.ts"
       - "src/frontend/src/api/ptcLiterature.ts"
+      - "src/frontend/src/api/ptcAssistant.ts"
       - "src/frontend/src/components/PTCCell3D.tsx"
       - "src/frontend/src/components/PTCProtein3D.tsx"
       - "src/frontend/src/components/PTCTargetingPanel.tsx"
       - "src/frontend/src/components/PTCLiteratureAssetsPanel.tsx"
+      - "src/frontend/src/components/PTCResearchAssistant.tsx"
       - "src/frontend/src/components/threeRuntime.ts"
       - "src/frontend/src/pages/PTC3DExplorerPage.tsx"
+      - "src/frontend/src/pages/PTCResearchAssistantPage.tsx"
       - "src/frontend/src/test/PTC3DExplorerPage.test.tsx"
       - "src/frontend/src/test/PTCProtein3D.test.tsx"
       - "src/frontend/src/test/PTCTargetingPanel.test.tsx"
       - "src/frontend/src/test/PTCLiteratureAssetsPanel.test.tsx"
+      - "src/frontend/src/test/PTCResearchAssistant.test.tsx"
       - "src/frontend/src/App.tsx"
       - "tests/backend/api/test_ptc_visualization.py"
       - "tests/backend/api/test_ptc_targeting.py"
+      - "tests/backend/api/test_ptc_assistant.py"
       - "tests/backend/services/test_ptc_literature_assets.py"
       - ".github/workflows/ptc-3d.yml"
   workflow_dispatch:
@@ -42,21 +48,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r src/backend/requirements-api.txt
           pip install pytest pytest-asyncio ruff aiosqlite
-      - name: Lint visualization targeting and literature code
+      - name: Lint visualization targeting literature and assistant code
         run: |
           ruff check \
             src/backend/api/v1/ptc_visualization.py \
             src/backend/api/v1/ptc_targeting.py \
             src/backend/api/v1/ptc_literature.py \
+            src/backend/api/v1/ptc_assistant.py \
             src/backend/services/ptc_literature_service.py \
             tests/backend/api/test_ptc_visualization.py \
             tests/backend/api/test_ptc_targeting.py \
+            tests/backend/api/test_ptc_assistant.py \
             tests/backend/services/test_ptc_literature_assets.py
-      - name: Run visualization targeting and literature tests
+      - name: Run visualization targeting literature and assistant tests
         run: |
           pytest -v --tb=short \
             tests/backend/api/test_ptc_visualization.py \
             tests/backend/api/test_ptc_targeting.py \
+            tests/backend/api/test_ptc_assistant.py \
             tests/backend/services/test_ptc_literature_assets.py
       - name: Verify API router imports
         run: |
@@ -66,6 +75,7 @@ jobs:
           assert any('/ptc-visualization' in path for path in paths)
           assert any('/ptc-targeting' in path for path in paths)
           assert any('/ptc-literature' in path for path in paths)
+          assert any('/ptc-assistant' in path for path in paths)
           PY
 
   frontend-3d:
@@ -81,11 +91,12 @@ jobs:
           cache: npm
           cache-dependency-path: src/frontend/package-lock.json
       - run: npm ci
-      - name: Run 3D explorer interaction tests
+      - name: Run PTC interaction tests
         run: |
           npm test -- --run src/test/PTC3DExplorerPage.test.tsx
           npm test -- --run src/test/PTCProtein3D.test.tsx
           npm test -- --run src/test/PTCTargetingPanel.test.tsx
           npm test -- --run src/test/PTCLiteratureAssetsPanel.test.tsx
+          npm test -- --run src/test/PTCResearchAssistant.test.tsx
       - name: TypeScript and production build
         run: npm run build
