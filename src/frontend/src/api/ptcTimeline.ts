@@ -1,3 +1,5 @@
+import { apiRequest, withQuery } from './client'
+
 export interface PTCTimelineAction { type: string; label: string }
 export interface PTCTimelineEvent {
   event_type: string
@@ -22,14 +24,6 @@ export interface PTCTimelineResponse {
   disclaimer: string
 }
 
-export async function getPTCCaseTimeline(caseId: string, gene?: string): Promise<PTCTimelineResponse> {
-  const params = new URLSearchParams()
-  if (gene) params.set('gene', gene)
-  const query = params.toString()
-  const response = await fetch(`/api/v1/ptc-timeline/case/${encodeURIComponent(caseId)}${query ? `?${query}` : ''}`)
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
-    throw new Error(body.detail || `HTTP ${response.status}`)
-  }
-  return response.json()
+export function getPTCCaseTimeline(caseId: string, gene?: string): Promise<PTCTimelineResponse> {
+  return apiRequest(withQuery(`/ptc-timeline/case/${encodeURIComponent(caseId)}`, { gene }))
 }
