@@ -1,4 +1,4 @@
-name: PTC Dual-Mode Database UI
+name: Dual-Mode Database UI
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
     paths:
       - "src/frontend/src/api/ptcResearch.ts"
       - "src/frontend/src/api/ptcDataQuality.ts"
+      - "src/frontend/src/api/databasePatients.ts"
       - "src/frontend/src/components/DualModeSelector.tsx"
       - "src/frontend/src/pages/PTCKnowledgePage.tsx"
       - "src/frontend/src/pages/PTCIntegratedPage.tsx"
@@ -13,12 +14,17 @@ on:
       - "src/frontend/src/components/PTCResearchAssistant.tsx"
       - "src/frontend/src/pages/PTCReportCenterPage.tsx"
       - "src/frontend/src/pages/PTCDataQualityPage.tsx"
+      - "src/frontend/src/pages/RecommendationPage.tsx"
+      - "src/frontend/src/pages/ClinicalGraphPage.tsx"
+      - "src/frontend/src/pages/ClinicalDecisionListPage.tsx"
+      - "src/frontend/src/pages/TreatmentPlanListPage.tsx"
       - "src/frontend/src/test/DualModeSelector.test.tsx"
       - "src/frontend/src/test/PTCKnowledgeSelectionPage.test.tsx"
       - "src/frontend/src/test/PTCIntegratedSelectionPage.test.tsx"
       - "src/frontend/src/test/PTCResearchAssistant.test.tsx"
       - "src/frontend/src/test/PTCReportCenterPage.test.tsx"
       - "src/frontend/src/test/PTCDataQualityPage.test.tsx"
+      - "src/frontend/src/test/LegacyDualModePages.test.tsx"
       - ".github/workflows/ptc-selection-ui.yml"
   workflow_dispatch:
 
@@ -44,5 +50,6 @@ jobs:
           npm test -- --run src/test/PTCResearchAssistant.test.tsx
           npm test -- --run src/test/PTCReportCenterPage.test.tsx
           npm test -- --run src/test/PTCDataQualityPage.test.tsx
+          npm test -- --run src/test/LegacyDualModePages.test.tsx
       - name: TypeScript and production build
         run: npm run build
