@@ -1,34 +1,4 @@
-/**
- * Clinical Decision API client.
- * Connects to the backend v1 clinical_decision endpoints.
- */
-
-const API_BASE = import.meta.env.VITE_API_URL || ''
-
-interface RequestOptions {
-  method?: string
-  body?: unknown
-  headers?: Record<string, string>
-}
-
-async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, headers = {} } = opts
-  const res = await fetch(`${API_BASE}/api/v1${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }))
-    throw new Error(err.detail || err.message || `HTTP ${res.status}`)
-  }
-  return res.json()
-}
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { apiRequest, withQuery } from './client'
 
 export interface ClinicalDecisionResponse {
   decision_id: string
@@ -51,21 +21,19 @@ export interface ClinicalDecisionRequest {
   context?: Record<string, any>
 }
 
-// ─── API Functions ───────────────────────────────────────────────────────────
-
-export function fetchClinicalDecisionById(id: string): Promise<ClinicalDecisionResponse> {
-  return request(`/clinical-decision/${id}`)
-}
-
-export function createClinicalDecision(data: ClinicalDecisionRequest): Promise<ClinicalDecisionResponse> {
-  return request('/clinical-decision', { method: 'POST', body: data })
-}
-
 export interface ClinicalDecisionListResponse {
   decisions: ClinicalDecisionResponse[]
   total: number
 }
 
+export function fetchClinicalDecisionById(id: string): Promise<ClinicalDecisionResponse> {
+  return apiRequest(`/clinical-decision/${encodeURIComponent(id)}`)
+}
+
+export function createClinicalDecision(data: ClinicalDecisionRequest): Promise<ClinicalDecisionResponse> {
+  return apiRequest('/clinical-decision', { method: 'POST', body: JSON.stringify(data) })
+}
+
 export function fetchClinicalDecisionsByPatientId(patientId: string): Promise<ClinicalDecisionListResponse> {
-  return request(`/clinical-decision?patient_id=${encodeURIComponent(patientId)}`)
+  return apiRequest(withQuery('/clinical-decision', { patient_id: patientId }))
 }
