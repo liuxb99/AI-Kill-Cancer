@@ -4,7 +4,9 @@ import { vi } from 'vitest'
 
 import PTCReportCenterPage from '../pages/PTCReportCenterPage'
 
-const downloadPTCReportJson = vi.fn()
+const mocks = vi.hoisted(() => ({
+  downloadPTCReportJson: vi.fn(),
+}))
 const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
 
 vi.mock('../api/ptcVisualization', () => ({
@@ -45,7 +47,7 @@ vi.mock('../api/ptcReports', () => ({
     limitations: ['Research only'],
   }),
   getPTCResearchReportHtmlUrl: vi.fn().mockReturnValue('/api/v1/ptc-reports/case/TCGA-REPORT-001/html?gene=BRAF'),
-  downloadPTCReportJson,
+  downloadPTCReportJson: mocks.downloadPTCReportJson,
 }))
 
 describe('PTCReportCenterPage', () => {
@@ -69,6 +71,6 @@ describe('PTCReportCenterPage', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: '下载 JSON' }))
-    await waitFor(() => expect(downloadPTCReportJson).toHaveBeenCalled())
+    await waitFor(() => expect(mocks.downloadPTCReportJson).toHaveBeenCalled())
   })
 })
