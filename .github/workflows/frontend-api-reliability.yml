@@ -1,0 +1,45 @@
+name: Frontend API Reliability
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/frontend/src/api/client.ts"
+      - "src/frontend/src/api/databasePatients.ts"
+      - "src/frontend/src/api/clinical_decision.ts"
+      - "src/frontend/src/api/treatmentPlan.ts"
+      - "src/frontend/src/api/ptcAssistant.ts"
+      - "src/frontend/src/api/ptcCohort.ts"
+      - "src/frontend/src/api/ptcTargeting.ts"
+      - "src/frontend/src/api/ptcLiterature.ts"
+      - "src/frontend/src/api/ptcReports.ts"
+      - "src/frontend/src/api/ptcIntegrated.ts"
+      - "src/frontend/src/api/ptcCompletion.ts"
+      - "src/frontend/src/test/apiClient.test.ts"
+      - ".github/workflows/frontend-api-reliability.yml"
+  workflow_dispatch:
+
+jobs:
+  api-reliability:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - run: npm ci
+      - name: Shared API client contract
+        run: npm test -- --run src/test/apiClient.test.ts
+      - name: Legacy dual-mode page regression
+        run: npm test -- --run src/test/LegacyDualModePages.test.tsx
+      - name: PTC report and assistant regression
+        run: |
+          npm test -- --run src/test/PTCReportCenterPage.test.tsx
+          npm test -- --run src/test/PTCResearchAssistant.test.tsx
+      - name: TypeScript and production build
+        run: npm run build
