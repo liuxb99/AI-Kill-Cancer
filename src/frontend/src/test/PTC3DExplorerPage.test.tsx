@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 
 import PTC3DExplorerPage from '../pages/PTC3DExplorerPage'
 
@@ -60,6 +60,10 @@ vi.mock('../api/ptcVisualization', () => ({
   })),
 }))
 
+beforeEach(() => {
+  window.history.replaceState({}, '', '/ptc-3d')
+})
+
 describe('PTC3DExplorerPage', () => {
   it('lists latest cases and switches the selected case', async () => {
     render(<PTC3DExplorerPage />)
@@ -69,6 +73,27 @@ describe('PTC3DExplorerPage', () => {
 
     fireEvent.click(screen.getByText(/TCGA-OLD-001/))
     expect(screen.getByText('cell-view:TCGA-OLD-001')).toBeInTheDocument()
+    expect(window.location.search).toContain('case=TCGA-OLD-001')
+  })
+
+  it('filters the latest cases by gene or case id', async () => {
+    render(<PTC3DExplorerPage />)
+    const search = await screen.findByRole('textbox', { name: '搜索最近 PTC 病例' })
+    fireEvent.change(search, { target: { value: 'RET' } })
+
+    expect(screen.queryByText(/TCGA-NEW-001/)).not.toBeInTheDocument()
+    expect(screen.getByText(/TCGA-OLD-001/)).toBeInTheDocument()
+    expect(screen.getByText('显示 1 / 2 例')).toBeInTheDocument()
+  })
+
+  it('restores a shared case and protein view from the URL', async () => {
+    window.history.replaceState({}, '', '/ptc-3d?case=TCGA-OLD-001&gene=RET&view=protein')
+    render(<PTC3DExplorerPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('protein-view:RET')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('heading', { name: 'TCGA-OLD-001' })).toBeInTheDocument()
   })
 
   it('opens protein structure from a case gene', async () => {
@@ -78,6 +103,7 @@ describe('PTC3DExplorerPage', () => {
     await waitFor(() => {
       expect(screen.getByText('protein-view:BRAF')).toBeInTheDocument()
     })
+    expect(window.location.search).toContain('gene=BRAF')
   })
 
   it('opens protein structure from a cell mutation beacon', async () => {
