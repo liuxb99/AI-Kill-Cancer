@@ -75,10 +75,11 @@ vi.mock('../api/ptcVisualization', () => ({
 
 beforeEach(() => {
   window.history.replaceState({}, '', '/ptc-3d')
+  Element.prototype.scrollIntoView = vi.fn()
 })
 
 describe('PTC3DExplorerPage', () => {
-  it('lists latest cases and switches the selected case', async () => {
+  it('lists the latest cases and switches the selected case', async () => {
     render(<PTC3DExplorerPage />)
     expect(await screen.findByText(/TCGA-NEW-001/)).toBeInTheDocument()
     expect(screen.getByText(/TCGA-OLD-001/)).toBeInTheDocument()
@@ -91,12 +92,12 @@ describe('PTC3DExplorerPage', () => {
 
   it('filters the latest cases by gene or case id', async () => {
     render(<PTC3DExplorerPage />)
-    const search = await screen.findByRole('textbox', { name: '搜索最近 PTC 病例' })
+    const search = await screen.findByRole('textbox', { name: '搜尋最近 PTC 病例' })
     fireEvent.change(search, { target: { value: 'RET' } })
 
     expect(screen.queryByText(/TCGA-NEW-001/)).not.toBeInTheDocument()
     expect(screen.getByText(/TCGA-OLD-001/)).toBeInTheDocument()
-    expect(screen.getByText('显示 1 / 2 例')).toBeInTheDocument()
+    expect(screen.getByText('顯示 1 / 2 例')).toBeInTheDocument()
   })
 
   it('restores a shared case and protein view from the URL', async () => {
@@ -109,21 +110,37 @@ describe('PTC3DExplorerPage', () => {
     expect(screen.getByRole('heading', { name: 'TCGA-OLD-001' })).toBeInTheDocument()
   })
 
-  it('opens protein, targeting and literature views from a case gene', async () => {
-    render(<PTC3DExplorerPage />)
-    fireEvent.click(await screen.findByRole('button', { name: 'BRAF 结构与靶向链' }))
+  it('restores targeting and literature focus without downgrading to cell view', async () => {
+    window.history.replaceState({}, '', '/ptc-3d?case=TCGA-NEW-001&gene=BRAF&view=targeting')
+    const { unmount } = render(<PTC3DExplorerPage />)
 
-    await waitFor(() => expect(screen.getByText('protein-view:BRAF')).toBeInTheDocument())
-    expect(screen.getByText('targeting-view:BRAF')).toBeInTheDocument()
-    expect(screen.getByText('literature-view:BRAF')).toBeInTheDocument()
-    expect(window.location.search).toContain('gene=BRAF')
+    expect(await screen.findByText('targeting-view:BRAF')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '靶向鏈' })).toHaveClass('bg-indigo-600')
+    expect(window.location.search).toContain('view=targeting')
+    unmount()
+
+    window.history.replaceState({}, '', '/ptc-3d?case=TCGA-NEW-001&gene=BRAF&view=literature')
+    render(<PTC3DExplorerPage />)
+    expect(await screen.findByText('literature-view:BRAF')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '文獻圖表' })).toHaveClass('bg-indigo-600')
   })
 
-  it('opens the complete gene chain from a cell mutation beacon', async () => {
+  it('switches all four views and keeps the URL reproducible', async () => {
     render(<PTC3DExplorerPage />)
-    fireEvent.click(await screen.findByText('cell-braf'))
+    await screen.findByText(/TCGA-NEW-001/)
 
+    fireEvent.click(screen.getByRole('button', { name: 'BRAF' }))
     await waitFor(() => expect(screen.getByText('protein-view:BRAF')).toBeInTheDocument())
-    expect(screen.getByText('literature-view:BRAF')).toBeInTheDocument()
+    expect(window.location.search).toContain('view=protein')
+
+    fireEvent.click(screen.getByRole('button', { name: '靶向鏈' }))
+    expect(window.location.search).toContain('view=targeting')
+
+    fireEvent.click(screen.getByRole('button', { name: '文獻圖表' }))
+    expect(window.location.search).toContain('view=literature')
+
+    fireEvent.click(screen.getByRole('button', { name: '癌細胞 3D' }))
+    expect(screen.getByText('cell-view:TCGA-NEW-001')).toBeInTheDocument()
+    expect(window.location.search).toContain('view=cell')
   })
 })
