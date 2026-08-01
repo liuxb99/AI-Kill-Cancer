@@ -1,3 +1,5 @@
+import { apiRequest, withQuery } from './client'
+
 export interface PTCSourceQuality {
   source_name: string
   label: string
@@ -40,19 +42,10 @@ export interface PTCDataQualityOverview {
   policy_note: string
 }
 
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`/api/v1${path}`)
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
-    throw new Error(body.detail || `HTTP ${response.status}`)
-  }
-  return response.json()
-}
-
 export function getPTCDataQuality(staleOnly = false): Promise<PTCDataQualityOverview> {
-  return request(`/ptc-data-quality/overview?stale_only=${staleOnly}`)
+  return apiRequest(withQuery('/ptc-data-quality/overview', { stale_only: staleOnly }))
 }
 
 export function getPTCGeneQuality(gene: string): Promise<{ gene: string; found: boolean; coverage: PTCGeneCoverage }> {
-  return request(`/ptc-data-quality/gene/${encodeURIComponent(gene)}`)
+  return apiRequest(`/ptc-data-quality/gene/${encodeURIComponent(gene.trim())}`)
 }
