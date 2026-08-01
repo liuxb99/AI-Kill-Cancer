@@ -20,9 +20,6 @@ from src.backend.domain.ptc_research import PTCResearchCaseModel
 
 router = APIRouter(prefix="/ptc-visualization", tags=["ptc-visualization"])
 
-# Curated human UniProt accessions and representative experimental PDB entries.
-# Structure URLs are generated locally from these identifiers. The backend never
-# calls the AlphaFold API.
 PROTEIN_CATALOG: dict[str, dict[str, Any]] = {
     "BRAF": {"uniprot": "P15056", "pdb_ids": ["1UWH", "4MNE"], "name": "B-Raf proto-oncogene kinase"},
     "RET": {"uniprot": "P07949", "pdb_ids": ["2IVU", "6NEC"], "name": "Proto-oncogene tyrosine-protein kinase receptor Ret"},
@@ -100,12 +97,20 @@ async def latest_cases(
     return {"count": len(rows), "limit": limit, "cases": [_case_payload(row) for row in rows]}
 
 
-def _alphafold_pdb_url(uniprot: str) -> str:
-    return f"https://alphafold.ebi.ac.uk/files/AF-{uniprot}-F1-model_v4.pdb"
+def _alphafold_pdb_urls(uniprot: str) -> list[str]:
+    base = f"AF-{uniprot}-F1-model"
+    return [
+        f"https://alphafold.ebi.ac.uk/files/{base}_v6.pdb",
+        f"https://alphafold.ebi.ac.uk/files/{base}_v4.pdb",
+    ]
 
 
-def _alphafold_cif_url(uniprot: str) -> str:
-    return f"https://alphafold.ebi.ac.uk/files/AF-{uniprot}-F1-model_v4.cif"
+def _alphafold_cif_urls(uniprot: str) -> list[str]:
+    base = f"AF-{uniprot}-F1-model"
+    return [
+        f"https://alphafold.ebi.ac.uk/files/{base}_v6.cif",
+        f"https://alphafold.ebi.ac.uk/files/{base}_v4.cif",
+    ]
 
 
 def _experimental_structure(pdb_id: str) -> dict[str, str]:
@@ -125,15 +130,19 @@ async def protein_structure(gene: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="No curated PTC protein structure mapping for this gene")
 
     uniprot = entry["uniprot"]
+    pdb_urls = _alphafold_pdb_urls(uniprot)
+    cif_urls = _alphafold_cif_urls(uniprot)
     structures = [_experimental_structure(pdb_id) for pdb_id in entry["pdb_ids"]]
     return {
         "gene": symbol,
         "name": entry["name"],
         "uniprot": uniprot,
         "alphafold_entry_id": f"AF-{uniprot}-F1",
-        "alphafold_entry_url": f"https://alphafold.ebi.ac.uk/entry/{uniprot}",
-        "pdb_url": _alphafold_pdb_url(uniprot),
-        "cif_url": _alphafold_cif_url(uniprot),
+        "alphafold_entry_url": f"https://alphafold.com/entry/AF-{uniprot}-F1",
+        "pdb_url": pdb_urls[0],
+        "pdb_urls": pdb_urls,
+        "cif_url": cif_urls[0],
+        "cif_urls": cif_urls,
         "experimental_structures": structures,
         "experimental_pdb_ids": entry["pdb_ids"],
         "default_pdb_id": entry["pdb_ids"][0] if entry["pdb_ids"] else None,
