@@ -51,6 +51,6 @@ describe('PTCTargetingPanel', () => {
     expect(screen.getByText('Dabrafenib')).toBeInTheDocument()
     expect(screen.getByText('BRAF V600E evidence')).toBeInTheDocument()
     expect(screen.getByText('NCT00000001')).toBeInTheDocument()
-    expect(screen.getByText(/BRAF inhibitor/)).toBeInTheDocument()
+    expect(screen.getByText(/MEK1\/2/)).toBeInTheDocument()
   })
 })
