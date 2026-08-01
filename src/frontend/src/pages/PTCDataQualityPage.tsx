@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react'
 
-import { getPTCDataQuality, type PTCDataQualityOverview } from '../api/ptcDataQuality'
+import DualModeSelector from '../components/DualModeSelector'
+import {
+  getPTCDataQuality,
+  getPTCGeneQuality,
+  type PTCDataQualityOverview,
+  type PTCGeneCoverage,
+} from '../api/ptcDataQuality'
 
 export default function PTCDataQualityPage() {
   const [data, setData] = useState<PTCDataQualityOverview | null>(null)
+  const [exactGene, setExactGene] = useState('')
+  const [exactCoverage, setExactCoverage] = useState<PTCGeneCoverage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [advancedLoading, setAdvancedLoading] = useState(false)
   const [staleOnly, setStaleOnly] = useState(false)
 
   useEffect(() => {
@@ -13,31 +22,68 @@ export default function PTCDataQualityPage() {
     setError(null)
     void getPTCDataQuality(staleOnly)
       .then(setData)
-      .catch((reason) => setError(reason instanceof Error ? reason.message : '无法载入资料品质状态'))
+      .catch((reason) => setError(reason instanceof Error ? reason.message : '無法載入資料品質狀態'))
       .finally(() => setLoading(false))
   }, [staleOnly])
 
-  const displayedGenes = data?.gene_coverage.slice(0, 100) || []
+  const displayedGenes = exactCoverage ? [exactCoverage] : data?.gene_coverage.slice(0, 100) || []
+
+  async function queryExactGene() {
+    const normalized = exactGene.trim().toUpperCase()
+    if (!normalized) return
+    setAdvancedLoading(true)
+    setError(null)
+    try {
+      const result = await getPTCGeneQuality(normalized)
+      setExactCoverage(result.coverage)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '資料庫找不到指定基因')
+    } finally {
+      setAdvancedLoading(false)
+    }
+  }
+
+  const recentContent = (
+    <div className="p-4 text-sm text-gray-600">
+      目前顯示資料庫基因覆蓋前 {Math.min(100, data?.gene_coverage.length || 0)} 筆。切換到進階模式可查詢不在前 100 筆中的基因。
+      {exactCoverage && (
+        <button className="ml-3 rounded border px-3 py-1 text-indigo-700" onClick={() => setExactCoverage(null)}>
+          返回前 100 筆
+        </button>
+      )}
+    </div>
+  )
 
   return (
     <main className="mx-auto max-w-[1500px] px-4 py-8">
       <header className="mb-6">
         <p className="text-sm font-semibold text-emerald-600">PTC Data Provenance & Freshness Center</p>
-        <h1 className="text-3xl font-bold">资料来源、版本、新鲜度与覆盖缺口</h1>
+        <h1 className="text-3xl font-bold">資料來源、版本、新鮮度與覆蓋缺口</h1>
         <p className="mt-2 max-w-5xl text-gray-600">
-          页面直接展示数据库中的来源状态与前 100 笔基因覆盖资料，不需要输入查询条件。
+          一般模式展示來源狀態與前 100 筆基因覆蓋；進階模式可輸入基因，精準查詢整個資料庫。
         </p>
       </header>
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-white p-4 shadow-sm">
-        <label className="flex items-center gap-2 text-sm font-medium">
+      <div className="mb-5 grid gap-4 lg:grid-cols-[1fr_auto]">
+        <DualModeSelector
+          title="基因覆蓋資料"
+          description="最近 100 筆與進階基因查詢共用下方覆蓋矩陣。"
+          recentContent={recentContent}
+          advancedLabel="完整基因符號"
+          advancedPlaceholder="例如 BRAF、RET、NTRK1"
+          advancedValue={exactGene}
+          onAdvancedValueChange={setExactGene}
+          onAdvancedSubmit={queryExactGene}
+          advancedLoading={advancedLoading}
+          advancedHelp="進階模式會呼叫後端查詢整個資料庫，不受前 100 筆限制。"
+        />
+        <label className="flex items-center gap-2 self-start rounded-xl border bg-white p-4 text-sm font-medium shadow-sm">
           <input type="checkbox" checked={staleOnly} onChange={(event) => setStaleOnly(event.target.checked)} />
-          只显示过期或缺失来源
+          只顯示過期或缺失來源
         </label>
-        <div className="text-sm text-gray-500">数据库基因覆盖：展示 {displayedGenes.length} / {data?.gene_coverage.length || 0} 笔</div>
       </div>
 
-      {loading && <div className="rounded border bg-white p-6 text-gray-500">正在稽核资料来源…</div>}
+      {loading && <div className="rounded border bg-white p-6 text-gray-500">正在稽核資料來源…</div>}
       {error && <div className="rounded border border-red-200 bg-red-50 p-4 text-red-700">{error}</div>}
 
       {data && !loading && (
@@ -69,13 +115,13 @@ export default function PTCDataQualityPage() {
                   <DataPoint label="Policy threshold" value={`${source.stale_after_days} d`} />
                 </dl>
                 <p className="mt-3 break-all text-xs text-gray-500">{source.last_retrieved_at || 'No persisted retrieval timestamp'}</p>
-                <a className="mt-3 inline-block text-sm font-semibold text-emerald-700" href={source.homepage} target="_blank" rel="noreferrer">打开来源主页 ↗</a>
+                <a className="mt-3 inline-block text-sm font-semibold text-emerald-700" href={source.homepage} target="_blank" rel="noreferrer">打開來源主頁 ↗</a>
               </article>
             ))}
           </section>
 
           <section className="rounded-xl border bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-bold">持久化资料库存</h2>
+            <h2 className="text-xl font-bold">持久化資料庫存</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
               {Object.entries(data.inventory).map(([name, value]) => <Metric key={name} label={name} value={value} />)}
             </div>
@@ -83,8 +129,8 @@ export default function PTCDataQualityPage() {
 
           <section className="overflow-hidden rounded-xl border bg-white shadow-sm">
             <div className="border-b p-5">
-              <h2 className="text-xl font-bold">数据库前 100 笔基因覆盖矩阵</h2>
-              <p className="text-sm text-gray-500">4 分代表同时具备病例变异、药物靶点、Evidence 与 Clinical Trial。</p>
+              <h2 className="text-xl font-bold">{exactCoverage ? `進階查詢：${exactCoverage.gene}` : '資料庫前 100 筆基因覆蓋矩陣'}</h2>
+              <p className="text-sm text-gray-500">4 分代表同時具備病例變異、藥物靶點、Evidence 與 Clinical Trial。</p>
             </div>
             <div className="max-h-[700px] overflow-auto">
               <table className="min-w-full text-left text-sm">
@@ -110,7 +156,7 @@ export default function PTCDataQualityPage() {
 
           {data.issues.length > 0 && (
             <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-              <h2 className="font-bold text-amber-950">客观资料问题</h2>
+              <h2 className="font-bold text-amber-950">客觀資料問題</h2>
               <ul className="mt-3 space-y-2 text-sm text-amber-900">
                 {data.issues.map((issue, index) => <li key={`${issue.source}-${issue.code}-${index}`}>{issue.severity.toUpperCase()} · {issue.source} · {issue.code}{issue.count ? ` · ${issue.count}` : ''}</li>)}
               </ul>
@@ -118,7 +164,7 @@ export default function PTCDataQualityPage() {
           )}
 
           <section className="rounded-xl border bg-slate-900 p-5 text-sm text-slate-200">
-            <strong>稽核说明：</strong> {data.policy_note}
+            <strong>稽核說明：</strong> {data.policy_note}
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               {data.trace.map((step) => <span key={step.step} className="rounded bg-slate-800 px-2 py-1">{step.step}. {step.name}: {step.records}</span>)}
             </div>
