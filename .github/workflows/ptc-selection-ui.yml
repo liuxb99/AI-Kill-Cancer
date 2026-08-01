@@ -1,16 +1,19 @@
-name: PTC Database Selection UI
+name: PTC Dual-Mode Database UI
 
 on:
   push:
     branches: [master]
     paths:
       - "src/frontend/src/api/ptcResearch.ts"
+      - "src/frontend/src/api/ptcDataQuality.ts"
+      - "src/frontend/src/components/DualModeSelector.tsx"
       - "src/frontend/src/pages/PTCKnowledgePage.tsx"
       - "src/frontend/src/pages/PTCIntegratedPage.tsx"
       - "src/frontend/src/pages/PTCResearchAssistantPage.tsx"
       - "src/frontend/src/components/PTCResearchAssistant.tsx"
       - "src/frontend/src/pages/PTCReportCenterPage.tsx"
       - "src/frontend/src/pages/PTCDataQualityPage.tsx"
+      - "src/frontend/src/test/DualModeSelector.test.tsx"
       - "src/frontend/src/test/PTCKnowledgeSelectionPage.test.tsx"
       - "src/frontend/src/test/PTCIntegratedSelectionPage.test.tsx"
       - "src/frontend/src/test/PTCResearchAssistant.test.tsx"
@@ -20,7 +23,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  selection-ui:
+  dual-mode-ui:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -33,8 +36,9 @@ jobs:
           cache: npm
           cache-dependency-path: src/frontend/package-lock.json
       - run: npm ci
-      - name: Run selection-only interaction tests
+      - name: Run dual-mode interaction tests
         run: |
+          npm test -- --run src/test/DualModeSelector.test.tsx
           npm test -- --run src/test/PTCKnowledgeSelectionPage.test.tsx
           npm test -- --run src/test/PTCIntegratedSelectionPage.test.tsx
           npm test -- --run src/test/PTCResearchAssistant.test.tsx
