@@ -59,8 +59,10 @@ describe('RecommendationPage — dual-mode and consolidation guards', () => {
 
     expect(source).toContain('getLatestPTCCases(100)')
     expect(source).toContain('<DualModeSelector')
-    expect(source).toContain('onAdvancedQuery={useAdvancedInput}')
-    expect(source).toContain('queryLabel="自訂 Patient ID"')
+    expect(source).toContain('recentContent={recentContent}')
+    expect(source).toContain('onAdvancedSubmit={useAdvancedInput}')
+    expect(source).toContain('advancedLabel="自訂 Patient ID"')
+    expect(source).toContain('onAdvancedValueChange={setAdvancedPatientId}')
   })
 
   it('does not reintroduce direct API fetch or legacy API-base configuration', async () => {
