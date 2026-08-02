@@ -115,4 +115,18 @@ describe('source-level API architecture guard', () => {
     }
     expect(violations).toEqual([])
   })
+
+  it('contains no direct same-origin API fetch outside the shared client', () => {
+    const violations: string[] = []
+    const directApiFetch = /\bfetch\s*\(\s*(?:`|'|")\/api(?:\/|`|'|")/
+
+    for (const file of sourceFiles(join(process.cwd(), 'src'))) {
+      const source = readFileSync(file, 'utf8')
+      if (directApiFetch.test(source)) {
+        violations.push(relative(process.cwd(), file).replaceAll('\\', '/'))
+      }
+    }
+
+    expect(violations).toEqual([])
+  })
 })
