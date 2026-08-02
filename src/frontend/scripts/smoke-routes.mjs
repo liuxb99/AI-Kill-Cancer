@@ -1,7 +1,13 @@
 const baseUrl = process.env.SMOKE_BASE_URL || 'http://127.0.0.1:4173'
 
-const routes = [
+export const routes = [
   '/',
+  '/knowledge',
+  '/tools',
+  '/research',
+  '/dashboard',
+  '/research-portal',
+  '/workbench',
   '/production-readiness',
   '/ptc-command-center',
   '/ptc-data-quality',
@@ -18,10 +24,9 @@ const routes = [
   '/ptc-knowledge',
   '/recommendation',
   '/clinical-decision',
+  '/tumor-board',
   '/clinical-graph',
   '/treatment-plans',
-  '/dashboard',
-  '/research-portal',
 ]
 
 const failures = []
