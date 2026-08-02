@@ -47,7 +47,7 @@ describe('PTCTargetingPanel', () => {
     render(<PTCTargetingPanel gene="BRAF" proteinChange="p.V600E" />)
 
     expect(await screen.findByText(/BRAF · MAPK \/ ERK/)).toBeInTheDocument()
-    expect(screen.getByText(/p\.V600E · residue 600 · 位于目标结构域/)).toBeInTheDocument()
+    expect(screen.getByText((_, element) => element?.textContent?.includes('p.V600E · residue 600 · 位于目标结构域') ?? false)).toBeInTheDocument()
     expect(screen.getByText('Dabrafenib')).toBeInTheDocument()
     expect(screen.getByText('BRAF V600E evidence')).toBeInTheDocument()
     expect(screen.getByText('NCT00000001')).toBeInTheDocument()
