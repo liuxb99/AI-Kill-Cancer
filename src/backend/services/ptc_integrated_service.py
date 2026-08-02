@@ -26,10 +26,8 @@ from src.backend.domain.ptc_knowledge import (
     PTCClinicalTrialModel,
     PTCEvidenceRecordModel,
     PTCTherapyModel,
-    PTCTherapyTargetModel,
 )
 from src.backend.domain.ptc_research import PTCResearchCaseModel
-
 
 STARTER_HERBS: list[dict[str, Any]] = [
     {

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Column, DateTime, Float, String, Text, UniqueConstraint
 
 from src.backend.database.models import Base, CompatUUID
 

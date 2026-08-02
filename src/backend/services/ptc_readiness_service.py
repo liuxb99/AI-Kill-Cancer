@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.backend.services.ptc_completion_service import PTCCompletionService
 from src.backend.services.ptc_knowgraph_export import PTCKnowGraphExportService
 
-
 DEMO_THRESHOLDS = {
     "cases": 1,
     "variants": 1,

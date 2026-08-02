@@ -10,7 +10,6 @@ from urllib.request import Request, urlopen
 
 from src.backend.importers.ptc_tcga.maf_parser import merge_variants_into_cases, parse_maf_bytes
 
-
 GDC_API = "https://api.gdc.cancer.gov"
 
 

@@ -2,7 +2,6 @@ import gzip
 
 from src.backend.importers.ptc_tcga.downloader import GDCClient, GDCDownloadResult
 
-
 MAF = """Hugo_Symbol\tChromosome\tStart_Position\tReference_Allele\tTumor_Seq_Allele2\tVariant_Type\tVariant_Classification\tHGVSp_Short\tTumor_Sample_Barcode
 BRAF\t7\t140453136\tA\tT\tSNP\tMissense_Mutation\tp.V600E\tTCGA-AB-1234-01A
 RET\t10\t43609912\tG\tA\tSNP\tMissense_Mutation\tp.G691S\tTCGA-AB-1234-01A

@@ -1,6 +1,5 @@
 from src.backend.services.ptc_literature_service import parse_pmc_fulltext_xml, parse_pubmed_xml
 
-
 PUBMED_XML = """
 <PubmedArticleSet>
   <PubmedArticle>

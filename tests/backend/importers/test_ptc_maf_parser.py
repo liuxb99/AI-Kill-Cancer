@@ -6,7 +6,6 @@ from src.backend.importers.ptc_tcga.maf_parser import (
     tcga_case_id,
 )
 
-
 MAF = """#version 2.4
 Hugo_Symbol\tChromosome\tStart_Position\tReference_Allele\tTumor_Seq_Allele2\tVariant_Classification\tVariant_Type\tTumor_Sample_Barcode\tHGVSp_Short\tdbSNP_RS
 BRAF\t7\t140453136\tA\tT\tMissense_Mutation\tSNP\tTCGA-ET-0001-01A\tp.V600E\trs113488022
