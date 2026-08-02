@@ -11,10 +11,24 @@ on:
       - "src/frontend/src/pages/ProductionReadinessPage.tsx"
       - "src/frontend/src/App.tsx"
       - "src/frontend/src/test/productionReadiness.test.ts"
+      - "src/frontend/src/test/routeSmokeCoverage.test.ts"
       - "src/frontend/scripts/smoke-routes.mjs"
       - "src/frontend/package.json"
       - "src/frontend/package-lock.json"
       - ".github/workflows/production-readiness.yml"
+  pull_request:
+    paths:
+      - "src/frontend/src/api/client.ts"
+      - "src/frontend/src/api/ptcCompletion.ts"
+      - "src/frontend/src/api/ptcDataQuality.ts"
+      - "src/frontend/src/api/productionReadiness.ts"
+      - "src/frontend/src/pages/ProductionReadinessPage.tsx"
+      - "src/frontend/src/App.tsx"
+      - "src/frontend/src/test/productionReadiness.test.ts"
+      - "src/frontend/src/test/routeSmokeCoverage.test.ts"
+      - "src/frontend/scripts/smoke-routes.mjs"
+      - "src/frontend/package.json"
+      - "src/frontend/package-lock.json"
   workflow_dispatch:
 
 jobs:
@@ -33,6 +47,8 @@ jobs:
       - run: npm ci
       - name: Validate readiness aggregation
         run: npm test -- --run src/test/productionReadiness.test.ts
+      - name: Validate complete route smoke contract
+        run: npm test -- --run src/test/routeSmokeCoverage.test.ts
       - name: Validate shared API architecture
         run: |
           npm test -- --run src/test/apiClient.test.ts
@@ -51,7 +67,7 @@ jobs:
           done
           cat /tmp/ai-kill-cancer-preview.log
           exit 1
-      - name: Smoke critical SPA routes
+      - name: Smoke all static SPA routes
         run: node scripts/smoke-routes.mjs
       - name: Stop production preview
         if: always()
