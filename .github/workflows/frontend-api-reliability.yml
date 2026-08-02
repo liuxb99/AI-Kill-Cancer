@@ -1,7 +1,7 @@
 name: Frontend API Reliability
 
 on:
-  push:
+  pull_request:
     branches: [master]
     paths:
       - "src/frontend/src/api/client.ts"
