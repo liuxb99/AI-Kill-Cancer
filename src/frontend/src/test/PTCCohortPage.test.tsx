@@ -47,7 +47,7 @@ describe('PTCCohortPage', () => {
     expect(await screen.findByText('TCGA-MATCH')).toBeInTheDocument()
     expect(screen.getByText('Outcome-blind 配對已啟用')).toBeInTheDocument()
     expect(screen.getByText(/ptc-cohort-outcome-blind-v2/)).toBeInTheDocument()
-    expect(screen.getByText(/排除欄位：/)).toHaveTextContent('vital_status')
+    expect(screen.getByText('vital_status')).toBeInTheDocument()
     expect(screen.queryByText(/vital_status: 5/)).not.toBeInTheDocument()
     expect(screen.getByText('100.0')).toBeInTheDocument()
     expect(screen.getByText(/共同基因：/)).toHaveTextContent('BRAF')
