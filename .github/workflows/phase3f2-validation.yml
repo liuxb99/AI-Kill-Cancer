@@ -1,0 +1,26 @@
+name: Phase 3F-2 Validation
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  outbox-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r src/backend/requirements-api.txt
+          pip install pytest pytest-asyncio ruff
+      - name: Lint changed files
+        run: ruff check src/backend/repositories/clinical_graph_outbox_repo.py tests/unit/test_phase3f2_outbox_event_contract.py
+      - name: Run outbox contract tests
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+        run: pytest -q tests/unit/test_phase3f2_outbox_event_contract.py tests/unit/test_phase3d_outbox_repo.py
