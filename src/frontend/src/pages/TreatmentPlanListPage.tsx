@@ -166,7 +166,7 @@ export default function TreatmentPlanListPage() {
         onAdvancedSubmit={() => selectAdvancedPatient(advancedPatientId)}
         advancedDisabled={!advancedPatientId.trim()}
         advancedLoading={loading}
-        advancedHelp="精準查詢成功後，會載入該患者的 Treatment Plans。"
+        advancedHelp={error || '精準查詢成功後，會載入該患者的 Treatment Plans。'}
       />
 
       {plans !== null && plans.length === 0 && !loading && (
