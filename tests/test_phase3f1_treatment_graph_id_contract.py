@@ -4,10 +4,7 @@ import uuid
 
 import pytest
 
-from src.backend.clinical_graph.id_factory import (
-    CLINICAL_NAMESPACE,
-    ClinicalGraphIDFactory,
-)
+from src.backend.clinical_graph.id_factory import CLINICAL_NAMESPACE, ClinicalGraphIDFactory
 
 
 ENTITY_CASES = {
