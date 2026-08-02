@@ -53,6 +53,7 @@ export default function RecommendationPage() {
   const navigate = useNavigate()
   const [cases, setCases] = useState<PTCLatestCase[]>([])
   const [patientId, setPatientId] = useState('')
+  const [advancedPatientId, setAdvancedPatientId] = useState('')
   const [variantsText, setVariantsText] = useState('')
   const [topN, setTopN] = useState(5)
   const [loading, setLoading] = useState(true)
@@ -79,12 +80,16 @@ export default function RecommendationPage() {
     setPatientId(selected.case_id)
     setVariantsText(selected.variants.map((variant) => `${variant.gene} ${variant.protein_change || variant.classification || variant.variant_id || ''}`.trim()).join('\n'))
     setResult(null)
+    setError(null)
   }
 
-  function useAdvancedInput(value: string) {
-    setPatientId(value.trim())
+  function useAdvancedInput() {
+    const normalized = advancedPatientId.trim()
+    if (!normalized) return
+    setPatientId(normalized)
     setVariantsText('')
     setResult(null)
+    setError(null)
   }
 
   async function generate() {
@@ -110,6 +115,28 @@ export default function RecommendationPage() {
     })
   }
 
+  const recentContent = (
+    <div className="p-4">
+      {loading && cases.length === 0 ? (
+        <p className="text-sm text-slate-500">載入病例中…</p>
+      ) : cases.length === 0 ? (
+        <p className="text-sm text-slate-500">目前沒有可選擇的病例。</p>
+      ) : (
+        <label className="block text-sm font-medium text-slate-700">
+          最近 100 個 PTC 病例
+          <select
+            aria-label="最近 100 個 PTC 病例"
+            value={cases.some((item) => item.case_id === patientId) ? patientId : ''}
+            onChange={(event) => selectCase(event.target.value)}
+            className="mt-2 w-full rounded-lg border px-3 py-2"
+          >
+            {cases.map((item) => <option key={item.case_id} value={item.case_id}>{caseLabel(item)}</option>)}
+          </select>
+        </label>
+      )}
+    </div>
+  )
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-6 flex items-center gap-4">
@@ -118,17 +145,17 @@ export default function RecommendationPage() {
       </header>
 
       <DualModeSelector
-        items={cases}
-        selectedId={cases.some((item) => item.case_id === patientId) ? patientId : ''}
-        onSelect={selectCase}
-        getId={(item) => item.case_id}
-        getLabel={caseLabel}
-        listLabel="最近 100 個 PTC 病例"
-        queryLabel="自訂 Patient ID"
-        queryPlaceholder="輸入 Patient ID 後自行填寫 Variants"
-        onAdvancedQuery={useAdvancedInput}
-        loading={loading}
-        error={error}
+        title="選擇推薦病例"
+        description="最近病例與自訂 Patient ID 共用同一個推薦結果區。"
+        recentContent={recentContent}
+        advancedLabel="自訂 Patient ID"
+        advancedPlaceholder="輸入 Patient ID 後自行填寫 Variants"
+        advancedValue={advancedPatientId}
+        onAdvancedValueChange={setAdvancedPatientId}
+        onAdvancedSubmit={useAdvancedInput}
+        advancedDisabled={!advancedPatientId.trim()}
+        advancedLoading={loading}
+        advancedHelp={error || '精準查詢會切換至手動 Variant 輸入模式。'}
       />
 
       <section className="mt-5 rounded-xl border bg-white p-5 shadow-sm">
