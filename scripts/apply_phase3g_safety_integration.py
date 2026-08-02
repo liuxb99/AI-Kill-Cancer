@@ -15,6 +15,8 @@ SERVICE_TEST = ROOT / "tests/backend/services/test_treatment_plan_service.py"
 
 def replace_once(path: Path, old: str, new: str) -> None:
     text = path.read_text(encoding="utf-8")
+    if path == SERVICE and "self._safety_gate.assert_can_transition" in text:
+        return
     if new in text:
         return
     if old not in text:
