@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE = ROOT / "src/backend/services/treatment_plan_service.py"
 GATE = ROOT / "src/backend/clinical/treatment_plan_safety_gate.py"
