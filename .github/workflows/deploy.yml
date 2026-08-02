@@ -1,9 +1,7 @@
 name: Deploy to Vercel
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
     branches: [master, main]
   workflow_dispatch:
 
@@ -21,14 +19,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
-      - name: Check out the validated commit
+      - name: Check out source
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -37,15 +30,26 @@ jobs:
           cache: npm
           cache-dependency-path: src/frontend/package-lock.json
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Install dependencies
+      - name: Install frontend dependencies
         run: npm ci
         working-directory: src/frontend
 
-      - name: Build and deploy to Vercel
-        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Run frontend tests
+        run: npm test
+        working-directory: src/frontend
+
+      - name: Run frontend production build
+        run: npm run build
+        working-directory: src/frontend
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel production settings
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Vercel output
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy prebuilt output to production
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
