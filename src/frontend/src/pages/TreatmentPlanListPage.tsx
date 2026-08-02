@@ -41,6 +41,7 @@ export default function TreatmentPlanListPage() {
   const navigate = useNavigate()
   const [patients, setPatients] = useState<DatabasePatient[]>([])
   const [patientId, setPatientId] = useState('')
+  const [advancedPatientId, setAdvancedPatientId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [plans, setPlans] = useState<TreatmentPlanListItem[] | null>(null)
@@ -56,8 +57,11 @@ export default function TreatmentPlanListPage() {
         setPatients(response.items)
         const requested = new URLSearchParams(window.location.search).get('patientId')
         const initial = response.items.find((item) => item.patient_id === requested) || response.items[0]
-        if (initial) await selectPatient(initial.patient_id)
-        else if (requested) await selectAdvancedPatient(requested)
+        if (initial) await loadPlans(initial.patient_id, 0)
+        else if (requested) {
+          setAdvancedPatientId(requested)
+          await selectAdvancedPatient(requested)
+        }
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : '無法載入患者資料')
       } finally {
@@ -86,10 +90,6 @@ export default function TreatmentPlanListPage() {
     }
   }
 
-  async function selectPatient(id: string) {
-    await loadPlans(id, 0)
-  }
-
   async function selectAdvancedPatient(value: string) {
     const normalized = value.trim()
     if (!normalized) return
@@ -97,7 +97,9 @@ export default function TreatmentPlanListPage() {
     setError(null)
     try {
       const patient = await getDatabasePatient(normalized)
-      setPatients((current) => current.some((item) => item.patient_id === patient.patient_id) ? current : [patient, ...current].slice(0, 100))
+      setPatients((current) => current.some((item) => item.patient_id === patient.patient_id)
+        ? current
+        : [patient, ...current].slice(0, 100))
       await loadPlans(patient.patient_id, 0)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '患者不存在')
@@ -107,33 +109,102 @@ export default function TreatmentPlanListPage() {
 
   const currentPage = Math.floor(skip / limit) + 1
 
+  const recentContent = (
+    <div className="p-4">
+      {loading && patients.length === 0 ? (
+        <p className="text-sm text-slate-500">載入患者資料中…</p>
+      ) : patients.length === 0 ? (
+        <p className="text-sm text-slate-500">目前沒有可選擇的患者。</p>
+      ) : (
+        <label className="block text-sm font-medium text-slate-700">
+          最近 100 位患者
+          <select
+            aria-label="最近 100 位患者"
+            className="mt-2 w-full rounded-lg border px-3 py-2"
+            value={patientId}
+            onChange={(event) => void loadPlans(event.target.value, 0)}
+          >
+            {patients.map((patient) => (
+              <option key={patient.patient_id} value={patient.patient_id}>
+                {patientDisplayLabel(patient)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+    </div>
+  )
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4"><button onClick={() => navigate(-1)} className="text-xl text-gray-400 hover:text-primary-600">←</button><div><p className="text-sm font-semibold text-primary-600">Treatment Plans</p><h1 className="text-3xl font-bold">治療計畫列表</h1><p className="mt-1 text-gray-600">最近 100 位患者快速選擇，或以完整 Patient ID 精準查詢。</p></div></div>
-        <button onClick={() => navigate(`/treatment-plans/new${patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''}`)} className="rounded bg-green-600 px-5 py-2.5 text-sm font-medium text-white">＋建立新計畫</button>
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate(-1)} className="text-xl text-gray-400 hover:text-primary-600">←</button>
+          <div>
+            <p className="text-sm font-semibold text-primary-600">Treatment Plans</p>
+            <h1 className="text-3xl font-bold">治療計畫列表</h1>
+            <p className="mt-1 text-gray-600">最近 100 位患者快速選擇，或以完整 Patient ID 精準查詢。</p>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate(`/treatment-plans/new${patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''}`)}
+          className="rounded bg-green-600 px-5 py-2.5 text-sm font-medium text-white"
+        >
+          ＋建立新計畫
+        </button>
       </header>
 
       <DualModeSelector
-        items={patients}
-        selectedId={patientId}
-        onSelect={(id) => void selectPatient(id)}
-        getId={(item) => item.patient_id}
-        getLabel={patientDisplayLabel}
-        listLabel="最近 100 位患者"
-        queryLabel="完整 Patient ID"
-        queryPlaceholder="輸入完整 UUID Patient ID"
-        onAdvancedQuery={selectAdvancedPatient}
-        loading={loading}
-        error={error}
+        title="選擇治療計畫患者"
+        description="最近 100 位患者與完整 Patient ID 查詢共用同一個計畫結果區。"
+        recentContent={recentContent}
+        advancedLabel="完整 Patient ID"
+        advancedPlaceholder="輸入完整 UUID Patient ID"
+        advancedValue={advancedPatientId}
+        onAdvancedValueChange={setAdvancedPatientId}
+        onAdvancedSubmit={() => selectAdvancedPatient(advancedPatientId)}
+        advancedDisabled={!advancedPatientId.trim()}
+        advancedLoading={loading}
+        advancedHelp="精準查詢成功後，會載入該患者的 Treatment Plans。"
       />
 
-      {plans !== null && plans.length === 0 && !loading && <section className="mt-6 rounded-xl border bg-white p-12 text-center text-gray-400">所選患者目前沒有 Treatment Plan。</section>}
+      {plans !== null && plans.length === 0 && !loading && (
+        <section className="mt-6 rounded-xl border bg-white p-12 text-center text-gray-400">
+          所選患者目前沒有 Treatment Plan。
+        </section>
+      )}
 
       {plans !== null && plans.length > 0 && !loading && (
         <section className="mt-6 space-y-4">
-          <div className="overflow-hidden rounded-xl border bg-white shadow-sm"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th className="px-5 py-3">Plan ID</th><th className="px-5 py-3">Version</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Intent</th><th className="px-5 py-3">Current</th><th className="px-5 py-3">Created</th></tr></thead><tbody className="divide-y">{plans.map((plan) => <tr key={`${plan.plan_id}-v${plan.version}`} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/treatment-plans/${plan.plan_id}`)}><td className="px-5 py-3 font-mono text-xs">{plan.plan_id}</td><td className="px-5 py-3">v{plan.version}</td><td className="px-5 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${statusColor(plan.plan_status)}`}>{statusLabel(plan.plan_status)}</span></td><td className="px-5 py-3">{plan.plan_intent || '—'}</td><td className="px-5 py-3">{plan.is_current ? <span className="font-medium text-green-600">✓ 當前</span> : '—'}</td><td className="px-5 py-3 text-xs text-gray-500">{formatDateTime(plan.created_at)}</td></tr>)}</tbody></table></div></div>
-          <div className="flex items-center justify-between text-sm text-gray-500"><span>第 {currentPage} 頁（每頁 {limit} 筆）</span><div className="flex gap-2"><button onClick={() => void loadPlans(patientId, skip - limit)} disabled={skip === 0 || loading} className="rounded border px-3 py-1 disabled:opacity-30">← 上一頁</button><button onClick={() => void loadPlans(patientId, skip + limit)} disabled={plans.length < limit || loading} className="rounded border px-3 py-1 disabled:opacity-30">下一頁 →</button></div></div>
+          <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                  <tr><th className="px-5 py-3">Plan ID</th><th className="px-5 py-3">Version</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Intent</th><th className="px-5 py-3">Current</th><th className="px-5 py-3">Created</th></tr>
+                </thead>
+                <tbody className="divide-y">
+                  {plans.map((plan) => (
+                    <tr key={`${plan.plan_id}-v${plan.version}`} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/treatment-plans/${plan.plan_id}`)}>
+                      <td className="px-5 py-3 font-mono text-xs">{plan.plan_id}</td>
+                      <td className="px-5 py-3">v{plan.version}</td>
+                      <td className="px-5 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${statusColor(plan.plan_status)}`}>{statusLabel(plan.plan_status)}</span></td>
+                      <td className="px-5 py-3">{plan.plan_intent || '—'}</td>
+                      <td className="px-5 py-3">{plan.is_current ? <span className="font-medium text-green-600">✓ 當前</span> : '—'}</td>
+                      <td className="px-5 py-3 text-xs text-gray-500">{formatDateTime(plan.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <span>第 {currentPage} 頁（每頁 {limit} 筆）</span>
+            <div className="flex gap-2">
+              <button onClick={() => void loadPlans(patientId, skip - limit)} disabled={skip === 0 || loading} className="rounded border px-3 py-1 disabled:opacity-30">← 上一頁</button>
+              <button onClick={() => void loadPlans(patientId, skip + limit)} disabled={plans.length < limit || loading} className="rounded border px-3 py-1 disabled:opacity-30">下一頁 →</button>
+            </div>
+          </div>
         </section>
       )}
     </main>
