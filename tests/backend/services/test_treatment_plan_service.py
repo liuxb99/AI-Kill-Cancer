@@ -927,6 +927,23 @@ class TestStatusTransitions:
         self._repos = mock_repos
         # plan_repo.get_current_by_plan_id returns a draft plan
         self._plan_model = _make_plan_model(plan_id="plan-001", version=1, plan_status="draft")
+        self._plan_model.summary = "Validated treatment plan"
+        self._plan_model.clinical_rationale = "Evidence-supported rationale"
+        medication = MagicMock()
+        medication.item_id = "item-001"
+        medication.item_type = "medication"
+        medication.planned_dose_text = "20 mg"
+        medication.route = "oral"
+        medication.frequency = "once daily"
+        monitoring = MagicMock()
+        monitoring.monitoring_id = "monitoring-001"
+        monitoring.schedule = "baseline and every 4 weeks"
+        monitoring.action_if_abnormal = "Hold and reassess"
+        self._plan_model.items = [medication]
+        self._plan_model.monitoring = [monitoring]
+        self._plan_model.safety_rules = []
+        self._plan_model.approved_by = USER_UUID
+        self._plan_model.approved_at = datetime.now(timezone.utc).replace(tzinfo=None)
         mock_repos["plan_repo"].get_current_by_plan_id.return_value = self._plan_model
 
     async def _call_transition(self, method_name: str, plan_id: str = "plan-001"):
