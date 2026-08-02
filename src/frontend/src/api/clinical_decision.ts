@@ -26,8 +26,13 @@ export interface ClinicalDecisionListResponse {
   total: number
 }
 
+const jsonGet: RequestInit = {
+  method: 'GET',
+  headers: { 'Content-Type': 'application/json' },
+}
+
 export function fetchClinicalDecisionById(id: string): Promise<ClinicalDecisionResponse> {
-  return apiRequest(`/clinical-decision/${encodeURIComponent(id)}`, { method: 'GET' })
+  return apiRequest(`/clinical-decision/${encodeURIComponent(id)}`, jsonGet)
 }
 
 export function createClinicalDecision(data: ClinicalDecisionRequest): Promise<ClinicalDecisionResponse> {
@@ -35,5 +40,5 @@ export function createClinicalDecision(data: ClinicalDecisionRequest): Promise<C
 }
 
 export function fetchClinicalDecisionsByPatientId(patientId: string): Promise<ClinicalDecisionListResponse> {
-  return apiRequest(withQuery('/clinical-decision', { patient_id: patientId }), { method: 'GET' })
+  return apiRequest(withQuery('/clinical-decision', { patient_id: patientId }), jsonGet)
 }
