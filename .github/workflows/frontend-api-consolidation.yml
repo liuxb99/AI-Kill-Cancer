@@ -10,8 +10,23 @@ on:
       - "src/frontend/src/api/researchPortal.ts"
       - "src/frontend/src/pages/Dashboard.tsx"
       - "src/frontend/src/pages/ResearchPortal.tsx"
+      - "src/frontend/src/pages/RecommendationPage.tsx"
       - "src/frontend/src/components/charts/**"
       - "src/frontend/src/test/apiConsolidation.test.ts"
+      - "src/frontend/src/test/RecommendationPage.test.tsx"
+      - ".github/workflows/frontend-api-consolidation.yml"
+  pull_request:
+    paths:
+      - "src/frontend/src/api/client.ts"
+      - "src/frontend/src/api/workbench.ts"
+      - "src/frontend/src/api/dashboard.ts"
+      - "src/frontend/src/api/researchPortal.ts"
+      - "src/frontend/src/pages/Dashboard.tsx"
+      - "src/frontend/src/pages/ResearchPortal.tsx"
+      - "src/frontend/src/pages/RecommendationPage.tsx"
+      - "src/frontend/src/components/charts/**"
+      - "src/frontend/src/test/apiConsolidation.test.ts"
+      - "src/frontend/src/test/RecommendationPage.test.tsx"
       - ".github/workflows/frontend-api-consolidation.yml"
   workflow_dispatch:
 
@@ -30,7 +45,7 @@ jobs:
           cache-dependency-path: src/frontend/package-lock.json
       - run: npm ci
       - name: Enforce one shared API client
-        run: npm test -- --run src/test/apiConsolidation.test.ts
+        run: npm test -- --run src/test/apiConsolidation.test.ts src/test/RecommendationPage.test.tsx
       - name: Shared client regression
         run: npm test -- --run src/test/apiClient.test.ts
       - name: TypeScript and production build
