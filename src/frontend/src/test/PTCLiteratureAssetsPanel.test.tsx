@@ -43,9 +43,9 @@ describe('PTCLiteratureAssetsPanel', () => {
     render(<PTCLiteratureAssetsPanel gene="BRAF" />)
 
     expect(await screen.findByText('BRAF V600E in papillary thyroid carcinoma')).toBeInTheDocument()
-    expect(screen.getByText(/Figure 1 · BRAF pathway response/)).toBeInTheDocument()
+    expect(screen.getByText('Figure 1').closest('figcaption')).toHaveTextContent('Figure 1 · BRAF pathway response.')
     expect(screen.getByRole('img', { name: 'BRAF pathway response.' })).toHaveAttribute('src', expect.stringContaining('figure1.jpg'))
-    expect(screen.getByText(/Table 1 · Observed variants/)).toBeInTheDocument()
+    expect(screen.getByText('Table 1').closest('div')).toHaveTextContent('Table 1 · Observed variants.')
     expect(screen.getByText('Gene')).toBeInTheDocument()
     expect(screen.getByText('Variant')).toBeInTheDocument()
     expect(screen.getByText('V600E')).toBeInTheDocument()
