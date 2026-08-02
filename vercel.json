@@ -1,0 +1,9 @@
+{
+  "buildCommand": "cd src/frontend && npm ci && npm run build",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index.py" }
+  ],
+  "env": {
+    "MODEL_ENABLED": "false"
+  }
+}
