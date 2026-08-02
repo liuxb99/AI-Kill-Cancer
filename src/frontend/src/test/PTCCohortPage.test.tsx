@@ -50,7 +50,7 @@ describe('PTCCohortPage', () => {
     expect(screen.getByText('排除欄位：').closest('p')).toHaveTextContent('vital_status')
     expect(screen.queryByText(/vital_status: 5/)).not.toBeInTheDocument()
     expect(screen.getByText('100.0')).toBeInTheDocument()
-    expect(screen.getByText(/共同基因：/)).toHaveTextContent('BRAF')
+    expect(screen.getByText(/共同基因：/).closest('div')).toHaveTextContent('BRAF')
     expect(screen.getByText('1200')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '開啟 3D' }))
