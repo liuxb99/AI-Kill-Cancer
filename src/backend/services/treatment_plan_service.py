@@ -34,6 +34,10 @@ from src.backend.clinical.treatment_plan_engine import (
     TreatmentPlanEngine,
 )
 from src.backend.clinical.treatment_plan_rules import TreatmentPlanRuleSet
+from src.backend.clinical.treatment_plan_safety_gate import (
+    SafetyGateReport,
+    TreatmentPlanSafetyGate,
+)
 from src.backend.clinical.treatment_plan_state_machine import (
     IllegalTransitionError,
     PlanStatus,
@@ -240,6 +244,7 @@ class TreatmentPlanService:
         state_machine = TreatmentPlanStateMachine()
         self._engine = engine or TreatmentPlanEngine(rule_set=rule_set)
         self._state_machine = state_machine
+        self._safety_gate = TreatmentPlanSafetyGate()
         self._plan_repo = plan_repo or TreatmentPlanRepository(db)
         self._phase_repo = phase_repo or TreatmentPhaseRepository(db)
         self._item_repo = item_repo or TreatmentItemRepository(db)
@@ -505,6 +510,19 @@ class TreatmentPlanService:
             for t in traces
         ]
 
+    # ── Public API: Clinical Safety Readiness ──────────────────────────────
+
+    async def get_safety_gate(
+        self,
+        plan_id: str,
+        target_status: str,
+    ) -> SafetyGateReport:
+        """Return a deterministic approval/activation readiness report."""
+        model = await self._plan_repo.get_current_by_plan_id(plan_id)
+        if model is None:
+            raise ValueError(f"Treatment plan with id '{plan_id}' not found")
+        return self._safety_gate.evaluate(model, target_status)
+
     # ── Public API: Status Transitions ─────────────────────────────────────
 
     async def _transition_status(
@@ -546,6 +564,11 @@ class TreatmentPlanService:
 
         current_status = PlanStatus(model.plan_status)
         self._state_machine.transition(current_status, target_status)
+
+        # Approval and activation are clinical safety boundaries.  Evaluate
+        # the materialised aggregate before mutating status or timestamps.
+        if target_status in {PlanStatus.APPROVED, PlanStatus.ACTIVE}:
+            self._safety_gate.assert_can_transition(model, target_status.value)
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
 
