@@ -17,6 +17,25 @@ def _next_available_at(attempt_count: int) -> datetime:
     return DEFAULT_RETRY_POLICY.next_available_at(attempt_count)
 
 
+def _coerce_event_id(value: object | None) -> str:
+    """Return a valid event ID or generate one when omitted.
+
+    The repository acts as the final persistence safety net. Callers may still
+    provide deterministic or externally assigned IDs, but blank and non-string
+    values are rejected before reaching the database.
+    """
+    if value is None:
+        return str(uuid.uuid4())
+    if not isinstance(value, str):
+        raise TypeError("event_id must be a string")
+    event_id = value.strip()
+    if not event_id:
+        raise ValueError("event_id must not be blank")
+    if len(event_id) > 64:
+        raise ValueError("event_id must not exceed 64 characters")
+    return event_id
+
+
 class ClinicalGraphOutboxRepository:
     """Transactional Outbox 仓储 — 不管理事务边界。"""
 
@@ -24,7 +43,8 @@ class ClinicalGraphOutboxRepository:
         self._db = db
 
     async def create(self, **kwargs) -> ClinicalGraphOutboxModel:
-        """创建新 outbox 记录。"""
+        """创建新 outbox 记录并保证 event_id 契约。"""
+        kwargs["event_id"] = _coerce_event_id(kwargs.get("event_id"))
         if "id" not in kwargs:
             kwargs["id"] = uuid.uuid4()
         model = ClinicalGraphOutboxModel(**kwargs)
