@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import DualModeSelector from '../components/DualModeSelector'
+import { apiRequest } from '../api/client'
 import { getLatestPTCCases, type PTCLatestCase } from '../api/ptcVisualization'
+import DualModeSelector from '../components/DualModeSelector'
 
 interface Explanation {
   category: string
@@ -30,17 +31,11 @@ interface RecommendationResult {
   created_at: string
 }
 
-async function fetchRecommendation(patientId: string, variants: string[], topN: number): Promise<RecommendationResult> {
-  const response = await fetch('/api/v1/recommendation', {
+export async function fetchRecommendation(patientId: string, variants: string[], topN: number): Promise<RecommendationResult> {
+  return apiRequest<RecommendationResult>('/recommendation', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ patient_id: patientId, variants, top_n: topN }),
   })
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
-    throw new Error(body.detail || `HTTP ${response.status}`)
-  }
-  return response.json()
 }
 
 function scoreClass(value: number): string {
