@@ -1,14 +1,14 @@
 """PTC integrated research and scientific herbal medicine.
 
 Revision ID: 028_ptc_integrated_research
-Revises: 027_ptc_therapy_evidence_trials
+Revises: 027
 """
 
 from alembic import op
 import sqlalchemy as sa
 
 revision = "028_ptc_integrated_research"
-down_revision = "027_ptc_therapy_evidence_trials"
+down_revision = "027"
 branch_labels = None
 depends_on = None
 
