@@ -60,7 +60,7 @@ vi.mock('../api/ptcTimeline', () => ({
 describe('PTCTimelinePage', () => {
   it('renders timeline semantics and opens protein 3D', async () => {
     render(<MemoryRouter><PTCTimelinePage /></MemoryRouter>)
-    expect(await screen.findByDisplayValue('TCGA-TIMELINE-001')).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: /TCGA-TIMELINE-001/ })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('基因筛选'), { target: { value: 'BRAF' } })
     fireEvent.click(screen.getByRole('button', { name: '生成 Digital Thread' }))
 
