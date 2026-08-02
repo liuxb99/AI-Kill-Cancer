@@ -1,46 +1,45 @@
-/**
- * Tests for ClinicalDecisionListPage (Phase 3B Final Acceptance Fix).
- *
- * Covers:
- * - Route registration in App.tsx
- * - Page rendering (title, query form)
- * - API call via fetchClinicalDecisionsByPatientId
- * - List display with data
- * - Empty state
- * - Error state
- * - Navigation to detail page
- */
-
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// ─── Mock fetch globally ──────────────────────────────────────────────────────
+const mocks = vi.hoisted(() => ({
+  listRecentDatabasePatients: vi.fn(),
+  getDatabasePatient: vi.fn(),
+  fetchClinicalDecisionsByPatientId: vi.fn(),
+  navigate: vi.fn(),
+}))
 
-const mockFetch = vi.fn()
+vi.mock('../api/databasePatients', () => ({
+  listRecentDatabasePatients: mocks.listRecentDatabasePatients,
+  getDatabasePatient: mocks.getDatabasePatient,
+  patientDisplayLabel: (patient: { patient_id: string; display_name?: string }) =>
+    patient.display_name ? `${patient.patient_id} · ${patient.display_name}` : patient.patient_id,
+}))
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  vi.stubGlobal('fetch', mockFetch)
-})
+vi.mock('../api/clinical_decision', () => ({
+  fetchClinicalDecisionsByPatientId: mocks.fetchClinicalDecisionsByPatientId,
+}))
 
-// ─── Mock useNavigate ─────────────────────────────────────────────────────────
-
-const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom')
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  }
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
+  return { ...actual, useNavigate: () => mocks.navigate }
 })
 
-// ─── Helper: render with router ──────────────────────────────────────────────
+import ClinicalDecisionListPage from '../pages/ClinicalDecisionListPage'
 
-function renderPage() {
+const patient = { patient_id: 'P-12345', display_name: '測試患者' }
+const decision = {
+  decision_id: 'dec-001',
+  patient_id: 'P-12345',
+  decision_type: 'treatment_selection',
+  confidence: 'high',
+  created_at: '2025-06-18T12:00:00Z',
+}
+
+function renderPage(initialEntry = '/clinical-decision') {
   return render(
-    <MemoryRouter initialEntries={['/clinical-decision']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/clinical-decision" element={<ClinicalDecisionListPage />} />
       </Routes>
@@ -48,334 +47,89 @@ function renderPage() {
   )
 }
 
-// Import AFTER mocks are set up
-import ClinicalDecisionListPage from '../pages/ClinicalDecisionListPage'
-
-// ─── Sample API Response ──────────────────────────────────────────────────────
-
-function createMockDecision(overrides: Record<string, any> = {}) {
-  return {
-    decision_id: 'dec-001',
-    patient_id: 'P-12345',
-    recommendation_id: 'rec-abc',
-    decision_type: 'treatment_selection',
-    reason: 'Based on EGFR mutation, Osimertinib is recommended as first-line therapy.',
-    evidence_summary: {
-      source: 'NCCN Guidelines v3.2025',
-      evidence_level: 'Category 1',
-      citations: ['NCCN-EGFR-001', 'NCCN-EGFR-002'],
-    },
-    confidence: 'high',
-    alternatives: [
-      {
-        drug: 'Gefitinib',
-        rationale: 'Alternative EGFR TKI',
-        evidence_level: 'Category 2A',
-      },
-    ],
-    contraindications: [
-      {
-        drug: 'Osimertinib',
-        condition: 'Severe interstitial lung disease',
-        severity: 'absolute',
-      },
-    ],
-    created_at: '2025-06-18T12:00:00Z',
-    trace_id: 'trace-xyz-789',
-    ...overrides,
-  }
-}
-
-function createMockListResponse(decisions: any[] = [createMockDecision()]) {
-  return {
-    decisions,
-    total: decisions.length,
-  }
-}
-
-// ─── Tests ────────────────────────────────────────────────────────────────────
-
-describe('ClinicalDecisionListPage — Route Registration', () => {
-  it('route is registered in App.tsx at /clinical-decision', async () => {
-    const fs = await import('fs')
-    const appTsx = fs.readFileSync('./src/App.tsx', 'utf-8')
-    expect(appTsx).toContain('/clinical-decision')
-    expect(appTsx).toContain('ClinicalDecisionListPage')
-    expect(appTsx).toContain('<Route path="/clinical-decision"')
-  })
+beforeEach(() => {
+  vi.clearAllMocks()
+  window.history.replaceState({}, '', '/clinical-decision')
+  mocks.listRecentDatabasePatients.mockResolvedValue({ items: [patient], total: 1, skip: 0, limit: 100 })
+  mocks.getDatabasePatient.mockResolvedValue(patient)
+  mocks.fetchClinicalDecisionsByPatientId.mockResolvedValue({ decisions: [decision], total: 1 })
 })
 
-describe('ClinicalDecisionListPage — Rendering', () => {
-  it('renders the page title', () => {
+describe('ClinicalDecisionListPage', () => {
+  it('renders the title and the dual-mode selector', async () => {
     renderPage()
     expect(screen.getByText('臨床決策列表')).toBeInTheDocument()
+    expect(screen.getByText('最近 100 筆')).toBeInTheDocument()
+    expect(screen.getByText('進階精準查詢')).toBeInTheDocument()
+    expect(await screen.findByText('P-12345 · 測試患者')).toBeInTheDocument()
   })
 
-  it('renders the back button', () => {
+  it('loads the first recent patient into the shared result area', async () => {
     renderPage()
-    const backBtn = screen.getByText('←')
-    expect(backBtn).toBeInTheDocument()
-    expect(backBtn.tagName).toBe('BUTTON')
+    expect(await screen.findByText('treatment_selection')).toBeInTheDocument()
+    expect(mocks.listRecentDatabasePatients).toHaveBeenCalledWith(100)
+    expect(mocks.fetchClinicalDecisionsByPatientId).toHaveBeenCalledWith('P-12345')
+    expect(screen.getByText('共 1 筆', { exact: false })).toBeInTheDocument()
   })
 
-  it('renders the query form with patient ID input and submit button', () => {
-    renderPage()
-    expect(screen.getByPlaceholderText('請輸入患者 ID 進行查詢')).toBeInTheDocument()
-    expect(screen.getByText('查詢')).toBeInTheDocument()
-  })
-})
-
-describe('ClinicalDecisionListPage — States', () => {
-  it('shows loading state during API call', async () => {
-    // Return a promise that never resolves to keep loading visible
-    mockFetch.mockReturnValueOnce(new Promise(() => {}))
-
-    renderPage()
-    const input = screen.getByPlaceholderText('請輸入患者 ID 進行查詢')
-    await userEvent.type(input, 'P-TEST')
-    await userEvent.click(screen.getByText('查詢'))
-
-    expect(await screen.findByText('查詢中…')).toBeInTheDocument()
-    // Loading spinner should be present
-    const spinner = document.querySelector('svg.animate-spin')
-    expect(spinner).toBeInTheDocument()
-  })
-
-  it('hides loading state after data loads', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => createMockListResponse(),
+  it('switches to advanced mode and queries a full Patient ID', async () => {
+    const user = userEvent.setup()
+    const advancedPatient = { patient_id: 'P-ADVANCED', display_name: '進階患者' }
+    mocks.getDatabasePatient.mockResolvedValueOnce(advancedPatient)
+    mocks.fetchClinicalDecisionsByPatientId.mockResolvedValueOnce({
+      decisions: [{ ...decision, patient_id: 'P-ADVANCED', decision_id: 'dec-advanced' }],
+      total: 1,
     })
 
     renderPage()
-    const input = screen.getByPlaceholderText('請輸入患者 ID 進行查詢')
-    await userEvent.type(input, 'P-LOAD')
-    await userEvent.click(screen.getByText('查詢'))
+    await screen.findByText('P-12345 · 測試患者')
+    await user.click(screen.getByText('進階精準查詢'))
+    const input = screen.getByPlaceholderText('輸入完整 UUID Patient ID')
+    await user.type(input, 'P-ADVANCED')
+    await user.click(screen.getByRole('button', { name: '精準查詢' }))
 
-    await waitFor(() => {
-      expect(screen.queryByText('查詢中…')).not.toBeInTheDocument()
-    })
+    await waitFor(() => expect(mocks.getDatabasePatient).toHaveBeenCalledWith('P-ADVANCED'))
+    await waitFor(() => expect(mocks.fetchClinicalDecisionsByPatientId).toHaveBeenCalledWith('P-ADVANCED'))
+    expect(await screen.findByText('P-ADVANCED 的決策')).toBeInTheDocument()
   })
 
-  it('shows error message on API failure', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+  it('restores a deep-linked patientId through the same advanced path', async () => {
+    const deepPatient = { patient_id: 'P-DEEP', display_name: '深連結患者' }
+    mocks.listRecentDatabasePatients.mockResolvedValueOnce({ items: [], total: 0, skip: 0, limit: 100 })
+    mocks.getDatabasePatient.mockResolvedValueOnce(deepPatient)
+    mocks.fetchClinicalDecisionsByPatientId.mockResolvedValueOnce({ decisions: [{ ...decision, patient_id: 'P-DEEP' }], total: 1 })
+    window.history.replaceState({}, '', '/clinical-decision?patientId=P-DEEP')
 
+    renderPage('/clinical-decision?patientId=P-DEEP')
+
+    await waitFor(() => expect(mocks.getDatabasePatient).toHaveBeenCalledWith('P-DEEP'))
+    expect(await screen.findByText('P-DEEP 的決策')).toBeInTheDocument()
+  })
+
+  it('shows a shared empty state', async () => {
+    mocks.fetchClinicalDecisionsByPatientId.mockResolvedValueOnce({ decisions: [], total: 0 })
     renderPage()
-    const input = screen.getByPlaceholderText('請輸入患者 ID 進行查詢')
-    await userEvent.type(input, 'P-ERR')
-    await userEvent.click(screen.getByText('查詢'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/Network error/)).toBeInTheDocument()
-    })
-    expect(screen.getByText(/錯誤：/)).toBeInTheDocument()
+    expect(await screen.findByText('所選患者目前沒有臨床決策記錄。')).toBeInTheDocument()
   })
 
-  it('shows HTTP error detail on non-ok response', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 422,
-      json: async () => ({ detail: 'Invalid patient ID' }),
-    })
-
+  it('shows API errors in an alert', async () => {
+    mocks.fetchClinicalDecisionsByPatientId.mockRejectedValueOnce(new Error('Network error'))
     renderPage()
-    const input = screen.getByPlaceholderText('請輸入患者 ID 進行查詢')
-    await userEvent.type(input, 'P-BAD')
-    await userEvent.click(screen.getByText('查詢'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/Invalid patient ID/)).toBeInTheDocument()
-    })
+    expect(await screen.findByRole('alert')).toHaveTextContent('錯誤：Network error')
   })
 
-  it('shows validation error when patient ID is empty', async () => {
+  it('navigates to a decision detail page', async () => {
+    const user = userEvent.setup()
     renderPage()
-    await userEvent.click(screen.getByText('查詢'))
-    expect(screen.getByText('請輸入患者 ID')).toBeInTheDocument()
+    const detail = await screen.findByText('查看詳情 →')
+    await user.click(detail)
+    expect(mocks.navigate).toHaveBeenCalledWith('/clinical-decision/dec-001')
   })
 
-  it('shows empty state when API returns empty list', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => createMockListResponse([]),
-    })
-
-    renderPage()
-    const input = screen.getByPlaceholderText('請輸入患者 ID 進行查詢')
-    await userEvent.type(input, 'P-EMPTY')
-    await userEvent.click(screen.getByText('查詢'))
-
-    await waitFor(() => {
-      expect(screen.getByText('查無決策記錄')).toBeInTheDocument()
-    })
-    expect(screen.getByText('請確認患者 ID 是否正確')).toBeInTheDocument()
-  })
-
-  it('shows error from the API module when no patient ID is provided', () => {
-    // This is tested above via the empty-submit validation
-    expect(true).toBe(true)
-  })
-})
-
-describe('ClinicalDecisionListPage — API Call', () => {
-  it('sends correct API request on submit', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => createMockListResponse(),
-    })
-
-    renderPage()
-    const input = screen.getByPlaceholderText('請輸入患者 ID 進行查詢')
-    await userEvent.type(input, 'P-TEST-API')
-    await userEvent.click(screen.getByText('查詢'))
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(1)
-    })
-
-    const [url, options] = mockFetch.mock.calls[0]
-    expect(url).toContain('/api/v1/clinical-decision?patient_id=P-TEST-API')
-    expect(options.method).toBe('GET')
-    expect(options.headers['Content-Type']).toBe('application/json')
-  })
-})
-
-describe('ClinicalDecisionListPage — List Display', () => {
-  it('renders decisions table with correct data', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => createMockListResponse([
-        createMockDecision({
-          decision_id: 'dec-001',
-          decision_type: 'treatment_selection',
-          confidence: 'high',
-          patient_id: 'P-12345',
-          created_at: '2025-06-18T12:00:00Z',
-        }),
-        createMockDecision({
-          decision_id: 'dec-002',
-          decision_type: 'medication_review',
-          confidence: 'medium',
-          patient_id: 'P-67890',
-          created_at: '2025-06-19T08:30:00Z',
-        }),
-      ]),
-    })
-
-    renderPage()
-    const input = screen.getByPlaceholderText('請輸入患者 ID 進行查詢')
-    await userEvent.type(input, 'P-LIST')
-    await userEvent.click(screen.getByText('查詢'))
-
-    await waitFor(() => {
-      expect(screen.getByText('查詢結果')).toBeInTheDocument()
-    })
-
-    // Check table headers
-    expect(screen.getByText('決策類型')).toBeInTheDocument()
-    expect(screen.getByText('信心等級')).toBeInTheDocument()
-    const patientIdHeaders = screen.getAllByText('患者 ID')
-    expect(patientIdHeaders.length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('建立時間')).toBeInTheDocument()
-    expect(screen.getByText('操作')).toBeInTheDocument()
-
-    // Check first row data
-    expect(screen.getByText('treatment_selection')).toBeInTheDocument()
-    expect(screen.getByText('P-12345')).toBeInTheDocument()
-
-    // Check second row data
-    expect(screen.getByText('medication_review')).toBeInTheDocument()
-    expect(screen.getByText('P-67890')).toBeInTheDocument()
-
-    // Check total count
-    expect(screen.getByText('共 2 筆')).toBeInTheDocument()
-
-    // Check both "查看詳情 →" buttons exist
-    const detailBtns = screen.getAllByText('查看詳情 →')
-    expect(detailBtns.length).toBe(2)
-  })
-
-  it('renders total count from API response', async () => {
-    const decisions = [
-      createMockDecision({ decision_id: 'dec-001' }),
-      createMockDecision({ decision_id: 'dec-002' }),
-      createMockDecision({ decision_id: 'dec-003' }),
-    ]
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ decisions, total: 10 }),
-    })
-
-    renderPage()
-    const input = screen.getByPlaceholderText('請輸入患者 ID 進行查詢')
-    await userEvent.type(input, 'P-COUNT')
-    await userEvent.click(screen.getByText('查詢'))
-
-    await waitFor(() => {
-      expect(screen.getByText('共 10 筆')).toBeInTheDocument()
-    })
-  })
-})
-
-describe('ClinicalDecisionListPage — Navigation', () => {
-  it('navigates to detail page when clicking a decision row', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => createMockListResponse([
-        createMockDecision({ decision_id: 'dec-nav-001', decision_type: 'ROW_NAV' }),
-      ]),
-    })
-
-    renderPage()
-    const input = screen.getByPlaceholderText('請輸入患者 ID 進行查詢')
-    await userEvent.type(input, 'P-NAV')
-    await userEvent.click(screen.getByText('查詢'))
-
-    await waitFor(() => {
-      expect(screen.getByText('ROW_NAV')).toBeInTheDocument()
-    })
-
-    // Click the row (the tr has cursor-pointer and onClick)
-    const row = screen.getByText('ROW_NAV').closest('tr')
-    expect(row).not.toBeNull()
-    await userEvent.click(row!)
-
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/clinical-decision/dec-nav-001')
-    })
-  })
-
-  it('navigates to detail page when clicking the detail button', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => createMockListResponse([
-        createMockDecision({ decision_id: 'dec-btn-001', decision_type: 'BTN_NAV' }),
-      ]),
-    })
-
-    renderPage()
-    const input = screen.getByPlaceholderText('請輸入患者 ID 進行查詢')
-    await userEvent.type(input, 'P-BTN')
-    await userEvent.click(screen.getByText('查詢'))
-
-    await waitFor(() => {
-      expect(screen.getByText('BTN_NAV')).toBeInTheDocument()
-    })
-
-    // Click the "查看詳情 →" button
-    const detailBtn = screen.getByText('查看詳情 →')
-    await userEvent.click(detailBtn)
-
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/clinical-decision/dec-btn-001')
-    })
-  })
-
-  it('renders navigation link in App.tsx navbar', async () => {
+  it('keeps the route and navigation label registered', async () => {
     const fs = await import('fs')
     const appTsx = fs.readFileSync('./src/App.tsx', 'utf-8')
-    expect(appTsx).toContain('臨床決策')
-    expect(appTsx).toContain('/clinical-decision')
+    expect(appTsx).toContain('<Route path="/clinical-decision"')
     expect(appTsx).toContain("label: '臨床決策'")
   })
 })
