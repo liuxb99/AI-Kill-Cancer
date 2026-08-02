@@ -1,12 +1,12 @@
 """Allow one public evidence record to support multiple gene assertions.
 
-Revision ID: 029_ptc_evidence_assertion_uniqueness
+Revision ID: 029_ptc_evidence_unique
 Revises: 028_ptc_integrated_research
 """
 
 from alembic import op
 
-revision = "029_ptc_evidence_assertion_uniqueness"
+revision = "029_ptc_evidence_unique"
 down_revision = "028_ptc_integrated_research"
 branch_labels = None
 depends_on = None
