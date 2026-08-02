@@ -38,35 +38,24 @@ jobs:
           pip install -r src/backend/requirements-api.txt
           pip install pytest pytest-cov ruff mypy numpy httpx pytest-asyncio anyio psycopg2-binary
 
-      # Phase 2: Lint with ruff (covers src/ and tests/ including new Phase 2 files)
       - name: Lint with ruff
         run: ruff check src/ tests/
 
-      # TODO: Re-enable mypy when type annotations are complete across the codebase.
-      # Current approach: mypy src/ --ignore-missing-imports
-      # Blocked on: missing type annotations in models/, repositories/, and domain/
-
-      # Phase 3D: Run Phase 3D Outbox tests
       - name: Phase 3D Outbox Tests
         env:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
         run: pytest -v --tb=short tests/unit/test_phase3d_*.py
 
-      # Phase 3D: KnowGraphGo Integration
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.25"
 
-      # Phase 2: Run all tests (unit + integration)
       - name: Test with pytest
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
         run: pytest -v --tb=short --cov=src/backend --ignore=tests/integration/test_migration_016.py --ignore=tests/integration/test_migration_025_pg_trace_constraint.py --ignore=tests/integration/test_migration_025_pg_schema_compare.py --ignore=tests/integration/test_migration_025_pg_full_cycle.py tests/unit/ tests/integration/
 
-      # ============================================================
-      # CI-01: Cross-language ID Parity
-      # ============================================================
       - name: CI-01 Checkout KnowGraphGo (fixed SHA)
         env:
           GH_TOKEN: ${{ secrets.PAT }}
@@ -89,22 +78,15 @@ jobs:
       - name: CI-01 Run Python ID parity test
         run: python -m pytest tests/test_phase3d_id_parity.py -v --tb=short
 
-      # ============================================================
-      # CI-02: Cross-repository E2E Digital Thread
-      # ============================================================
       - name: CI-02 Cross-repository E2E Digital Thread
         env:
           KNOWGRAPH_CLI: KnowGraphGo/knowgraph.exe
         run: python scripts/cross_repo_e2e_test.py
 
-      # ============================================================
-      # CI-03~CI-05: Go adapter tests (Stub + Provenance + No Panic)
-      # ============================================================
       - name: CI-03~CI-05 Go adapter tests
         working-directory: KnowGraphGo
         run: go test ./adapter/... -v
 
-      # Phase 2: Postgres Integration Gate
       - name: Postgres Integration Gate - Alembic upgrade on Postgres
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
@@ -128,7 +110,6 @@ jobs:
           pytest -v --tb=long tests/backend/integration/test_treatment_plan_restart.py tests/backend/integration/test_treatment_plan_digital_thread.py tests/backend/services/test_treatment_plan_service.py tests/backend/repositories/test_treatment_plan_repos.py tests/backend/api/test_treatment_plan_api.py tests/backend/models/test_treatment_plan_models.py tests/backend/clinical/test_treatment_plan_engine.py 2>&1 | tee /tmp/pg-test-phase3e.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
           echo "=== Phase 3F-0: Transaction Atomicity Tests ==="
           pytest -v --tb=long tests/backend/repositories/test_base_repository_atomicity.py tests/backend/atomicity/ 2>&1 | tee /tmp/pg-test-atomicity.log; rc=${PIPESTATUS[0]}; [ $rc -ne 0 ] && EXIT=$rc
-          # Emit annotations for any failures found in logs
           bash scripts/emit_annotations.sh 2>&1 || true
           exit $EXIT
 
@@ -137,24 +118,6 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db
           PYTHONPATH: .
         run: |
-          # Insert test data to verify 020→019 downgrade is blocked when data exists
-          python -c "
-          import asyncio, os
-          from sqlalchemy.ext.asyncio import create_async_engine
-          from sqlalchemy import text, Integer
-          async def main():
-              engine = create_async_engine(os.environ['DATABASE_URL'])
-              async with engine.connect() as conn:
-                  # First create a patient to satisfy FK constraint (Postgres)
-                  await conn.execute(text(\"INSERT INTO domain_patients (id, display_name, sex, consent_status) VALUES ('ci-test-pid', 'CI Test Patient', 'F', 'granted')\"))
-                  await conn.execute(text(\"INSERT INTO domain_tumor_board_consensus (id, consensus_id, patient_id, consensus_status) VALUES ('ci-test-id', 'ci-test-cid', 'ci-test-pid', 'pending')\"))
-                  await conn.commit()
-              await engine.dispose()
-          asyncio.run(main())
-          "
-          # Verify downgrade is blocked when data exists
-          alembic -c migrations/alembic.ini downgrade 019 2>&1 && { echo "ERROR: 020→019 downgrade should have been blocked when data exists"; exit 1; } || echo "OK: 020→019 downgrade blocked as expected (data exists)"
-          # Delete test data so empty-table downgrade can proceed
           python -c "
           import asyncio, os
           from sqlalchemy.ext.asyncio import create_async_engine
@@ -162,7 +125,20 @@ jobs:
           async def main():
               engine = create_async_engine(os.environ['DATABASE_URL'])
               async with engine.connect() as conn:
-                  # Delete in topological order (children before parents) to respect FK constraints
+                  await conn.execute(text(\"INSERT INTO domain_patients (id, display_name, sex, consent_status) VALUES ('ci-test-pid', 'CI Test Patient', 'F', 'granted')\"))
+                  await conn.execute(text(\"INSERT INTO domain_tumor_board_consensus (id, consensus_id, patient_id, consensus_status) VALUES ('ci-test-id', 'ci-test-cid', 'ci-test-pid', 'pending')\"))
+                  await conn.commit()
+              await engine.dispose()
+          asyncio.run(main())
+          "
+          alembic -c migrations/alembic.ini downgrade 019 2>&1 && { echo "ERROR: 020→019 downgrade should have been blocked when data exists"; exit 1; } || echo "OK: 020→019 downgrade blocked as expected (data exists)"
+          python -c "
+          import asyncio, os
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from sqlalchemy import text
+          async def main():
+              engine = create_async_engine(os.environ['DATABASE_URL'])
+              async with engine.connect() as conn:
                   await conn.execute(text(\"DELETE FROM domain_clinical_graph_outbox\"))
                   await conn.execute(text(\"DELETE FROM domain_treatment_plan_traces\"))
                   await conn.execute(text(\"DELETE FROM domain_treatment_safety_rules\"))
@@ -183,9 +159,7 @@ jobs:
               await engine.dispose()
           asyncio.run(main())
           "
-          # Now downgrade should succeed (empty tables)
           alembic -c migrations/alembic.ini downgrade 019
-          # Full downgrade to 016 and re-upgrade
           alembic -c migrations/alembic.ini downgrade 016
           alembic -c migrations/alembic.ini upgrade head
 
@@ -204,7 +178,6 @@ jobs:
           PYTHONPATH: .
         run: pytest -v --tb=short tests/test_migration.py
 
-      # Phase 2: Test migration (database schema)
       - name: Test migration
         env:
           DATABASE_URL: sqlite+aiosqlite:///test_migration_ci.db
@@ -213,10 +186,6 @@ jobs:
           rm -f test_migration_ci.db test_migration_ci.db-wal test_migration_ci.db-shm
           alembic -c migrations/alembic.ini upgrade head
 
-
-  # ============================================================
-  # A-04/A-05: Migration Gate (isolated PostgreSQL)
-  # ============================================================
   migration-gate:
     runs-on: ubuntu-latest
     services:
@@ -275,7 +244,6 @@ jobs:
           async def main():
               engine = create_async_engine(os.environ['DATABASE_URL'])
               async with engine.connect() as conn:
-                  # Verify domain_treatment_plans composite unique constraint
                   result = await conn.execute(text(\"\"\"
                       SELECT con.conname FROM pg_catalog.pg_constraint con
                       JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
@@ -283,9 +251,7 @@ jobs:
                         AND con.contype = 'u'
                   \"\"\"))
                   rows = [r[0] for r in result.fetchall()]
-                  print('domain_treatment_plans unique constraints:', rows)
                   assert 'uq_plan_id_version' in rows, f'Missing uq_plan_id_version in {rows}'
-                  # Verify domain_treatment_plan_traces composite unique constraint
                   result = await conn.execute(text(\"\"\"
                       SELECT con.conname FROM pg_catalog.pg_constraint con
                       JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
@@ -293,9 +259,7 @@ jobs:
                         AND con.contype = 'u'
                   \"\"\"))
                   rows = [r[0] for r in result.fetchall()]
-                  print('domain_treatment_plan_traces unique constraints:', rows)
                   assert 'uq_domain_treatment_plan_traces_step' in rows, f'Missing uq_domain_treatment_plan_traces_step in {rows}'
-                  # Verify foreign keys exist
                   result = await conn.execute(text(\"\"\"
                       SELECT con.conname FROM pg_catalog.pg_constraint con
                       JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
@@ -303,10 +267,8 @@ jobs:
                         AND con.contype = 'f'
                   \"\"\"))
                   fk_rows = [r[0] for r in result.fetchall()]
-                  print('domain_treatment_plans foreign keys:', fk_rows)
                   assert 'fk_prev_version' in fk_rows, 'Missing fk_prev_version'
                   assert 'fk_supersedes_version' in fk_rows, 'Missing fk_supersedes_version'
-                  print('All PostgreSQL schema validations passed!')
               await engine.dispose()
           asyncio.run(main())
           "
@@ -315,8 +277,7 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cancer_db_migration_gate
           PYTHONPATH: .
-        run: |
-          pytest -v --tb=long tests/test_migration_gate.py
+        run: pytest -v --tb=long tests/test_migration_gate.py
 
       - name: Downgrade 024
         env:
@@ -362,7 +323,6 @@ jobs:
           done
         working-directory: src/frontend
 
-      # Phase 2: Run frontend tests (covers src/test/tabs/)
       - name: Test frontend
         run: npm test
         working-directory: src/frontend
@@ -370,3 +330,46 @@ jobs:
       - name: Build frontend
         run: npm run build
         working-directory: src/frontend
+
+  deploy:
+    name: Deploy to Vercel
+    needs: [backend, migration-gate, frontend]
+    if: >-
+      success() &&
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: vercel-production
+      cancel-in-progress: true
+    env:
+      VERCEL_ORG_ID: team_QiaVGRjLjPmzkfZmHhEZ2IVv
+      VERCEL_PROJECT_ID: prj_afBg7ytQt8XBPKA4hDOlfcrRJuMy
+      VERCEL_SCOPE: cyliu99-s-projects
+      VERCEL_PROJECT_NAME: ai-kill-cancer
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Reset and link Vercel project
+        run: |
+          rm -rf .vercel
+          vercel link \
+            --yes \
+            --project="$VERCEL_PROJECT_NAME" \
+            --scope="$VERCEL_SCOPE" \
+            --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Pull Vercel production settings
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Deploy to Vercel production
+        run: vercel deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
