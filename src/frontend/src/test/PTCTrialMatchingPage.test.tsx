@@ -63,7 +63,7 @@ describe('PTCTrialMatchingPage', () => {
 
   it('separates research relevance from eligibility review', async () => {
     render(<MemoryRouter><PTCTrialMatchingPage /></MemoryRouter>)
-    expect(await screen.findByDisplayValue('TCGA-TRIAL-001')).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: /TCGA-TRIAL-001/ })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('基因筛选'), { target: { value: 'BRAF' } })
     fireEvent.click(screen.getByRole('button', { name: '开始研究比对' }))
 
@@ -79,12 +79,12 @@ describe('PTCTrialMatchingPage', () => {
 
   it('supports exact full-database case lookup', async () => {
     render(<MemoryRouter><PTCTrialMatchingPage /></MemoryRouter>)
-    await screen.findByDisplayValue('TCGA-TRIAL-001')
+    await screen.findByRole('option', { name: /TCGA-TRIAL-001/ })
     fireEvent.click(screen.getByRole('button', { name: '進階精準查詢' }))
     fireEvent.change(screen.getByPlaceholderText('例如 TCGA-XX-XXXX'), { target: { value: 'TCGA-ARCHIVE-999' } })
     fireEvent.click(screen.getByRole('button', { name: '精準查詢' }))
 
     await waitFor(() => expect(getPTCCase).toHaveBeenCalledWith('TCGA-ARCHIVE-999'))
-    expect((await screen.findAllByDisplayValue('TCGA-ARCHIVE-999')).length).toBeGreaterThan(0)
+    expect(await screen.findByDisplayValue('TCGA-ARCHIVE-999')).toBeInTheDocument()
   })
 })
