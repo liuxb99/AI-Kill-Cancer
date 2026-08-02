@@ -37,6 +37,7 @@ from src.backend.clinical.recommendation_engine import (
     RecommendationEngine,
 )
 from src.backend.clinical.report_generator import ReportGenerator
+from src.backend.contracts.recommendation_report import RecommendationReport
 from src.backend.domain.enums import RecommendationStatusEnum
 from src.backend.domain.recommendation import (
     RecommendationModel,
@@ -245,10 +246,9 @@ class RecommendationService:
 
         # ── Generate HTML report ────────────────────────────────────────────
         try:
-            from src.backend.api.v1.recommendation import RecommendationResponse
-
-            # Build a temporary RecommendationResponse for the ReportGenerator
-            resp = RecommendationResponse(**response)
+            # Build a framework-independent report input.  API/Pydantic models
+            # must never flow back into the service or clinical layers.
+            resp = RecommendationReport.from_mapping(response)
             generator = ReportGenerator()
             report_html = generator.generate(
                 resp,

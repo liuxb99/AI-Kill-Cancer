@@ -1,6 +1,6 @@
 """
 HTML Report Generator — produces a self-contained, printable, responsive
-HTML drug recommendation report from a ``RecommendationResponse``.
+HTML drug recommendation report from a ``RecommendationReportView``.
 
 The report includes patient info, evidence summary, ranked drug table,
 detailed reason breakdown, warnings, calculation trace, and engine metadata.
@@ -14,13 +14,12 @@ from __future__ import annotations
 import html as html_lib
 import json
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from src.backend.api.v1.recommendation import (
-        RecommendationDrugItem,
-        RecommendationResponse,
-    )
+from src.backend.contracts.recommendation_report import (
+    RecommendationDrugView,
+    RecommendationReportView,
+)
 
 # ── CSS (inline, self-contained) ─────────────────────────────────────────────
 
@@ -997,7 +996,7 @@ class ReportGenerator:
 
     def generate(
         self,
-        recommendation: RecommendationResponse,
+        recommendation: RecommendationReportView,
         *,
         variants: list[str] | None = None,
         evidence_count: int = 0,
@@ -1012,7 +1011,7 @@ class ReportGenerator:
 
         Parameters
         ----------
-        recommendation : RecommendationResponse
+        recommendation : RecommendationReportView
             The structured recommendation response from the pipeline.
         variants : list[str], optional
             List of variant strings (e.g. ``["EGFR L858R", "KRAS G12C"]``).
@@ -1106,7 +1105,7 @@ class ReportGenerator:
 
     # ── Section: Header ────────────────────────────────────────────────────
 
-    def _render_header(self, rec: RecommendationResponse) -> str:
+    def _render_header(self, rec: RecommendationReportView) -> str:
         """Render the report header with title and metadata."""
         created = rec.created_at
         # Format ISO timestamp to a friendlier form
@@ -1128,7 +1127,7 @@ class ReportGenerator:
 
     # ── Section: Patient ───────────────────────────────────────────────────
 
-    def _render_patient_section(self, rec: RecommendationResponse, variants: list[str]) -> str:
+    def _render_patient_section(self, rec: RecommendationReportView, variants: list[str]) -> str:
         """Render the patient information section."""
         variants_html = ""
         if variants:
@@ -1150,7 +1149,7 @@ class ReportGenerator:
 
     # ── Section: Evidence Summary ─────────────────────────────────────────
 
-    def _render_evidence_summary(self, rec: RecommendationResponse, evidence_count: int) -> str:
+    def _render_evidence_summary(self, rec: RecommendationReportView, evidence_count: int) -> str:
         """Render the evidence summary card.
 
         Computes source and tier distributions from the explanation data
@@ -1211,7 +1210,7 @@ class ReportGenerator:
 
     # ── Section: Ranking Table ────────────────────────────────────────────
 
-    def _render_ranking_table(self, drugs: list[RecommendationDrugItem]) -> str:
+    def _render_ranking_table(self, drugs: list[RecommendationDrugView]) -> str:
         """Render the top drugs ranking table."""
         if not drugs:
             return ""
@@ -1257,7 +1256,7 @@ class ReportGenerator:
 
     # ── Section: Reason Breakdown ─────────────────────────────────────────
 
-    def _render_reason_breakdown(self, drugs: list[RecommendationDrugItem]) -> str:
+    def _render_reason_breakdown(self, drugs: list[RecommendationDrugView]) -> str:
         """Render detailed reason breakdown for each drug."""
         if not drugs:
             return ""
@@ -1330,7 +1329,7 @@ class ReportGenerator:
 
     # ── Section: Warnings ─────────────────────────────────────────────────
 
-    def _render_warnings(self, drugs: list[RecommendationDrugItem]) -> str:
+    def _render_warnings(self, drugs: list[RecommendationDrugView]) -> str:
         """Render warnings for resistance and conflict items."""
         warnings: list[tuple[str, str, str]] = []  # (severity, icon, message)
 
@@ -1457,7 +1456,7 @@ class ReportGenerator:
 
     # ── Section: Footer ───────────────────────────────────────────────────
 
-    def _render_footer(self, rec: RecommendationResponse) -> str:
+    def _render_footer(self, rec: RecommendationReportView) -> str:
         """Render the report footer with version and disclaimer."""
         return f"""\
 <div class="report-footer">
