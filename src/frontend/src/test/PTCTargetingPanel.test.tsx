@@ -24,19 +24,8 @@ vi.mock('../api/ptcTargeting', () => ({
       source_name: 'openFDA',
       matched_targets: [{ gene: 'BRAF', variant: 'V600E' }],
     }],
-    evidence: [{
-      evidence_key: 'e1',
-      source_name: 'CIViC',
-      title: 'BRAF V600E evidence',
-      evidence_level: 'A',
-    }],
-    trials: [{
-      nct_id: 'NCT00000001',
-      brief_title: 'BRAF thyroid cancer trial',
-      overall_status: 'RECRUITING',
-      phases: ['PHASE2'],
-      interventions: [],
-    }],
+    evidence: [{ evidence_key: 'e1', source_name: 'CIViC', title: 'BRAF V600E evidence', evidence_level: 'A' }],
+    trials: [{ nct_id: 'NCT00000001', brief_title: 'BRAF thyroid cancer trial', overall_status: 'RECRUITING', phases: ['PHASE2'], interventions: [] }],
     counts: { therapies: 1, evidence: 1, trials: 1 },
     disclaimer: 'Research only',
   }),
@@ -47,7 +36,7 @@ describe('PTCTargetingPanel', () => {
     render(<PTCTargetingPanel gene="BRAF" proteinChange="p.V600E" />)
 
     expect(await screen.findByText(/BRAF · MAPK \/ ERK/)).toBeInTheDocument()
-    expect(screen.getByText((_, element) => element?.textContent?.includes('p.V600E · residue 600 · 位于目标结构域') ?? false)).toBeInTheDocument()
+    expect(screen.getByText('p.V600E').closest('span')).toHaveTextContent('p.V600E · residue 600 · 位于目标结构域')
     expect(screen.getByText('Dabrafenib')).toBeInTheDocument()
     expect(screen.getByText('BRAF V600E evidence')).toBeInTheDocument()
     expect(screen.getByText('NCT00000001')).toBeInTheDocument()
