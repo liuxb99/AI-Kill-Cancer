@@ -20,7 +20,9 @@ jobs:
         with:
           python-version: "3.11"
       - name: Apply deterministic source integration
-        run: python scripts/apply_phase3h_sync_integration.py
+        run: |
+          python scripts/apply_phase3h_sync_integration.py
+          python scripts/fix_phase3h_import_order.py
       - name: Commit generated integration when needed
         run: |
           if ! git diff --quiet; then
