@@ -57,9 +57,5 @@ jobs:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           PUBLIC_DATA_DIR: "${{ runner.temp }}/public-data"
         run: |
-          pytest -q \
-            tests/test_phase3h_public_data_store.py \
-            tests/test_ptc_tcga_downloader.py \
-            tests/test_ptc_knowledge_service.py \
-            tests/test_ptc_literature_service.py \
-            tests/test_ptc_completion_service.py
+          mapfile -t ptc_tests < <(find tests -type f -name 'test_*ptc*.py' -print | sort)
+          pytest -q tests/test_phase3h_public_data_store.py "${ptc_tests[@]}"
