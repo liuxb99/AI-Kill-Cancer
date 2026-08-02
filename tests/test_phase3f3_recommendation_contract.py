@@ -6,7 +6,6 @@ import ast
 from pathlib import Path
 
 import pytest
-
 from src.backend.clinical.report_generator import ReportGenerator
 from src.backend.contracts.recommendation_report import (
     RecommendationReport,
