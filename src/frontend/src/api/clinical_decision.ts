@@ -27,7 +27,7 @@ export interface ClinicalDecisionListResponse {
 }
 
 export function fetchClinicalDecisionById(id: string): Promise<ClinicalDecisionResponse> {
-  return apiRequest(`/clinical-decision/${encodeURIComponent(id)}`)
+  return apiRequest(`/clinical-decision/${encodeURIComponent(id)}`, { method: 'GET' })
 }
 
 export function createClinicalDecision(data: ClinicalDecisionRequest): Promise<ClinicalDecisionResponse> {
@@ -35,5 +35,5 @@ export function createClinicalDecision(data: ClinicalDecisionRequest): Promise<C
 }
 
 export function fetchClinicalDecisionsByPatientId(patientId: string): Promise<ClinicalDecisionListResponse> {
-  return apiRequest(withQuery('/clinical-decision', { patient_id: patientId }))
+  return apiRequest(withQuery('/clinical-decision', { patient_id: patientId }), { method: 'GET' })
 }
