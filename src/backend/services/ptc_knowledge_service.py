@@ -11,14 +11,13 @@ import httpx
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.sync.public_data_store import PublicDataStore
-
 from src.backend.domain.ptc_knowledge import (
     PTCClinicalTrialModel,
     PTCEvidenceRecordModel,
     PTCTherapyModel,
     PTCTherapyTargetModel,
 )
+from src.backend.sync.public_data_store import PublicDataStore
 
 CTGOV_STUDIES_URL = "https://clinicaltrials.gov/api/v2/studies"
 OPENFDA_LABEL_URL = "https://api.fda.gov/drug/label.json"
