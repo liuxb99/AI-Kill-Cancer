@@ -49,4 +49,6 @@ jobs:
           pytest -q \
             tests/test_phase3g_treatment_plan_safety_gate.py \
             tests/test_phase3g_safety_architecture.py \
-            tests/test_treatment_plan*.py
+            tests/backend/services/test_treatment_plan_service.py \
+            tests/backend/integration/test_treatment_plan_restart.py \
+            tests/backend/atomicity/test_success_path_red.py
