@@ -23,6 +23,7 @@ jobs:
         run: |
           python scripts/apply_phase3h_sync_integration.py
           python scripts/fix_phase3h_import_order.py
+          python scripts/fix_phase3h_gdc_compat.py
       - name: Commit generated integration when needed
         run: |
           if ! git diff --quiet; then
@@ -57,5 +58,11 @@ jobs:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           PUBLIC_DATA_DIR: "${{ runner.temp }}/public-data"
         run: |
-          mapfile -t ptc_tests < <(find tests -type f -name 'test_*ptc*.py' -print | sort)
-          pytest -q tests/test_phase3h_public_data_store.py "${ptc_tests[@]}"
+          mapfile -t adapter_tests < <(find tests -type f \( \
+            -name '*gdc*.py' -o \
+            -name '*tcga*.py' -o \
+            -name '*knowledge*.py' -o \
+            -name '*literature*.py' -o \
+            -name '*completion*.py' \
+          \) -print | sort)
+          pytest -q tests/test_phase3h_public_data_store.py "${adapter_tests[@]}"
