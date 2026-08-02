@@ -21,7 +21,9 @@ describe('PTC visualization API URLs', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/ptc-visualization/cases/latest?limit=100',
-      expect.objectContaining({ headers: {} }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+      }),
     )
   })
 
@@ -37,7 +39,9 @@ describe('PTC visualization API URLs', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/ptc-visualization/proteins/RET%20FUSION',
-      expect.objectContaining({ headers: {} }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+      }),
     )
   })
 
