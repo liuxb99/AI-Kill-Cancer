@@ -17,6 +17,7 @@ from src.backend.domain.ptc_knowledge import (
     PTCTherapyModel,
     PTCTherapyTargetModel,
 )
+from src.backend.sync.public_data_store import PublicDataStore
 
 CTGOV_STUDIES_URL = "https://clinicaltrials.gov/api/v2/studies"
 OPENFDA_LABEL_URL = "https://api.fda.gov/drug/label.json"
@@ -61,30 +62,54 @@ def infer_target_genes(*values: Any) -> list[str]:
 class PTCKnowledgeService:
     """Synchronize public knowledge while keeping transaction ownership in Service."""
 
-    def __init__(self, db: AsyncSession, client: httpx.AsyncClient | None = None):
+    def __init__(
+        self,
+        db: AsyncSession,
+        client: httpx.AsyncClient | None = None,
+        store: PublicDataStore | None = None,
+        *,
+        force_refresh: bool = False,
+    ):
         self.db = db
         self.client = client
+        self.store = store or PublicDataStore(force_refresh=force_refresh)
 
     async def _http(self) -> httpx.AsyncClient:
         if self.client is not None:
             return self.client
         return httpx.AsyncClient(timeout=45.0, follow_redirects=True)
 
+    async def _get_json(
+        self, client: httpx.AsyncClient, source: str, url: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        identity = self.store.canonical_identity(url, params)
+
+        async def fetch() -> bytes:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            return response.content
+
+        stored = await self.store.aget_or_fetch(
+            source=source,
+            identity=identity,
+            fetcher=fetch,
+            metadata={"url": url, "params": params, "media_type": "application/json"},
+            suffix=".json",
+        )
+        return httpx.Response(200, content=stored.content).json()
+
     async def sync_clinical_trials(self, *, page_size: int = 100) -> int:
         client = await self._http()
         owned = self.client is None
         try:
-            response = await client.get(
-                CTGOV_STUDIES_URL,
-                params={
-                    "query.cond": "Papillary Thyroid Carcinoma",
-                    "pageSize": min(max(page_size, 1), 1000),
-                    "format": "json",
-                },
-            )
-            response.raise_for_status()
+            params = {
+                "query.cond": "Papillary Thyroid Carcinoma",
+                "pageSize": min(max(page_size, 1), 1000),
+                "format": "json",
+            }
+            payload = await self._get_json(client, "clinicaltrials.gov", CTGOV_STUDIES_URL, params)
             count = 0
-            for study in response.json().get("studies", []):
+            for study in payload.get("studies", []):
                 protocol = study.get("protocolSection", {})
                 identification = protocol.get("identificationModule", {})
                 status = protocol.get("statusModule", {})
@@ -158,11 +183,14 @@ class PTCKnowledgeService:
             count = 0
             for drug_name in sorted({name.strip() for name in drug_names if name.strip()}):
                 search = f'openfda.generic_name:"{drug_name}"'
-                response = await client.get(OPENFDA_LABEL_URL, params={"search": search, "limit": 10})
-                if response.status_code == 404:
-                    continue
-                response.raise_for_status()
-                for record in response.json().get("results", []):
+                params = {"search": search, "limit": 10}
+                try:
+                    payload = await self._get_json(client, "openfda", OPENFDA_LABEL_URL, params)
+                except httpx.HTTPStatusError as exc:
+                    if exc.response.status_code == 404:
+                        continue
+                    raise
+                for record in payload.get("results", []):
                     openfda = record.get("openfda", {})
                     label_id = record.get("id") or record.get("set_id") or _key(drug_name, record.get("effective_time"))
                     existing = await self.db.scalar(

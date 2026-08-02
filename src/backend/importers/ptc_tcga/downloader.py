@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -9,6 +10,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from src.backend.importers.ptc_tcga.maf_parser import merge_variants_into_cases, parse_maf_bytes
+from src.backend.sync.public_data_store import PublicDataStore
 
 GDC_API = "https://api.gdc.cancer.gov"
 
@@ -23,9 +25,17 @@ class GDCDownloadResult:
 
 
 class GDCClient:
-    def __init__(self, base_url: str = GDC_API, timeout: int = 60):
+    def __init__(
+        self,
+        base_url: str = GDC_API,
+        timeout: int = 60,
+        store: PublicDataStore | None = None,
+        *,
+        force_refresh: bool = False,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.store = store or PublicDataStore(force_refresh=force_refresh)
 
     def fetch_ptc_cases(self, *, size: int = 100, offset: int = 0) -> GDCDownloadResult:
         if size < 1 or size > 10_000:
@@ -107,7 +117,12 @@ class GDCClient:
             file_id = item.get("file_id")
             if not file_id:
                 continue
-            grouped = parse_maf_bytes(self.download_public_file(str(file_id)))
+            downloader = self.download_public_file
+            if "expected_md5" in inspect.signature(downloader).parameters:
+                raw_payload = downloader(str(file_id), expected_md5=item.get("md5sum"))
+            else:  # Backward-compatible adapter/test-double contract.
+                raw_payload = downloader(str(file_id))
+            grouped = parse_maf_bytes(raw_payload)
             downloaded += 1
             for case_id, variants in grouped.items():
                 target = merged_by_case.setdefault(case_id, [])
@@ -171,23 +186,50 @@ class GDCClient:
         payload = self._get_json(f"/files?{urlencode(params)}")
         return list(payload.get("data", {}).get("hits", []))
 
-    def download_public_file(self, file_id: str) -> bytes:
+    def download_public_file(
+        self, file_id: str, *, expected_md5: str | None = None
+    ) -> bytes:
         if not file_id or "/" in file_id or ".." in file_id:
             raise ValueError("invalid GDC file id")
-        request = Request(
-            f"{self.base_url}/data/{file_id}",
-            headers={"Accept": "application/octet-stream", "User-Agent": "AI-Kill-Cancer/ptc-importer"},
+        url = f"{self.base_url}/data/{file_id}"
+
+        def fetch() -> bytes:
+            request = Request(
+                url,
+                headers={"Accept": "application/octet-stream", "User-Agent": "AI-Kill-Cancer/ptc-importer"},
+            )
+            with urlopen(request, timeout=self.timeout) as response:  # nosec B310 - fixed HTTPS GDC endpoint
+                return response.read()
+
+        stored = self.store.get_or_fetch(
+            source="gdc",
+            identity=self.store.canonical_identity(url),
+            fetcher=fetch,
+            expected_md5=expected_md5,
+            metadata={"url": url, "file_id": file_id},
+            suffix=".maf",
         )
-        with urlopen(request, timeout=self.timeout) as response:  # nosec B310 - fixed HTTPS GDC endpoint
-            return response.read()
+        return stored.content
 
     def _get_json(self, path: str) -> dict[str, Any]:
-        request = Request(
-            f"{self.base_url}{path}",
-            headers={"Accept": "application/json", "User-Agent": "AI-Kill-Cancer/ptc-importer"},
+        url = f"{self.base_url}{path}"
+
+        def fetch() -> bytes:
+            request = Request(
+                url,
+                headers={"Accept": "application/json", "User-Agent": "AI-Kill-Cancer/ptc-importer"},
+            )
+            with urlopen(request, timeout=self.timeout) as response:  # nosec B310 - configured trusted GDC endpoint
+                return response.read()
+
+        stored = self.store.get_or_fetch(
+            source="gdc",
+            identity=self.store.canonical_identity(url),
+            fetcher=fetch,
+            metadata={"url": url, "media_type": "application/json"},
+            suffix=".json",
         )
-        with urlopen(request, timeout=self.timeout) as response:  # nosec B310 - configured trusted GDC endpoint
-            return json.loads(response.read().decode("utf-8"))
+        return json.loads(stored.content.decode("utf-8"))
 
     @staticmethod
     def _flatten_case(hit: dict[str, Any]) -> dict[str, Any]:

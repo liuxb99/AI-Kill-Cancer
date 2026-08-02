@@ -20,6 +20,7 @@ from src.backend.importers.ptc_tcga.service import PTCTCGAImportService
 from src.backend.services.ptc_integrated_service import PTCIntegratedService
 from src.backend.services.ptc_knowledge_service import PTCKnowledgeService
 from src.backend.services.ptc_literature_service import PTCLiteratureService
+from src.backend.sync.public_data_store import PublicDataStore
 
 DEFAULT_PTC_DRUGS = [
     "selpercatinib", "pralsetinib", "larotrectinib", "repotrectinib",
@@ -43,8 +44,11 @@ def _edge(source: str, target: str, relation: str, **properties: Any) -> dict[st
 
 
 class PTCCompletionService:
-    def __init__(self, db: AsyncSession):
+    def __init__(
+        self, db: AsyncSession, *, force_refresh: bool = False, store: PublicDataStore | None = None
+    ):
         self.db = db
+        self.store = store or PublicDataStore(force_refresh=force_refresh)
 
     async def sync_all(
         self,
@@ -73,7 +77,7 @@ class PTCCompletionService:
 
         async def import_gdc() -> dict[str, Any]:
             download = await asyncio.to_thread(
-                GDCClient().fetch_ptc_cases_with_mutations,
+                GDCClient(store=self.store).fetch_ptc_cases_with_mutations,
                 size=gdc_size,
                 offset=0,
                 mutation_files=gdc_mutation_files,
@@ -90,8 +94,8 @@ class PTCCompletionService:
                 "mutation_variants": download.mutation_variants,
             }
 
-        knowledge = PTCKnowledgeService(self.db)
-        literature = PTCLiteratureService(self.db)
+        knowledge = PTCKnowledgeService(self.db, store=self.store)
+        literature = PTCLiteratureService(self.db, store=self.store)
         integrated = PTCIntegratedService(self.db)
         await run_stage("gdc_tcga_thca", import_gdc)
         await run_stage("clinical_trials", lambda: knowledge.sync_clinical_trials(page_size=trial_size))
@@ -112,6 +116,7 @@ class PTCCompletionService:
             "duration_seconds": round((finished_at - started_at).total_seconds(), 3),
             "stages": stages,
             "summary": summary,
+            "download_store": self.store.stats(),
         }
 
     async def source_status(self) -> dict[str, Any]:
