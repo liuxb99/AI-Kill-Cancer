@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { vi } from 'vitest'
 
 import PTCKnowledgePage from '../pages/PTCKnowledgePage'
@@ -42,8 +42,10 @@ describe('PTCKnowledgePage dual-mode workflow', () => {
   it('supports latest-100 selection and advanced exact query', async () => {
     render(<PTCKnowledgePage />)
 
-    expect(await screen.findByDisplayValue('TCGA-KNOW-001')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('BRAF')).toBeInTheDocument()
+    const selects = await screen.findAllByRole('combobox')
+    expect(selects).toHaveLength(2)
+    expect(within(selects[0]).getByRole('option', { name: /TCGA-KNOW-001/ })).toBeInTheDocument()
+    expect(within(selects[1]).getByRole('option', { name: 'BRAF' })).toBeInTheDocument()
     expect(mocks.getLatestPTCCases).toHaveBeenCalledWith(100)
 
     fireEvent.click(screen.getByRole('button', { name: '展示所選基因資料' }))
