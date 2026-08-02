@@ -33,24 +33,14 @@ vi.mock('../api/ptcReports', () => ({
 }))
 
 const report = {
-  schema_version: 'ptc-research-report-v1',
-  generated_at: '2026-08-01T06:00:00Z',
-  report_type: 'deidentified_public_research',
-  case_id: 'TCGA-REPORT-001',
-  selected_gene: 'BRAF',
-  executive_summary: 'BRAF V600E evidence-grounded summary.',
-  case_facts: {
-    source_dataset: 'TCGA-THCA',
-    pathologic_stage: 'Stage I',
-    variants: [{ variant_id: 'v1', gene: 'BRAF', protein_change: 'p.V600E' }],
-  },
+  schema_version: 'ptc-research-report-v1', generated_at: '2026-08-01T06:00:00Z', report_type: 'deidentified_public_research',
+  case_id: 'TCGA-REPORT-001', selected_gene: 'BRAF', executive_summary: 'BRAF V600E evidence-grounded summary.',
+  case_facts: { source_dataset: 'TCGA-THCA', pathologic_stage: 'Stage I', variants: [{ variant_id: 'v1', gene: 'BRAF', protein_change: 'p.V600E' }] },
   pathway: { pathway: 'MAPK / ERK', protein_domain: 'Kinase domain' },
   therapies: [{ therapy_key: 't1', name: 'Dabrafenib', approval_status: 'FDA label available' }],
   evidence: [{ evidence_key: 'e1', source: 'PubMed', title: 'BRAF PTC study', figures: [{}], tables: [{}] }],
   trials: [{ nct_id: 'NCT00000001', title: 'BRAF trial', status: 'RECRUITING' }],
-  assets: { figures: 1, tables: 1 },
-  trace: [{ step: 1, name: 'resolve_case', records: 1 }],
-  limitations: ['Research only'],
+  assets: { figures: 1, tables: 1 }, trace: [{ step: 1, name: 'resolve_case', records: 1 }], limitations: ['Research only'],
 }
 
 describe('PTCReportCenterPage', () => {
@@ -62,9 +52,9 @@ describe('PTCReportCenterPage', () => {
   it('generates a report from database selections without text query input', async () => {
     render(<PTCReportCenterPage />)
 
-    expect(await screen.findByDisplayValue(/TCGA-REPORT-001/)).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: /TCGA-REPORT-001/ })).toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '生成报告预览' }))
+    fireEvent.click(screen.getByRole('button', { name: '生成報告預覽' }))
 
     expect(await screen.findByText('BRAF V600E evidence-grounded summary.')).toBeInTheDocument()
     expect(mocks.getPTCResearchReport).toHaveBeenCalledWith('TCGA-REPORT-001', 'BRAF', undefined)
@@ -73,14 +63,10 @@ describe('PTCReportCenterPage', () => {
     expect(screen.getByText('NCT00000001')).toBeInTheDocument()
     expect(screen.getByText(/resolve_case/)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '打开列印版／另存 PDF' }))
-    expect(openSpy).toHaveBeenCalledWith(
-      '/api/v1/ptc-reports/case/TCGA-REPORT-001/html?gene=BRAF',
-      '_blank',
-      'noopener,noreferrer',
-    )
+    fireEvent.click(screen.getByRole('button', { name: '打開列印版／另存 PDF' }))
+    expect(openSpy).toHaveBeenCalledWith('/api/v1/ptc-reports/case/TCGA-REPORT-001/html?gene=BRAF', '_blank', 'noopener,noreferrer')
 
-    fireEvent.click(screen.getByRole('button', { name: '下载 JSON' }))
+    fireEvent.click(screen.getByRole('button', { name: '下載 JSON' }))
     await waitFor(() => expect(mocks.downloadPTCReportJson).toHaveBeenCalled())
   })
 })
