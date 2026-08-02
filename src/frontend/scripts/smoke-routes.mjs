@@ -27,6 +27,7 @@ export const routes = [
   '/tumor-board',
   '/clinical-graph',
   '/treatment-plans',
+  '/treatment-plans/new',
 ]
 
 const failures = []
