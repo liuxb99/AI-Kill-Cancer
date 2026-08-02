@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -116,9 +117,12 @@ class GDCClient:
             file_id = item.get("file_id")
             if not file_id:
                 continue
-            grouped = parse_maf_bytes(
-                self.download_public_file(str(file_id), expected_md5=item.get("md5sum"))
-            )
+            downloader = self.download_public_file
+            if "expected_md5" in inspect.signature(downloader).parameters:
+                raw_payload = downloader(str(file_id), expected_md5=item.get("md5sum"))
+            else:  # Backward-compatible adapter/test-double contract.
+                raw_payload = downloader(str(file_id))
+            grouped = parse_maf_bytes(raw_payload)
             downloaded += 1
             for case_id, variants in grouped.items():
                 target = merged_by_case.setdefault(case_id, [])
