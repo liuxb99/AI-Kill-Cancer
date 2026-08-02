@@ -11,6 +11,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.services.ptc_knowledge_service import PTCKnowledgeService, infer_target_genes
+from src.backend.sync.public_data_store import PublicDataStore
 
 NCBI_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 NCBI_EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
@@ -147,12 +148,53 @@ def parse_pmc_fulltext_xml(payload: str) -> dict[str, dict[str, Any]]:
 
 
 class PTCLiteratureService:
-    def __init__(self, db: AsyncSession, client: httpx.AsyncClient | None = None):
+    def __init__(
+        self,
+        db: AsyncSession,
+        client: httpx.AsyncClient | None = None,
+        store: PublicDataStore | None = None,
+        *,
+        force_refresh: bool = False,
+    ):
         self.db = db
         self.client = client
+        self.store = store or PublicDataStore(force_refresh=force_refresh)
 
     async def _http(self) -> httpx.AsyncClient:
         return self.client or httpx.AsyncClient(timeout=60.0, follow_redirects=True)
+
+    async def _get_bytes(
+        self,
+        client: httpx.AsyncClient,
+        source: str,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        method: str = "GET",
+        headers: dict[str, str] | None = None,
+        json_body: dict[str, Any] | None = None,
+        suffix: str = ".bin",
+    ) -> bytes:
+        identity_params = dict(params or {})
+        if json_body is not None:
+            identity_params["__body__"] = json_body
+        identity = self.store.canonical_identity(f"{method}:{url}", identity_params)
+
+        async def fetch() -> bytes:
+            response = await client.request(
+                method, url, params=params, headers=headers, json=json_body
+            )
+            response.raise_for_status()
+            return response.content
+
+        stored = await self.store.aget_or_fetch(
+            source=source,
+            identity=identity,
+            fetcher=fetch,
+            metadata={"url": url, "params": params or {}, "method": method},
+            suffix=suffix,
+        )
+        return stored.content
 
     async def _fetch_pmc_assets(
         self,
@@ -162,12 +204,14 @@ class PTCLiteratureService:
         if not pmcids:
             return {}
         try:
-            response = await client.get(
+            payload = await self._get_bytes(
+                client,
+                "pmc",
                 NCBI_EFETCH_URL,
                 params={"db": "pmc", "id": ",".join(sorted(set(pmcids))), "retmode": "xml"},
+                suffix=".xml",
             )
-            response.raise_for_status()
-            return parse_pmc_fulltext_xml(response.text)
+            return parse_pmc_fulltext_xml(payload.decode("utf-8"))
         except (httpx.HTTPError, ET.ParseError):
             return {}
 
@@ -176,20 +220,24 @@ class PTCLiteratureService:
         owned = self.client is None
         query = query or '"papillary thyroid carcinoma"[Title/Abstract]'
         try:
-            search = await client.get(
+            search_payload = await self._get_bytes(
+                client,
+                "pubmed",
                 NCBI_ESEARCH_URL,
                 params={"db": "pubmed", "term": query, "retmode": "json", "retmax": min(max(retmax, 1), 500)},
+                suffix=".json",
             )
-            search.raise_for_status()
-            ids = search.json().get("esearchresult", {}).get("idlist", [])
+            ids = httpx.Response(200, content=search_payload).json().get("esearchresult", {}).get("idlist", [])
             if not ids:
                 return 0
-            fetch = await client.get(
+            fetch_payload = await self._get_bytes(
+                client,
+                "pubmed",
                 NCBI_EFETCH_URL,
                 params={"db": "pubmed", "id": ",".join(ids), "retmode": "xml"},
+                suffix=".xml",
             )
-            fetch.raise_for_status()
-            rows = parse_pubmed_xml(fetch.text)
+            rows = parse_pubmed_xml(fetch_payload.decode("utf-8"))
             assets_by_pmcid = await self._fetch_pmc_assets(
                 client,
                 [row["pmcid"] for row in rows if row.get("pmcid")],
@@ -256,13 +304,16 @@ class PTCLiteratureService:
         }
         """
         try:
-            response = await client.post(
+            civic_payload = await self._get_bytes(
+                client,
+                "civic",
                 CIVIC_GRAPHQL_URL,
+                method="POST",
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                json={"query": query, "variables": {"names": sorted(set(gene_symbols))}},
+                json_body={"query": query, "variables": {"names": sorted(set(gene_symbols))}},
+                suffix=".json",
             )
-            response.raise_for_status()
-            body = response.json()
+            body = httpx.Response(200, content=civic_payload).json()
             if body.get("errors"):
                 raise RuntimeError(f"CIViC GraphQL error: {body['errors']}")
             nodes = body.get("data", {}).get("genes", {}).get("nodes", [])

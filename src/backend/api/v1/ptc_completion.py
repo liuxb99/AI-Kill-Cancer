@@ -22,6 +22,7 @@ class CompleteSyncRequest(BaseModel):
     pubmed_size: int = Field(default=100, ge=1, le=500)
     drug_names: list[str] = Field(default_factory=lambda: list(DEFAULT_PTC_DRUGS))
     include_civic: bool = False
+    force_refresh: bool = False
 
 
 @router.post("/sync-all")
@@ -29,7 +30,7 @@ async def sync_all(
     body: CompleteSyncRequest,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    return await PTCCompletionService(db).sync_all(
+    return await PTCCompletionService(db, force_refresh=body.force_refresh).sync_all(
         gdc_size=body.gdc_size,
         gdc_mutation_files=body.gdc_mutation_files,
         trial_size=body.trial_size,
