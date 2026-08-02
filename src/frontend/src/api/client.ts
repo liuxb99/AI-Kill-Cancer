@@ -25,13 +25,14 @@ export function withQuery(path: string, params: Record<string, string | number |
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = apiUrl(path)
+  const hasBody = options.body !== undefined && options.body !== null
   let response: Response
   try {
     response = await fetch(url, {
       ...options,
       headers: {
         ...authHeaders(),
-        'Content-Type': 'application/json',
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
         ...(options.headers || {}),
       },
     })
