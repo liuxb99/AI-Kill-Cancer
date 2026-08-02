@@ -42,11 +42,12 @@ jobs:
             src/backend/services/recommendation_service.py \
             src/backend/clinical/report_generator.py \
             tests/test_phase3f3_recommendation_contract.py
-      - name: Run contract and report regression tests
+      - name: Run contract and recommendation regressions
         env:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
         run: |
           pytest -q \
             tests/test_phase3f3_recommendation_contract.py \
-            tests/test_report_generator.py \
-            tests/test_explainable_trace.py
+            tests/test_explainable_trace.py \
+            tests/test_recommendation_service.py \
+            tests/test_recommendation_transaction.py
