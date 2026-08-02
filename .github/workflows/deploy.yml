@@ -7,9 +7,16 @@ on:
     branches: [master, main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -18,7 +25,10 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the validated commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -37,5 +47,5 @@ jobs:
         run: npm ci
         working-directory: src/frontend
 
-      - name: Build and Deploy to Vercel
+      - name: Build and deploy to Vercel
         run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
