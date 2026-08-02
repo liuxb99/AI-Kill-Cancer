@@ -107,7 +107,7 @@ export default function ProductionReadinessPage() {
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {counts ? Object.entries(counts).filter(([, value]) => typeof value === 'number').map(([key, value]) => (
-                <Metric key={key} label={key.replaceAll('_', ' ')} value={value as number} />
+                <Metric key={key} label={key.replace(/_/g, ' ')} value={value as number} />
               )) : <div className="text-sm text-gray-500">资料状态不可读取：{snapshot.source_status.error || '未知错误'}</div>}
             </div>
           </section>
