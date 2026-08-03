@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.backend.api.research import router as research_router
@@ -28,8 +28,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(
-        "Starting %s v%s (mode=%s)",
-        settings.APP_NAME, settings.APP_VERSION, settings.APP_MODE,
+        "Starting %s v%s (mode=%s)", settings.APP_NAME, settings.APP_VERSION, settings.APP_MODE,
     )
     db_url = settings.DATABASE_URL
     if db_url:
@@ -85,6 +84,15 @@ def create_app() -> FastAPI:
         if os.path.isfile(index_html):
             @app.get("/{full_path:path}")
             async def _serve_frontend(full_path: str):
+                normalized = full_path.lstrip("/")
+                if normalized == "api" or normalized.startswith("api/"):
+                    return JSONResponse(
+                        status_code=404,
+                        content={
+                            "detail": "API route not found",
+                            "path": f"/{normalized}",
+                        },
+                    )
                 return FileResponse(index_html, media_type="text/html")
 
     return app
