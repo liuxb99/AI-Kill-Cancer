@@ -58,4 +58,15 @@ describe('shared same-origin API client', () => {
     }))
     await expect(apiRequest('/missing')).rejects.toThrow('Patient not found')
   })
+
+  it('reports HTML routing failures without exposing a JSON parser exception', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('<!DOCTYPE html><html><body>SPA fallback</body></html>', {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    }))
+
+    await expect(apiRequest('/ptc-visualization/cases/latest')).rejects.toThrow(
+      'API returned non-JSON content (/api/v1/ptc-visualization/cases/latest): text/html',
+    )
+  })
 })
