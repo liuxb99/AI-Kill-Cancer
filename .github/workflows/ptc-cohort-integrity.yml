@@ -1,16 +1,6 @@
 name: PTC Cohort Scientific Integrity
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "src/backend/api/v1/ptc_cohort.py"
-      - "tests/backend/api/test_ptc_cohort.py"
-      - "src/frontend/src/api/ptcCohort.ts"
-      - "src/frontend/src/api/ptcResearch.ts"
-      - "src/frontend/src/pages/PTCCohortPage.tsx"
-      - "src/frontend/src/test/PTCCohortPage.test.tsx"
-      - ".github/workflows/ptc-cohort-integrity.yml"
   workflow_dispatch:
 
 jobs:
