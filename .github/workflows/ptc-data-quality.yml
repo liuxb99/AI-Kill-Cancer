@@ -1,17 +1,6 @@
 name: PTC Data Provenance and Freshness
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "src/backend/api/v1/ptc_data_quality.py"
-      - "src/backend/api/v1/router.py"
-      - "src/frontend/src/api/ptcDataQuality.ts"
-      - "src/frontend/src/pages/PTCDataQualityPage.tsx"
-      - "src/frontend/src/test/PTCDataQualityPage.test.tsx"
-      - "src/frontend/src/App.tsx"
-      - "tests/backend/api/test_ptc_data_quality.py"
-      - ".github/workflows/ptc-data-quality.yml"
   workflow_dispatch:
 
 jobs:
