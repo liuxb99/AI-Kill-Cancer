@@ -1,16 +1,6 @@
 name: PTC Evidence Matrix Integrity
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "src/backend/api/v1/ptc_evidence_matrix.py"
-      - "src/frontend/src/api/ptcEvidenceMatrix.ts"
-      - "src/frontend/src/pages/PTCEvidenceMatrixPage.tsx"
-      - "src/frontend/src/components/DualModeSelector.tsx"
-      - "src/frontend/src/test/PTCEvidenceMatrixPage.test.tsx"
-      - "tests/backend/api/test_ptc_evidence_matrix.py"
-      - ".github/workflows/ptc-evidence-integrity.yml"
   workflow_dispatch:
 
 jobs:
