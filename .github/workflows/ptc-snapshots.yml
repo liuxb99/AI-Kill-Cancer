@@ -1,17 +1,6 @@
 name: PTC Reproducible Research Snapshots
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "src/backend/api/v1/ptc_snapshots.py"
-      - "src/backend/api/v1/router.py"
-      - "src/frontend/src/api/ptcSnapshots.ts"
-      - "src/frontend/src/pages/PTCSnapshotPage.tsx"
-      - "src/frontend/src/test/PTCSnapshotPage.test.tsx"
-      - "src/frontend/src/App.tsx"
-      - "tests/backend/api/test_ptc_snapshots.py"
-      - ".github/workflows/ptc-snapshots.yml"
   workflow_dispatch:
 
 jobs:
