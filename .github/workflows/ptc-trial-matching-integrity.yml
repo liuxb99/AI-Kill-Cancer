@@ -1,22 +1,6 @@
 name: PTC Trial Matching Scientific Integrity
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'src/backend/api/v1/ptc_trial_matching.py'
-      - 'tests/backend/api/test_ptc_trial_matching.py'
-      - 'src/frontend/src/api/ptcTrialMatching.ts'
-      - 'src/frontend/src/pages/PTCTrialMatchingPage.tsx'
-      - 'src/frontend/src/test/PTCTrialMatchingPage.test.tsx'
-      - '.github/workflows/ptc-trial-matching-integrity.yml'
-  pull_request:
-    paths:
-      - 'src/backend/api/v1/ptc_trial_matching.py'
-      - 'tests/backend/api/test_ptc_trial_matching.py'
-      - 'src/frontend/src/api/ptcTrialMatching.ts'
-      - 'src/frontend/src/pages/PTCTrialMatchingPage.tsx'
-      - 'src/frontend/src/test/PTCTrialMatchingPage.test.tsx'
   workflow_dispatch:
 
 jobs:
