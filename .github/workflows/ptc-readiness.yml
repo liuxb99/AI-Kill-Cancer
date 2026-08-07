@@ -1,14 +1,6 @@
 name: PTC Product Readiness Gate
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "src/backend/services/ptc_readiness_service.py"
-      - "src/backend/api/v1/ptc_readiness.py"
-      - "src/backend/api/v1/router.py"
-      - "tests/backend/services/test_ptc_readiness_service.py"
-      - ".github/workflows/ptc-readiness.yml"
   workflow_dispatch:
 
 jobs:
