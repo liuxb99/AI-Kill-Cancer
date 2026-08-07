@@ -1,22 +1,6 @@
 name: PTC Traceability Integrity
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'src/frontend/src/api/ptcTimeline.ts'
-      - 'src/frontend/src/api/ptcSnapshots.ts'
-      - 'src/frontend/src/pages/ClinicalGraphPage.tsx'
-      - 'src/frontend/src/test/ptcTraceabilityApis.test.ts'
-      - 'src/frontend/src/test/LegacyDualModePages.test.tsx'
-      - '.github/workflows/ptc-traceability-integrity.yml'
-  pull_request:
-    paths:
-      - 'src/frontend/src/api/ptcTimeline.ts'
-      - 'src/frontend/src/api/ptcSnapshots.ts'
-      - 'src/frontend/src/pages/ClinicalGraphPage.tsx'
-      - 'src/frontend/src/test/ptcTraceabilityApis.test.ts'
-      - 'src/frontend/src/test/LegacyDualModePages.test.tsx'
   workflow_dispatch:
 
 jobs:
