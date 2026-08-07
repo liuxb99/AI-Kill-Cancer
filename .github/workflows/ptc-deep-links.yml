@@ -1,17 +1,6 @@
 name: PTC Deep Links and Same-Origin API
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "src/frontend/src/api/client.ts"
-      - "src/frontend/src/api/ptcVisualization.ts"
-      - "src/frontend/src/components/StatusBanner.tsx"
-      - "src/frontend/src/pages/PTC3DExplorerPage.tsx"
-      - "src/frontend/src/test/apiClient.test.ts"
-      - "src/frontend/src/test/ptcVisualizationApi.test.ts"
-      - "src/frontend/src/test/PTC3DExplorerPage.test.tsx"
-      - ".github/workflows/ptc-deep-links.yml"
   workflow_dispatch:
 
 jobs:
