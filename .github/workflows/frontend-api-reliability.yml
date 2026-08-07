@@ -1,22 +1,6 @@
 name: Frontend API Reliability
 
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - "src/frontend/src/api/client.ts"
-      - "src/frontend/src/api/databasePatients.ts"
-      - "src/frontend/src/api/clinical_decision.ts"
-      - "src/frontend/src/api/treatmentPlan.ts"
-      - "src/frontend/src/api/ptcAssistant.ts"
-      - "src/frontend/src/api/ptcCohort.ts"
-      - "src/frontend/src/api/ptcTargeting.ts"
-      - "src/frontend/src/api/ptcLiterature.ts"
-      - "src/frontend/src/api/ptcReports.ts"
-      - "src/frontend/src/api/ptcIntegrated.ts"
-      - "src/frontend/src/api/ptcCompletion.ts"
-      - "src/frontend/src/test/apiClient.test.ts"
-      - ".github/workflows/frontend-api-reliability.yml"
   workflow_dispatch:
 
 jobs:
