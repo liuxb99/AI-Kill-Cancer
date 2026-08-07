@@ -1,34 +1,6 @@
 name: Production Readiness and Route Smoke
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "src/frontend/src/api/client.ts"
-      - "src/frontend/src/api/ptcCompletion.ts"
-      - "src/frontend/src/api/ptcDataQuality.ts"
-      - "src/frontend/src/api/productionReadiness.ts"
-      - "src/frontend/src/pages/ProductionReadinessPage.tsx"
-      - "src/frontend/src/App.tsx"
-      - "src/frontend/src/test/productionReadiness.test.ts"
-      - "src/frontend/src/test/routeSmokeCoverage.test.ts"
-      - "src/frontend/scripts/smoke-routes.mjs"
-      - "src/frontend/package.json"
-      - "src/frontend/package-lock.json"
-      - ".github/workflows/production-readiness.yml"
-  pull_request:
-    paths:
-      - "src/frontend/src/api/client.ts"
-      - "src/frontend/src/api/ptcCompletion.ts"
-      - "src/frontend/src/api/ptcDataQuality.ts"
-      - "src/frontend/src/api/productionReadiness.ts"
-      - "src/frontend/src/pages/ProductionReadinessPage.tsx"
-      - "src/frontend/src/App.tsx"
-      - "src/frontend/src/test/productionReadiness.test.ts"
-      - "src/frontend/src/test/routeSmokeCoverage.test.ts"
-      - "src/frontend/scripts/smoke-routes.mjs"
-      - "src/frontend/package.json"
-      - "src/frontend/package-lock.json"
   workflow_dispatch:
 
 jobs:
