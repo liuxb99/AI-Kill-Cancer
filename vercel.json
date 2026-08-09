@@ -1,5 +1,6 @@
 {
   "buildCommand": "cd src/frontend && npm ci && npm run build",
+  "ignoreCommand": "node scripts/vercel-ignore-git-deploy.js",
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
   ],
