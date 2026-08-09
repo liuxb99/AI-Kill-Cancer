@@ -55,6 +55,21 @@ jobs:
       - name: SQLite compatibility regression
         run: python -m pytest tests/backend/test_sqlite_local_compat.py -v --tb=short
 
+      - name: Initialize configured local SQLite database
+        shell: pwsh
+        run: |
+          @'
+          import asyncio
+          from src.backend.config import settings
+          from src.backend.database.session import close_db, init_db
+
+          async def main():
+              await init_db(settings.DATABASE_URL)
+              await close_db()
+
+          asyncio.run(main())
+          '@ | python -
+
       - name: Verify local database file
         shell: pwsh
         run: |
