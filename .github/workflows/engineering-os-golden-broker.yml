@@ -1,0 +1,72 @@
+name: Engineering OS Golden Broker
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/engineering-os-golden-broker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  golden-broker:
+    runs-on: [self-hosted, Windows, X64, ai-ci]
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell
+    env:
+      GH_TOKEN: ${{ secrets.PAT }}
+    steps:
+      - name: Verify private repository credential
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+            throw 'AI-Kill-Cancer secret PAT is empty or unavailable.'
+          }
+          foreach ($repo in @(
+            'liuxb99/AI-Engineering-OS',
+            'liuxb99/Bridge_Types',
+            'liuxb99/AI-BIM-Forge',
+            'liuxb99/AI-CivilQuantity',
+            'liuxb99/SceneX'
+          )) {
+            & gh repo view $repo --json nameWithOwner *> $null
+            if ($LASTEXITCODE -ne 0) { throw "Private repo access failed: $repo" }
+          }
+          Write-Host 'Private repository credential verified (value hidden).'
+
+      - name: Checkout AI-Engineering-OS
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'engineering-os-golden-broker'
+          if (Test-Path $root) { Remove-Item $root -Recurse -Force }
+          & gh repo clone liuxb99/AI-Engineering-OS $root -- --depth 1
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to clone AI-Engineering-OS.' }
+          "ENGINEERING_OS_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Bootstrap immutable Golden workspace
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:ENGINEERING_OS_ROOT 'scripts\windows\bootstrap-golden-runner.ps1') -RepositoryRoot $env:ENGINEERING_OS_ROOT -SkipRunnerConfiguration
+          if ($LASTEXITCODE -ne 0) { throw 'Golden bootstrap failed.' }
+
+      - name: Run Golden Bridge cross-repo verification
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:ENGINEERING_OS_ROOT 'scripts\windows\verify-golden-bridge-action.ps1') -RepositoryRoot $env:ENGINEERING_OS_ROOT
+          if ($LASTEXITCODE -ne 0) { throw 'Golden Bridge verification failed.' }
+
+      - name: Verify Golden evidence exists
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $required = @(
+            (Join-Path $env:ENGINEERING_OS_ROOT 'data\verification\latest-golden-bridge.json'),
+            (Join-Path $env:ENGINEERING_OS_ROOT 'data\verification\latest-golden-bridge-revision.json')
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path -PathType Leaf)) { throw "Missing Golden evidence: $path" }
+          }
+          Write-Host 'Engineering OS Golden verification PASS.'
