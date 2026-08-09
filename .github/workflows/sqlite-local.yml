@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   local-verify:
-    runs-on: [self-hosted, Windows, X64]
+    runs-on: self-hosted
     timeout-minutes: 45
     env:
       APP_MODE: research
