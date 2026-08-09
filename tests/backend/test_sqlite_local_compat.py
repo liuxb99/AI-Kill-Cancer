@@ -9,12 +9,10 @@ from sqlalchemy.exc import IntegrityError
 
 from src.backend.config import _sqlite_database_url
 from src.backend.database import session as db_session
-from src.backend.database.models import Diagnosis, GenderEnum, Patient, CancerStageEnum
+from src.backend.database.models import CancerStageEnum, Diagnosis, GenderEnum, Patient
 
 
-pytestmark = pytest.mark.asyncio
-
-
+@pytest.mark.asyncio
 async def test_sqlite_file_init_creates_parent_and_persists_across_sessions(tmp_path: Path):
     db_path = tmp_path / "nested" / "ai-kill-cancer.db"
     db_url = _sqlite_database_url(str(db_path))
@@ -40,6 +38,7 @@ async def test_sqlite_file_init_creates_parent_and_persists_across_sessions(tmp_
         await db_session.close_db()
 
 
+@pytest.mark.asyncio
 async def test_sqlite_foreign_keys_are_enforced(tmp_path: Path):
     db_url = _sqlite_database_url(str(tmp_path / "fk.db"))
     await db_session.init_db(db_url)
@@ -62,6 +61,7 @@ async def test_sqlite_foreign_keys_are_enforced(tmp_path: Path):
         await db_session.close_db()
 
 
+@pytest.mark.asyncio
 async def test_memory_sqlite_schema_survives_multiple_sessions():
     await db_session.init_db("sqlite+aiosqlite:///:memory:")
     try:
