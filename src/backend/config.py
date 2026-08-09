@@ -1,5 +1,34 @@
 import logging
 import os
+from pathlib import Path
+
+
+def _sqlite_database_url(path: str) -> str:
+    """Build an async SQLite URL for local/demo/research use."""
+    raw = path.strip()
+    if raw in {"", ":memory:"}:
+        return "sqlite+aiosqlite:///:memory:"
+    normalized = Path(raw).expanduser().as_posix()
+    return f"sqlite+aiosqlite:///{normalized}"
+
+
+def _database_url_from_environment() -> str:
+    explicit = os.getenv("DATABASE_URL", "").strip()
+    if explicit:
+        return explicit
+
+    backend = os.getenv("DB_BACKEND", "postgresql").strip().lower()
+    if backend == "sqlite":
+        return _sqlite_database_url(os.getenv("SQLITE_PATH", "./data/ai-kill-cancer.db"))
+    if backend != "postgresql":
+        raise ValueError("DB_BACKEND must be 'postgresql' or 'sqlite'")
+
+    host = os.getenv("DB_HOST", "localhost")
+    port = int(os.getenv("DB_PORT", "5432"))
+    user = os.getenv("DB_USER", "postgres")
+    password = os.getenv("DB_PASSWORD", "postgres")
+    name = os.getenv("DB_NAME", "cancer_db")
+    return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{name}"
 
 
 class Settings:
@@ -16,15 +45,14 @@ class Settings:
         logging.warning("CORS_ORIGINS=* is not allowed in production mode, falling back to http://localhost:5173")
         CORS_ORIGINS = ["http://localhost:5173"]
 
+    DB_BACKEND: str = os.getenv("DB_BACKEND", "postgresql").strip().lower()
     DB_HOST: str = os.getenv("DB_HOST", "localhost")
     DB_PORT: int = int(os.getenv("DB_PORT", "5432"))
     DB_USER: str = os.getenv("DB_USER", "postgres")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "postgres")
     DB_NAME: str = os.getenv("DB_NAME", "cancer_db")
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}",
-    )
+    SQLITE_PATH: str = os.getenv("SQLITE_PATH", "./data/ai-kill-cancer.db")
+    DATABASE_URL: str = _database_url_from_environment()
 
     MODEL_PATH: str = os.getenv("MODEL_PATH", "./models/cancer_prediction.pkl")
     MODEL_ENABLED: bool = os.getenv("MODEL_ENABLED", "true").lower() == "true"
@@ -39,7 +67,16 @@ class Settings:
     BCRYPT_ROUNDS: int = 12
 
     def __init__(self):
+        self._validate_database_mode()
         self._validate_jwt_secret()
+
+    def _validate_database_mode(self):
+        """SQLite is an explicit local/demo/research backend, not production storage."""
+        if self.DATABASE_URL.startswith("sqlite") and self.APP_MODE == "production":
+            raise ValueError(
+                "SQLite is supported for local/demo/research mode only. "
+                "Production mode requires PostgreSQL."
+            )
 
     def _validate_jwt_secret(self):
         """In production mode, require JWT_SECRET_KEY to be set from environment."""
