@@ -26,6 +26,7 @@ jobs:
     env:
       VERCEL_ORG_ID: team_QiaVGRjLjPmzkfZmHhEZ2IVv
       VERCEL_PROJECT_ID: prj_afBg7ytQt8XBPKA4hDOlfcrRJuMy
+      VERCEL_SCOPE: cyliu99-s-projects
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - name: Require Vercel token
@@ -64,16 +65,19 @@ jobs:
             Remove-Item '.vercel' -Recurse -Force
           }
 
+      - name: Link Vercel project
+        run: vercel link --yes --project ai-kill-cancer --scope=$env:VERCEL_SCOPE --token=$env:VERCEL_TOKEN
+
       - name: Pull production environment
-        run: vercel pull --yes --environment=production --token=$env:VERCEL_TOKEN
+        run: vercel pull --yes --environment=production --scope=$env:VERCEL_SCOPE --token=$env:VERCEL_TOKEN
 
       - name: Build verified production artifact
-        run: vercel build --prod --token=$env:VERCEL_TOKEN
+        run: vercel build --prod --scope=$env:VERCEL_SCOPE --token=$env:VERCEL_TOKEN
 
       - name: Deploy prebuilt artifact to production
         id: deploy
         run: |
-          $url = (vercel deploy --prebuilt --prod --token=$env:VERCEL_TOKEN).Trim()
+          $url = (vercel deploy --prebuilt --prod --scope=$env:VERCEL_SCOPE --token=$env:VERCEL_TOKEN).Trim()
           if ([string]::IsNullOrWhiteSpace($url)) {
             throw 'Vercel CLI returned an empty deployment URL.'
           }
