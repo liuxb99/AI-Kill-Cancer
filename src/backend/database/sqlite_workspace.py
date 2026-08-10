@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,7 +23,7 @@ def check_sqlite_integrity(database_path: str | Path) -> SQLiteIntegrityResult:
     path = _path(database_path)
     if not path.is_file():
         return SQLiteIntegrityResult(False, f"database does not exist: {path}")
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection:
         row = connection.execute("PRAGMA integrity_check").fetchone()
     message = str(row[0]) if row else "no integrity result"
     return SQLiteIntegrityResult(message.lower() == "ok", message)
@@ -38,7 +39,7 @@ def backup_sqlite_database(database_path: str | Path, backup_dir: str | Path | N
     target_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     target = target_dir / f"{source.stem}-{stamp}{source.suffix or '.db'}"
-    with sqlite3.connect(source) as src, sqlite3.connect(target) as dst:
+    with closing(sqlite3.connect(source)) as src, closing(sqlite3.connect(target)) as dst:
         src.backup(dst)
     if not check_sqlite_integrity(target).ok:
         target.unlink(missing_ok=True)
@@ -47,7 +48,13 @@ def backup_sqlite_database(database_path: str | Path, backup_dir: str | Path | N
 
 
 def restore_sqlite_database(backup_path: str | Path, database_path: str | Path) -> Path:
-    """Restore an integrity-checked backup using an atomic replacement file."""
+    """Restore an integrity-checked backup using an atomic replacement file.
+
+    Every native SQLite handle opened by this module is explicitly closed before
+    ``Path.replace``. This matters on Windows, where an integrity-check connection
+    left alive by ``sqlite3.Connection.__exit__`` can keep the target/staging file
+    locked even after leaving a ``with sqlite3.connect(...)`` block.
+    """
     backup = _path(backup_path)
     target = _path(database_path)
     result = check_sqlite_integrity(backup)
@@ -55,6 +62,7 @@ def restore_sqlite_database(backup_path: str | Path, database_path: str | Path) 
         raise RuntimeError(f"Refusing to restore invalid SQLite backup: {result.message}")
     target.parent.mkdir(parents=True, exist_ok=True)
     staging = target.with_suffix(f"{target.suffix}.restore")
+    staging.unlink(missing_ok=True)
     shutil.copy2(backup, staging)
     if not check_sqlite_integrity(staging).ok:
         staging.unlink(missing_ok=True)
