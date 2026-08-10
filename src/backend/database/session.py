@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from fastapi import HTTPException
 from sqlalchemy import event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
@@ -44,8 +45,6 @@ def _create_engine(db_url: str, debug: bool) -> AsyncEngine:
     if is_sqlite_url(db_url):
         _prepare_sqlite_file(db_url)
         if _is_memory_sqlite(db_url):
-            # A single connection keeps an in-memory SQLite schema alive for the
-            # entire test/local process instead of recreating an empty DB per checkout.
             kwargs["poolclass"] = StaticPool
 
     db_engine = create_async_engine(db_url, **kwargs)
@@ -54,13 +53,24 @@ def _create_engine(db_url: str, debug: bool) -> AsyncEngine:
     return db_engine
 
 
-async def ensure_db_initialized() -> None:
-    """Ensure schema initialization completed before serving a DB-backed request.
+def database_status() -> dict[str, object]:
+    """Return a credential-safe database startup diagnostic."""
+    from src.backend.config import settings
 
-    FastAPI lifespan remains the primary initialization path. This request-time
-    guard makes serverless/cold-start behavior robust when startup completed only
-    partially or an earlier initialization attempt failed.
-    """
+    try:
+        backend = make_url(settings.DATABASE_URL).get_backend_name()
+    except Exception:
+        backend = "unknown"
+    return {
+        "ready": database_initialized and async_session_factory is not None,
+        "backend": backend,
+        "mode": settings.APP_MODE,
+        "error": database_initialization_error,
+    }
+
+
+async def ensure_db_initialized() -> None:
+    """Ensure schema initialization completed before serving a DB-backed request."""
     if database_initialized and async_session_factory is not None:
         return
 
@@ -75,9 +85,30 @@ async def ensure_db_initialized() -> None:
 
 
 async def get_db():
-    await ensure_db_initialized()
+    try:
+        await ensure_db_initialized()
+    except Exception as exc:
+        status = database_status()
+        # FastAPI's HTTPException guarantees JSON instead of Starlette's plain-text
+        # 500 response.  It also exposes the exact cold-start failure in demo mode
+        # without leaking database credentials.
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "database_initialization_failed",
+                "message": str(exc),
+                "database": status,
+            },
+        ) from exc
+
     if async_session_factory is None:
-        raise RuntimeError("Database not initialized")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "database_not_initialized",
+                "database": database_status(),
+            },
+        )
     async with async_session_factory() as session:
         try:
             yield session
@@ -106,8 +137,6 @@ async def init_db(db_url: str, debug: bool = False):
         engine = _create_engine(db_url, debug)
         async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-        # Import domain modules before create_all so the local SQLite database sees
-        # the same ORM metadata as the API, including the PTC research extensions.
         import src.backend.domain  # noqa: F401
         import src.backend.domain.clinical_graph_outbox  # noqa: F401
         import src.backend.domain.ptc_integrated  # noqa: F401
@@ -122,8 +151,6 @@ async def init_db(db_url: str, debug: bool = False):
                 if enabled != 1:
                     raise RuntimeError("SQLite foreign key enforcement is not enabled")
 
-        # Demo mode is intentionally ephemeral on Vercel. Re-project bundled CSV
-        # into SQLite on cold start; UUIDv5 IDs keep repeated bootstraps idempotent.
         from src.backend.config import settings
 
         if (
