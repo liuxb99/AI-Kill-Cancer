@@ -33,6 +33,7 @@ const PTCSnapshotPage = lazy(() => import('./pages/PTCSnapshotPage'))
 const PTCTimelinePage = lazy(() => import('./pages/PTCTimelinePage'))
 const PTCTrialMatchingPage = lazy(() => import('./pages/PTCTrialMatchingPage'))
 const ProductionReadinessPage = lazy(() => import('./pages/ProductionReadinessPage'))
+const WorkspaceImportPage = lazy(() => import('./pages/WorkspaceImportPage'))
 
 function AppNavbar() {
   const navigate = useNavigate()
@@ -49,6 +50,7 @@ function AppNavbar() {
 
   const links = [
     { label: '生产就绪', path: '/production-readiness' },
+    { label: 'Workspace 匯入', path: '/workspace-import' },
     { label: 'PTC 總控台', path: '/ptc-command-center' },
     { label: 'PTC 資料品質', path: '/ptc-data-quality' },
     { label: 'PTC 研究快照', path: '/ptc-snapshots' },
@@ -112,6 +114,7 @@ function App() {
           <Route path="/research-portal" element={<ResearchPortal />} />
           <Route path="/workbench" element={<Workbench />} />
           <Route path="/production-readiness" element={<ProductionReadinessPage />} />
+          <Route path="/workspace-import" element={<WorkspaceImportPage />} />
           <Route path="/ptc-command-center" element={<PTCCommandCenterRoute />} />
           <Route path="/ptc-data-quality" element={<PTCDataQualityPage />} />
           <Route path="/ptc-snapshots" element={<PTCSnapshotPage />} />
