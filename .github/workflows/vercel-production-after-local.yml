@@ -58,6 +58,12 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
+      - name: Reset stale Vercel link
+        run: |
+          if (Test-Path '.vercel') {
+            Remove-Item '.vercel' -Recurse -Force
+          }
+
       - name: Pull production environment
         run: vercel pull --yes --environment=production --token=$env:VERCEL_TOKEN
 
