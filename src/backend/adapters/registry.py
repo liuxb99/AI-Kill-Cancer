@@ -30,13 +30,7 @@ class AdapterRegistry:
         }
 
     async def health_all(self) -> dict[str, dict]:
-        """Return resolved health status for all registered adapters.
-
-        ``BaseAdapter.health_check`` is asynchronous.  The previous registry
-        returned coroutine objects, which made the aggregate health endpoint
-        unusable and could leak un-awaited coroutine warnings.  Health checks
-        now execute concurrently and failures are isolated per adapter.
-        """
+        """Return resolved health status for all registered adapters."""
         names = list(self._adapters)
 
         async def check(name: str) -> dict:
@@ -53,7 +47,6 @@ class AdapterRegistry:
         return dict(zip(names, results, strict=True))
 
 
-# Global registry instance
 _registry: AdapterRegistry | None = None
 
 
@@ -66,7 +59,7 @@ def get_registry() -> AdapterRegistry:
 
 
 def _register_defaults(registry: AdapterRegistry) -> None:
-    """Register implemented adapters and explicit optional integrations."""
+    """Register concrete adapters; individual health checks report availability."""
     from src.backend.adapters.civic import CIViCAdapter
     from src.backend.adapters.dgidb import DGIdbAdapter
     from src.backend.adapters.drkg import DRKGAdapter
@@ -81,8 +74,8 @@ def _register_defaults(registry: AdapterRegistry) -> None:
     registry.register("opencravat", OpenCRAVATAdapter())
     registry.register("civic", CIViCAdapter())
     registry.register("dgidb", DGIdbAdapter())
-    registry.register("oncotree", OncoTreeAdapter(name="oncotree"))
+    registry.register("oncotree", OncoTreeAdapter())
     registry.register("myvariant", MyVariantAdapter())
-    registry.register("drkg", DRKGAdapter(name="drkg"))
-    registry.register("pharmcat", PharmCATAdapter(name="pharmcat"))
+    registry.register("drkg", DRKGAdapter())
+    registry.register("pharmcat", PharmCATAdapter())
     registry.register("bcftools", BcftoolsAdapter())
