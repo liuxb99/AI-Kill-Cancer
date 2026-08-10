@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from src.backend.config import settings
+from src.backend.demo.validator import validate_demo_dataset
 
 router = APIRouter(prefix="/demo", tags=["demo"])
 
@@ -20,29 +21,23 @@ def _rows(name: str) -> list[dict[str, str]]:
 
 @router.get("/status")
 async def demo_status():
-    files = [
-        "patients.csv",
-        "cancer_cases.csv",
-        "specimens.csv",
-        "sequencing_tests.csv",
-        "variants.csv",
-        "drugs.csv",
-        "publications.csv",
-        "clinical_trials.csv",
-        "evidence.csv",
-    ]
-    counts = {name.removesuffix(".csv"): len(_rows(name)) for name in files}
+    validation = validate_demo_dataset(settings.DEMO_DATA_DIR)
     return {
         "mode": settings.APP_MODE,
         "dataset": "bundled-synthetic-csv",
         "synthetic": True,
         "clinical_use": False,
-        "counts": counts,
+        "counts": validation.counts,
+        "validation": {"ok": validation.ok, "errors": validation.errors},
     }
 
 
 @router.get("/cases")
 async def demo_cases():
+    validation = validate_demo_dataset(settings.DEMO_DATA_DIR)
+    if not validation.ok:
+        raise HTTPException(status_code=503, detail={"message": "Demo dataset validation failed", "errors": validation.errors})
+
     patients = {row["demo_patient_key"]: row for row in _rows("patients.csv")}
     specimens = {row["demo_case_key"]: row for row in _rows("specimens.csv")}
     sequencing = {row["demo_specimen_key"]: row for row in _rows("sequencing_tests.csv")}
@@ -68,22 +63,9 @@ async def demo_cases():
             "cancer_type": case.get("cancer_type"),
             "stage": case.get("stage"),
             "radioiodine_status": case.get("radioiodine_status"),
-            "variant": {
-                "gene": variant.get("gene_symbol"),
-                "hgvs_p": variant.get("hgvs_p") or variant.get("protein_change"),
-                "variant_type": variant.get("variant_type"),
-                "driver_status": variant.get("driver_status"),
-            },
-            "drug": {
-                "name": drug.get("name"),
-                "mechanism": drug.get("mechanism_of_action"),
-            },
-            "evidence": {
-                "level": evidence.get("evidence_level"),
-                "direction": evidence.get("evidence_direction"),
-                "summary": evidence.get("summary"),
-                "synthetic": True,
-            },
+            "variant": {"gene": variant.get("gene_symbol"), "hgvs_p": variant.get("hgvs_p") or variant.get("protein_change"), "variant_type": variant.get("variant_type"), "driver_status": variant.get("driver_status")},
+            "drug": {"name": drug.get("name"), "mechanism": drug.get("mechanism_of_action")},
+            "evidence": {"level": evidence.get("evidence_level"), "direction": evidence.get("evidence_direction"), "summary": evidence.get("summary"), "synthetic": True},
             "publication": {"title": publication.get("title"), "journal": publication.get("journal")},
             "clinical_trial": {"id": trial.get("nct_id"), "title": trial.get("title"), "status": trial.get("status")},
         })
