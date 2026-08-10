@@ -1,22 +1,14 @@
 /**
- * Tests for App.tsx routing and navigation (Phase 3C Frontend).
- *
- * Covers:
- * - /tumor-board route renders TumorBoardConsensusListPage
- * - /tumor-board/:id route renders TumorBoardConsensusPage
- * - Navigation bar has "腫瘤委員會" link
+ * Tests for App.tsx routing and navigation.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
-
-// ─── Mock fetch globally ──────────────────────────────────────────────────────
+import { MemoryRouter, useLocation } from 'react-router-dom'
 
 const mockFetch = vi.fn()
 
-// Mock StatusBanner to avoid its health-check fetch consuming mock calls
 vi.mock('../components/StatusBanner', () => ({
   default: () => null,
 }))
@@ -30,32 +22,30 @@ afterEach(() => {
   cleanup()
 })
 
-// Import AFTER mocks are set up
 import App from '../App'
 
-// ─── Helper: render App with a given route ────────────────────────────────────
+function LocationProbe() {
+  const location = useLocation()
+  return <div data-testid="location-probe">{location.pathname}{location.search}</div>
+}
 
 function renderAppAt(initialRoute: string) {
   return render(
     <MemoryRouter initialEntries={[initialRoute]}>
+      <LocationProbe />
       <App />
     </MemoryRouter>,
   )
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
-
 describe('App — Route: /tumor-board', () => {
   it('renders TumorBoardConsensusListPage at /tumor-board', async () => {
     renderAppAt('/tumor-board')
-
-    // The list page title should be rendered
     expect(screen.getByText('腫瘤委員會共識列表')).toBeInTheDocument()
   })
 
   it('renders the query form on the list page', async () => {
     renderAppAt('/tumor-board')
-
     expect(screen.getByPlaceholderText('請輸入患者 ID 進行查詢')).toBeInTheDocument()
     expect(screen.getByText('查詢')).toBeInTheDocument()
   })
@@ -63,7 +53,6 @@ describe('App — Route: /tumor-board', () => {
 
 describe('App — Route: /tumor-board/:id', () => {
   it('renders TumorBoardConsensusPage at /tumor-board/:id', async () => {
-    // The detail page calls fetch on mount; resolve with mock data
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -87,36 +76,21 @@ describe('App — Route: /tumor-board/:id', () => {
     })
 
     renderAppAt('/tumor-board/cons-001')
-
-    // The detail page title should be rendered
     expect(screen.getByText('腫瘤委員會共識')).toBeInTheDocument()
-
-    // Wait for data to load and verify detail content
-    await waitFor(() => {
-      expect(screen.getByText('共識詳情')).toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.getByText('共識詳情')).toBeInTheDocument())
     expect(screen.getByText('Test recommendation')).toBeInTheDocument()
   })
 
   it('shows 404 error for invalid consensus ID', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      json: async () => ({ detail: 'Not Found' }),
-    })
-
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({ detail: 'Not Found' }) })
     renderAppAt('/tumor-board/invalid-id')
-
-    await waitFor(() => {
-      expect(screen.getByText(/找不到此共識記錄/)).toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.getByText(/找不到此共識記錄/)).toBeInTheDocument())
   })
 })
 
-describe('App — Route: /clinical-decision (for reference)', () => {
+describe('App — Route: /clinical-decision', () => {
   it('renders ClinicalDecisionListPage at /clinical-decision', async () => {
     renderAppAt('/clinical-decision')
-
     expect(screen.getByText('臨床決策列表')).toBeInTheDocument()
   })
 
@@ -124,29 +98,14 @@ describe('App — Route: /clinical-decision (for reference)', () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        decision_id: 'dec-001',
-        patient_id: 'P-12345',
-        decision_type: 'treatment_selection',
-        reason: 'Test reason',
-        evidence_summary: null,
-        confidence: 'high',
-        alternatives: [],
-        contraindications: [],
-        recommendation_id: 'rec-001',
-        created_at: '2025-06-18T12:00:00Z',
-        trace_id: 'trace-001',
+        decision_id: 'dec-001', patient_id: 'P-12345', decision_type: 'treatment_selection',
+        reason: 'Test reason', evidence_summary: null, confidence: 'high', alternatives: [],
+        contraindications: [], recommendation_id: 'rec-001', created_at: '2025-06-18T12:00:00Z', trace_id: 'trace-001',
       }),
     })
-
     renderAppAt('/clinical-decision/dec-001')
-
-    // The nav bar and the page heading both contain '臨床決策' — use getAllByText
-    const headings = screen.getAllByText('臨床決策')
-    expect(headings.length).toBeGreaterThanOrEqual(1)
-
-    await waitFor(() => {
-      expect(screen.getByText('決策詳情')).toBeInTheDocument()
-    })
+    expect(screen.getAllByText('臨床決策').length).toBeGreaterThanOrEqual(1)
+    await waitFor(() => expect(screen.getByText('決策詳情')).toBeInTheDocument())
     expect(screen.getByText('Test reason')).toBeInTheDocument()
   })
 })
@@ -154,33 +113,50 @@ describe('App — Route: /clinical-decision (for reference)', () => {
 describe('App — Navigation Bar', () => {
   it('renders the navigation bar with 腫瘤委員會 link', () => {
     renderAppAt('/tumor-board')
-
-    // The navbar should contain the nav links
     expect(screen.getByText('腫瘤委員會')).toBeInTheDocument()
     expect(screen.getByText('臨床決策')).toBeInTheDocument()
     expect(screen.getByText('藥物推薦')).toBeInTheDocument()
   })
 
   it('navigates to /tumor-board when clicking 腫瘤委員會 in navbar', async () => {
-    // Start at a different page so the navbar is visible (home page hides it)
     renderAppAt('/clinical-decision')
-
-    // Click on 腫瘤委員會 in the navbar
     await userEvent.click(screen.getByText('腫瘤委員會'))
-
-    // Should now show the TumorBoardConsensusListPage
-    await waitFor(() => {
-      expect(screen.getByText('腫瘤委員會共識列表')).toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.getByText('腫瘤委員會共識列表')).toBeInTheDocument())
   })
 
   it('navigates to /clinical-decision when clicking 臨床決策 in navbar', async () => {
     renderAppAt('/tumor-board')
-
     await userEvent.click(screen.getByText('臨床決策'))
+    await waitFor(() => expect(screen.getByText('臨床決策列表')).toBeInTheDocument())
+  })
 
-    await waitFor(() => {
-      expect(screen.getByText('臨床決策列表')).toBeInTheDocument()
+  it('preserves demo_case and synthetic data_mode while navigating between demo-capable routes', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [{
+        case_key: 'PTC-DEMO-001', display_name: 'Synthetic BRAF Case', cancer_type: 'Papillary Thyroid Carcinoma',
+        stage: 'Stage III', radioiodine_status: 'refractory',
+        variant: { gene: 'BRAF', hgvs_p: 'p.Val600Glu', variant_type: 'SNV', driver_status: 'driver' },
+        drug: { name: 'Demo Drug', mechanism: 'Synthetic mechanism' },
+        evidence: { level: 'A', direction: 'supports', summary: 'Synthetic evidence', synthetic: true },
+        publication: { title: 'Synthetic Publication', journal: 'Demo Journal' },
+        clinical_trial: { id: 'NCT-DEMO-001', title: 'Synthetic Trial', status: 'RECRUITING' },
+      }] }),
     })
+
+    renderAppAt('/ptc-research?demo_case=PTC-DEMO-001&data_mode=synthetic')
+    expect(await screen.findByTestId('demo-context-banner')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByText('PTC 工作台'))
+    await waitFor(() => expect(screen.getByTestId('location-probe')).toHaveTextContent('/ptc-workbench?demo_case=PTC-DEMO-001&data_mode=synthetic'))
+    expect(await screen.findByText('Synthetic Integrated Workbench')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByText('PTC 總控台'))
+    await waitFor(() => expect(screen.getByTestId('location-probe')).toHaveTextContent('/ptc-command-center?demo_case=PTC-DEMO-001&data_mode=synthetic'))
+    expect(await screen.findByText('Synthetic Command Center')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByText('PTC 病例'))
+    await waitFor(() => expect(screen.getByTestId('location-probe')).toHaveTextContent('/ptc-research?demo_case=PTC-DEMO-001&data_mode=synthetic'))
+    expect(await screen.findByText('PTC 研究工作台')).toBeInTheDocument()
   })
 })
