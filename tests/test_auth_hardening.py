@@ -1,5 +1,5 @@
 """
-Comprehensive authentication tests for v1.0.2 production hardening.
+Comprehensive authentication tests for v1.0.3 production hardening.
 """
 from __future__ import annotations
 
@@ -122,13 +122,10 @@ class TestAuthServiceUnit:
                 del os.environ["JWT_SECRET_KEY"]
             from src.backend import config
             importlib.reload(config)
-            # Settings() is called at module level; if it didn't raise,
-            # Settings() already exists from the reload
             s = config.Settings()
-            # If we got here, JWT_SECRET_KEY was set from somewhere
             assert s.JWT_SECRET_KEY, "Should have a JWT secret"
         except (ValueError, RuntimeError):
-            pass  # Expected - production requires JWT_SECRET_KEY
+            pass
         finally:
             os.environ["APP_MODE"] = mode
             if key:
