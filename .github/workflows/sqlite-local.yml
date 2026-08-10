@@ -37,13 +37,16 @@ jobs:
           }
 
           $pythonExe = $python.Source
+          $version = & $pythonExe -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
           & $pythonExe -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"
           if ($LASTEXITCODE -ne 0) {
             throw 'Python 3.10+ is required on the self-hosted runner.'
           }
 
+          $supportsPipeline = (& $pythonExe -c "import sys; print('true' if sys.version_info >= (3, 11) else 'false')").Trim()
           "PYTHON_EXE=$pythonExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          & $pythonExe --version
+          "PYTHON_SUPPORTS_PIPELINE=$supportsPipeline" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Python $version; full pipeline tests: $supportsPipeline"
 
       - name: Install SQLite verification dependencies
         run: |
@@ -59,7 +62,12 @@ jobs:
       - name: Lint backend and SQLite regression
         run: |
           & $env:PYTHON_EXE -m ruff check src/backend tests/backend/test_sqlite_local_compat.py tests/test_analysis_persistence.py
-          & $env:PYTHON_EXE -m pytest tests/backend/test_sqlite_local_compat.py tests/test_analysis_persistence.py -v --tb=short
+          & $env:PYTHON_EXE -m pytest tests/backend/test_sqlite_local_compat.py -v --tb=short
+          if ($env:PYTHON_SUPPORTS_PIPELINE -eq 'true') {
+            & $env:PYTHON_EXE -m pytest tests/test_analysis_persistence.py -v --tb=short
+          } else {
+            Write-Host 'Skipping analysis persistence runtime test on Python 3.10; pipeline runtime requires Python 3.11+.'
+          }
 
       - name: Initialize configured local SQLite database
         run: |
