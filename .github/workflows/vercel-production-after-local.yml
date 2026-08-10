@@ -233,12 +233,12 @@ jobs:
             fs.writeFileSync('production-browser-report.json', JSON.stringify(report, null, 2));
             console.log(JSON.stringify(report, null, 2));
             await browser.close();
-            const meaningful = rootChildCount > 0 && bodyText.length > 80 && /AI Kill Cancer|用 AI 對抗癌症/.test(bodyText);
+            const meaningful = rootChildCount > 0 && bodyText.length > 80 && bodyText.includes('AI Kill Cancer');
             if (!meaningful || pageErrors.length || badResponses.length) process.exit(1);
           })().catch(err => { console.error(err); process.exit(1); });
           '@
           $scriptPath = Join-Path $env:BROWSER_VERIFY_DIR 'verify.cjs'
-          Set-Content -Path $scriptPath -Value $script -Encoding utf8
+          Set-Content -Path $scriptPath -Value $script -Encoding ascii
           Push-Location $env:BROWSER_VERIFY_DIR
           node $scriptPath
           Pop-Location
