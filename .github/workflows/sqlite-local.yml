@@ -26,11 +26,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: pip
+      - name: Use local Python
+        shell: pwsh
+        run: |
+          $python = Get-Command python -ErrorAction SilentlyContinue
+          if (-not $python) {
+            $py = Get-Command py -ErrorAction SilentlyContinue
+            if (-not $py) {
+              throw 'Python is not installed or not available in PATH on the self-hosted runner.'
+            }
+            $pythonExe = (& py -3.11 -c "import sys; print(sys.executable)").Trim()
+            if (-not $pythonExe) {
+              throw 'Python 3.11 is not available through the py launcher.'
+            }
+            $pythonDir = Split-Path -Parent $pythonExe
+            $pythonScripts = Join-Path $pythonDir 'Scripts'
+            $pythonDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            if (Test-Path $pythonScripts) {
+              $pythonScripts | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            }
+          }
+          python --version
+          python -c "import sys; assert sys.version_info[:2] == (3, 11), sys.version"
 
       - name: Install backend test dependencies
         shell: pwsh
