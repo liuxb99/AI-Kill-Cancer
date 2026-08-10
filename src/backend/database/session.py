@@ -164,6 +164,7 @@ async def init_db(db_url: str, debug: bool = False):
         import src.backend.domain.ptc_integrated  # noqa: F401
         import src.backend.domain.ptc_knowledge  # noqa: F401
         import src.backend.domain.ptc_research  # noqa: F401
+        import src.backend.domain.research_depth  # noqa: F401
         from src.backend.database.models import Base
 
         from src.backend.config import settings
