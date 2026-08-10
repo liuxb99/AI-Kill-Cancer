@@ -9,6 +9,8 @@ from sqlalchemy.pool import StaticPool
 
 engine: AsyncEngine | None = None
 async_session_factory: async_sessionmaker[AsyncSession] | None = None
+database_initialized = False
+database_initialization_error: str | None = None
 
 
 def is_sqlite_url(db_url: str) -> bool:
@@ -52,7 +54,28 @@ def _create_engine(db_url: str, debug: bool) -> AsyncEngine:
     return db_engine
 
 
+async def ensure_db_initialized() -> None:
+    """Ensure schema initialization completed before serving a DB-backed request.
+
+    FastAPI lifespan remains the primary initialization path. This request-time
+    guard makes serverless/cold-start behavior robust when startup completed only
+    partially or an earlier initialization attempt failed.
+    """
+    if database_initialized and async_session_factory is not None:
+        return
+
+    from src.backend.config import settings
+
+    try:
+        await init_db(settings.DATABASE_URL, debug=settings.DEBUG)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Database initialization failed: {type(exc).__name__}: {exc}"
+        ) from exc
+
+
 async def get_db():
+    await ensure_db_initialized()
     if async_session_factory is None:
         raise RuntimeError("Database not initialized")
     async with async_session_factory() as session:
@@ -76,32 +99,40 @@ async def get_db():
 
 
 async def init_db(db_url: str, debug: bool = False):
-    global engine, async_session_factory
+    global engine, async_session_factory, database_initialized, database_initialization_error
     await close_db()
-    engine = _create_engine(db_url, debug)
-    async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    database_initialization_error = None
+    try:
+        engine = _create_engine(db_url, debug)
+        async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    # Import domain modules before create_all so the local SQLite database sees
-    # the same ORM metadata as the API, including the PTC research extensions.
-    import src.backend.domain  # noqa: F401
-    import src.backend.domain.clinical_graph_outbox  # noqa: F401
-    import src.backend.domain.ptc_integrated  # noqa: F401
-    import src.backend.domain.ptc_knowledge  # noqa: F401
-    import src.backend.domain.ptc_research  # noqa: F401
-    from src.backend.database.models import Base
+        # Import domain modules before create_all so the local SQLite database sees
+        # the same ORM metadata as the API, including the PTC research extensions.
+        import src.backend.domain  # noqa: F401
+        import src.backend.domain.clinical_graph_outbox  # noqa: F401
+        import src.backend.domain.ptc_integrated  # noqa: F401
+        import src.backend.domain.ptc_knowledge  # noqa: F401
+        import src.backend.domain.ptc_research  # noqa: F401
+        from src.backend.database.models import Base
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        if is_sqlite_url(db_url):
-            enabled = (await conn.execute(text("PRAGMA foreign_keys"))).scalar_one()
-            if enabled != 1:
-                raise RuntimeError("SQLite foreign key enforcement is not enabled")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            if is_sqlite_url(db_url):
+                enabled = (await conn.execute(text("PRAGMA foreign_keys"))).scalar_one()
+                if enabled != 1:
+                    raise RuntimeError("SQLite foreign key enforcement is not enabled")
+        database_initialized = True
+    except Exception as exc:
+        database_initialization_error = f"{type(exc).__name__}: {exc}"
+        database_initialized = False
+        raise
 
 
 async def close_db():
-    global engine, async_session_factory
+    global engine, async_session_factory, database_initialized
     current = engine
     engine = None
     async_session_factory = None
+    database_initialized = False
     if current is not None:
         await current.dispose()
