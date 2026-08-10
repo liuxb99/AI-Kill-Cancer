@@ -9,6 +9,7 @@
 - [x] `RELEASE_NOTES_v1.0.3.md` exists
 - [x] release-critical runtime metadata scan completed; no runtime authority still reports 1.0.2
 - [x] automated `tests/test_release_metadata.py` added to Local Verification Gate
+- [x] metadata consistency verified — Local Verification Gate #167 PASS
 
 > `src/frontend/package.json` / `package-lock.json` are private frontend package metadata and are not product release authorities. Product release authority is root `VERSION` + backend `APP_VERSION`.
 
@@ -34,7 +35,7 @@
 ## Release gates
 - [x] Workspace Import UI baseline verified — Local Gate #152 PASS
 - [x] quota-hardening baseline verified — Local Gate #162 PASS
-- [ ] latest metadata-consistency release-candidate Local Verification Gate PASS
+- [x] metadata-consistency release-candidate verified — Local Gate #167 PASS
 - [ ] production deployment for release-candidate head PASS — currently blocked by Vercel daily free-tier deployment quota
 - [ ] production API JSON smoke PASS on release-candidate head
 - [ ] production multi-route Chromium gate PASS on release-candidate head
@@ -42,6 +43,10 @@
 ## External blocker
 
 Latest production workflow reached `vercel deploy --prod` after token/project/environment preflight, then Vercel returned `api-deployments-free-per-day` / `Resource is limited - try again in 24 hours`. This is an external quota blocker, not an application build/runtime failure. Do not create no-op commits to retry deployments.
+
+## Release freeze policy
+
+The 1.0.3 software-side release candidate is locally green. Until Vercel quota becomes available, keep release scope frozen: no new product features, no opportunistic refactors, and no no-op commits intended only to trigger deployment. Only a release-blocking defect or release-gate hardening change may modify the candidate.
 
 ## Tagging policy
 Do not create or move a `v1.0.3` tag until all unchecked release gates above are green. A green software release does not imply clinical validation.
