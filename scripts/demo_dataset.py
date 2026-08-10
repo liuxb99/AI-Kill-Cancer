@@ -3,12 +3,17 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 from pathlib import Path
 
-from src.backend.config import settings
-from src.backend.database import session as db_session
-from src.backend.demo import rebuild_demo_dataset, reset_demo_dataset
-from src.backend.demo.validator import validate_demo_dataset
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from src.backend.config import settings  # noqa: E402
+from src.backend.database import session as db_session  # noqa: E402
+from src.backend.demo import rebuild_demo_dataset, reset_demo_dataset  # noqa: E402
+from src.backend.demo.validator import validate_demo_dataset  # noqa: E402
 
 _CONFIRM = "RESET-DEMO"
 
