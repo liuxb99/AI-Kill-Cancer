@@ -32,17 +32,11 @@ jobs:
       - name: Select local Python 3.10+
         run: |
           $python = Get-Command python -ErrorAction SilentlyContinue
-          if (-not $python) {
-            throw 'Python is not available on the self-hosted runner.'
-          }
-
+          if (-not $python) { throw 'Python is not available on the self-hosted runner.' }
           $pythonExe = $python.Source
           $version = & $pythonExe -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
           & $pythonExe -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Python 3.10+ is required on the self-hosted runner.'
-          }
-
+          if ($LASTEXITCODE -ne 0) { throw 'Python 3.10+ is required on the self-hosted runner.' }
           $supportsPipeline = (& $pythonExe -c "import sys; print('true' if sys.version_info >= (3, 11) else 'false')").Trim()
           "PYTHON_EXE=$pythonExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "PYTHON_SUPPORTS_PIPELINE=$supportsPipeline" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -55,9 +49,11 @@ jobs:
             "sqlalchemy[asyncio]>=2.0.36" "aiosqlite>=0.20.0" `
             "fastapi>=0.115.0" "httpx>=0.28.1" numpy pytest pytest-asyncio ruff
 
-      - name: Compile backend
+      - name: Compile backend and maintenance scripts
         run: |
-          & $env:PYTHON_EXE -m compileall src/backend/config.py src/backend/database src/backend/domain src/backend/api src/backend/adapters src/backend/pipeline
+          & $env:PYTHON_EXE -m compileall `
+            src/backend/config.py src/backend/database src/backend/domain src/backend/api `
+            src/backend/adapters src/backend/pipeline src/backend/demo scripts/demo_dataset.py
 
       - name: Lint release-critical backend and regression tests
         run: |
@@ -65,24 +61,15 @@ jobs:
             src/backend/adapters `
             src/backend/pipeline/opencravat_adapter.py `
             src/backend/pipeline/vep_adapter.py `
+            src/backend/demo/bootstrap.py `
+            src/backend/demo/maintenance.py `
+            scripts/demo_dataset.py `
             tests/backend/test_sqlite_local_compat.py `
             tests/backend/test_demo_bootstrap.py `
+            tests/backend/test_demo_maintenance.py `
             tests/test_analysis_persistence.py `
             tests/test_release_metadata.py `
-            tests/test_demo_validator.py `
-            tests/test_sqlite_workspace.py `
-            tests/test_workspace_status.py `
-            tests/test_traceability_persistence_e2e.py `
-            tests/test_adapters.py `
-            tests/test_opencravat_adapter.py `
-            tests/test_myvariant_adapter.py
-
-      - name: Run local-first and adapter regression suite
-        run: |
-          & $env:PYTHON_EXE -m pytest `
-            tests/backend/test_sqlite_local_compat.py `
-            tests/backend/test_demo_bootstrap.py `
-            tests/test_release_metadata.py `
+            tests/test_code_completeness.py `
             tests/test_demo_validator.py `
             tests/test_sqlite_workspace.py `
             tests/test_workspace_status.py `
@@ -90,6 +77,30 @@ jobs:
             tests/test_adapters.py `
             tests/test_opencravat_adapter.py `
             tests/test_myvariant_adapter.py `
+            tests/test_vep_adapter.py `
+            tests/test_oncotree_adapter.py `
+            tests/test_drkg_adapter.py `
+            tests/test_pharmcat_adapter.py
+
+      - name: Run local-first, completeness, and adapter regression suite
+        run: |
+          & $env:PYTHON_EXE -m pytest `
+            tests/backend/test_sqlite_local_compat.py `
+            tests/backend/test_demo_bootstrap.py `
+            tests/backend/test_demo_maintenance.py `
+            tests/test_release_metadata.py `
+            tests/test_code_completeness.py `
+            tests/test_demo_validator.py `
+            tests/test_sqlite_workspace.py `
+            tests/test_workspace_status.py `
+            tests/test_traceability_persistence_e2e.py `
+            tests/test_adapters.py `
+            tests/test_opencravat_adapter.py `
+            tests/test_myvariant_adapter.py `
+            tests/test_vep_adapter.py `
+            tests/test_oncotree_adapter.py `
+            tests/test_drkg_adapter.py `
+            tests/test_pharmcat_adapter.py `
             -v --tb=short
           if ($env:PYTHON_SUPPORTS_PIPELINE -eq 'true') {
             & $env:PYTHON_EXE -m pytest tests/test_analysis_persistence.py -v --tb=short
@@ -140,6 +151,10 @@ jobs:
 
           asyncio.run(main())
           '@ | & $env:PYTHON_EXE -
+
+      - name: Validate demo maintenance CLI
+        run: |
+          & $env:PYTHON_EXE scripts/demo_dataset.py validate --data-dir data/demo
 
       - name: Verify local workspace integrity
         run: |
