@@ -121,6 +121,21 @@ async def init_db(db_url: str, debug: bool = False):
                 enabled = (await conn.execute(text("PRAGMA foreign_keys"))).scalar_one()
                 if enabled != 1:
                     raise RuntimeError("SQLite foreign key enforcement is not enabled")
+
+        # Demo mode is intentionally ephemeral on Vercel. Re-project bundled CSV
+        # into SQLite on cold start; UUIDv5 IDs keep repeated bootstraps idempotent.
+        from src.backend.config import settings
+
+        if (
+            is_sqlite_url(db_url)
+            and settings.APP_MODE == "demo"
+            and settings.DEMO_AUTO_BOOTSTRAP
+            and async_session_factory is not None
+        ):
+            from src.backend.demo import bootstrap_demo_dataset
+
+            await bootstrap_demo_dataset(async_session_factory, settings.DEMO_DATA_DIR)
+
         database_initialized = True
     except Exception as exc:
         database_initialization_error = f"{type(exc).__name__}: {exc}"
