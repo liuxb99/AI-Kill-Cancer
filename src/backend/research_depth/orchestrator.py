@@ -25,9 +25,13 @@ def _norm(value: str | None) -> str:
     return (value or "").strip().upper()
 
 
+def _enum_value(value: Any) -> str:
+    return str(getattr(value, "value", value or ""))
+
+
 def research_input_fingerprint(cases: Sequence[Any], evidence: Sequence[Any]) -> str:
     """Stable fingerprint of research facts that can alter a loop result."""
-    case_facts = []
+    case_facts: list[dict[str, Any]] = []
     for case in cases:
         case_facts.append(
             {
@@ -52,22 +56,39 @@ def research_input_fingerprint(cases: Sequence[Any], evidence: Sequence[Any]) ->
                 ),
             }
         )
-    evidence_facts = sorted(
+
+    evidence_facts = [
         {
             "id": str(getattr(item, "id", "")),
             "source": str(getattr(item, "source_name", "")),
             "record": str(getattr(item, "source_record_id", "")),
-            "direction": str(getattr(getattr(item, "evidence_direction", None), "value", getattr(item, "evidence_direction", ""))),
-            "level": str(getattr(getattr(item, "evidence_level", None), "value", getattr(item, "evidence_level", ""))),
+            "direction": _enum_value(getattr(item, "evidence_direction", "")),
+            "level": _enum_value(getattr(item, "evidence_level", "")),
         }
         for item in evidence
+    ]
+    evidence_facts.sort(
+        key=lambda item: (
+            item["source"],
+            item["record"],
+            item["id"],
+            item["direction"],
+            item["level"],
+        )
     )
-    payload = {"cases": sorted(case_facts, key=lambda item: item["case_id"]), "evidence": evidence_facts}
+    payload = {
+        "cases": sorted(case_facts, key=lambda item: item["case_id"]),
+        "evidence": evidence_facts,
+    }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _hypothesis_key(gene: str, protein_change: str | None, hypothesis: dict[str, Any]) -> str:
+def _hypothesis_key(
+    gene: str,
+    protein_change: str | None,
+    hypothesis: dict[str, Any],
+) -> str:
     identity = "|".join(
         [
             gene.strip().upper(),
@@ -88,6 +109,28 @@ async def _next_version(db: AsyncSession, hypothesis_key: str) -> int:
         )
     ).scalar_one_or_none()
     return int(current or 0) + 1
+
+
+def _serialize_hypothesis(item: ResearchHypothesisModel) -> dict[str, Any]:
+    return {
+        "id": str(item.id),
+        "hypothesis_key": item.hypothesis_key,
+        "gene_symbol": item.gene_symbol,
+        "protein_change": item.protein_change,
+        "hypothesis_type": item.hypothesis_type,
+        "version": item.version,
+        "status": item.status,
+        "claim": item.claim,
+        "rationale": item.rationale,
+        "supporting_observations": item.supporting_observations,
+        "counter_evidence": item.counter_evidence,
+        "uncertainties": item.uncertainties,
+        "falsification_criteria": item.falsification_criteria,
+        "next_data_needed": item.next_data_needed,
+        "input_fingerprint": item.input_fingerprint,
+        "clinical_use": False,
+        "created_at": item.created_at.isoformat() if item.created_at else None,
+    }
 
 
 async def execute_research_loop(
@@ -144,17 +187,33 @@ async def execute_research_loop(
             "clinical_use": False,
         }
 
-    stratification = cohort_biomarker_stratification(cases, normalized_gene, protein_change)
+    stratification = cohort_biomarker_stratification(
+        cases,
+        normalized_gene,
+        protein_change,
+    )
     conflict = evidence_conflict_summary(evidence)
     generated = build_hypotheses(stratification, conflict)
     now = datetime.utcnow()
     run_key = f"research-run:{normalized_gene}:{uuid.uuid4()}"
     trace = [
         {"step": 1, "name": "fingerprint_inputs", "fingerprint": fingerprint},
-        {"step": 2, "name": "outcome_blind_biomarker_stratification", "cases": len(cases)},
+        {
+            "step": 2,
+            "name": "outcome_blind_biomarker_stratification",
+            "cases": len(cases),
+        },
         {"step": 3, "name": "post_selection_outcome_feedback"},
-        {"step": 4, "name": "evidence_conflict_resolution", "evidence_records": len(evidence)},
-        {"step": 5, "name": "falsifiable_hypothesis_generation", "hypotheses": len(generated)},
+        {
+            "step": 4,
+            "name": "evidence_conflict_resolution",
+            "evidence_records": len(evidence),
+        },
+        {
+            "step": 5,
+            "name": "falsifiable_hypothesis_generation",
+            "hypotheses": len(generated),
+        },
         {"step": 6, "name": "identify_next_research_data"},
         {"step": 7, "name": "persist_research_digital_thread"},
     ]
@@ -211,7 +270,10 @@ async def execute_research_loop(
             date_semantics="generated_at",
             source_type="research_loop",
             source_id=run_key,
-            provenance={"input_fingerprint": fingerprint, "evidence_records": len(evidence)},
+            provenance={
+                "input_fingerprint": fingerprint,
+                "evidence_records": len(evidence),
+            },
             payload={
                 "severity": conflict["conflict_severity"],
                 "weighted_support": conflict["weighted_support"],
@@ -283,30 +345,9 @@ async def execute_research_loop(
         "clinical_use": False,
         "disclaimer": (
             "Controlled research automation only. This loop identifies research signals, "
-            "evidence conflicts, falsifiable hypotheses, and data gaps; it performs no clinical action."
+            "evidence conflicts, falsifiable hypotheses, and data gaps; it performs no "
+            "clinical action."
         ),
-    }
-
-
-def _serialize_hypothesis(item: ResearchHypothesisModel) -> dict[str, Any]:
-    return {
-        "id": str(item.id),
-        "hypothesis_key": item.hypothesis_key,
-        "gene_symbol": item.gene_symbol,
-        "protein_change": item.protein_change,
-        "hypothesis_type": item.hypothesis_type,
-        "version": item.version,
-        "status": item.status,
-        "claim": item.claim,
-        "rationale": item.rationale,
-        "supporting_observations": item.supporting_observations,
-        "counter_evidence": item.counter_evidence,
-        "uncertainties": item.uncertainties,
-        "falsification_criteria": item.falsification_criteria,
-        "next_data_needed": item.next_data_needed,
-        "input_fingerprint": item.input_fingerprint,
-        "clinical_use": False,
-        "created_at": item.created_at.isoformat() if item.created_at else None,
     }
 
 
