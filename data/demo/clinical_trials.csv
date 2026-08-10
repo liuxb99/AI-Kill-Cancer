@@ -1,0 +1,4 @@
+demo_trial_key,nct_id,title,phase,status,conditions,interventions,biomarkers,sponsor,locations,enrollment,start_date,completion_date,url,summary
+trial-braf,DEMO-BRAF-001,Synthetic BRAF-targeted PTC study,Phase 2,Recruiting,"[\"Papillary thyroid carcinoma\"]","[\"Dabrafenib\"]","[\"BRAF V600E\"]",Demo Sponsor,"[\"Demo Research Center\"]",40,2026-01-01,2027-12-31,,Synthetic trial record for UI demonstration only
+trial-ret,DEMO-RET-001,Synthetic RET-fusion thyroid study,Phase 2,Recruiting,"[\"RET fusion thyroid carcinoma\"]","[\"Selpercatinib\"]","[\"RET fusion\"]",Demo Sponsor,"[\"Demo Research Center\"]",30,2026-02-01,2027-12-31,,Synthetic trial record for UI demonstration only
+trial-ntrk,DEMO-NTRK-001,Synthetic NTRK-fusion thyroid study,Phase 2,Recruiting,"[\"NTRK fusion thyroid carcinoma\"]","[\"Larotrectinib\"]","[\"NTRK1 fusion\"]",Demo Sponsor,"[\"Demo Research Center\"]",25,2026-03-01,2028-03-01,,Synthetic trial record for UI demonstration only
