@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import HTTPException
 from sqlalchemy import event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
@@ -88,10 +87,12 @@ async def get_db():
     try:
         await ensure_db_initialized()
     except Exception as exc:
+        # Keep the low-level database module importable by lightweight SQLite
+        # tooling that intentionally does not install FastAPI.  The web-only
+        # exception type is imported only when a request actually needs it.
+        from fastapi import HTTPException
+
         status = database_status()
-        # FastAPI's HTTPException guarantees JSON instead of Starlette's plain-text
-        # 500 response.  It also exposes the exact cold-start failure in demo mode
-        # without leaking database credentials.
         raise HTTPException(
             status_code=503,
             detail={
@@ -102,6 +103,8 @@ async def get_db():
         ) from exc
 
     if async_session_factory is None:
+        from fastapi import HTTPException
+
         raise HTTPException(
             status_code=503,
             detail={
