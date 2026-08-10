@@ -28,6 +28,7 @@ const PTCIntegratedPage = lazy(() => import('./pages/PTCIntegratedPage'))
 const PTCKnowledgePage = lazy(() => import('./pages/PTCKnowledgePage'))
 const PTCReportCenterPage = lazy(() => import('./pages/PTCReportCenterPage'))
 const PTCResearchAssistantPage = lazy(() => import('./pages/PTCResearchAssistantPage'))
+const PTCResearchDepthPage = lazy(() => import('./pages/PTCResearchDepthPage'))
 const PTCResearchPage = lazy(() => import('./pages/PTCResearchPage'))
 const PTCSnapshotPage = lazy(() => import('./pages/PTCSnapshotPage'))
 const PTCTimelinePage = lazy(() => import('./pages/PTCTimelinePage'))
@@ -53,6 +54,7 @@ function AppNavbar() {
     { label: 'Workspace 匯入', path: '/workspace-import' },
     { label: 'PTC 總控台', path: '/ptc-command-center' },
     { label: 'PTC 資料品質', path: '/ptc-data-quality' },
+    { label: 'PTC 研究深度', path: '/ptc-research-depth' },
     { label: 'PTC 研究快照', path: '/ptc-snapshots' },
     { label: 'PTC 3D', path: '/ptc-3d' },
     { label: 'PTC Digital Thread', path: '/ptc-timeline' },
@@ -117,6 +119,7 @@ function App() {
           <Route path="/workspace-import" element={<WorkspaceImportPage />} />
           <Route path="/ptc-command-center" element={<PTCCommandCenterRoute />} />
           <Route path="/ptc-data-quality" element={<PTCDataQualityPage />} />
+          <Route path="/ptc-research-depth" element={<PTCResearchDepthPage />} />
           <Route path="/ptc-snapshots" element={<PTCSnapshotPage />} />
           <Route path="/ptc-3d" element={<PTC3DExplorerPage />} />
           <Route path="/ptc-timeline" element={<PTCTimelinePage />} />
