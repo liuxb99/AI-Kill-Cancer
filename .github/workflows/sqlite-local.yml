@@ -32,23 +32,30 @@ jobs:
       - name: Select local Python 3.11+
         run: |
           $pythonExe = $null
-          $python = Get-Command python -ErrorAction SilentlyContinue
-          if ($python) {
-            $pythonExe = $python.Source
+
+          $py = Get-Command py -ErrorAction SilentlyContinue
+          if ($py) {
+            $candidate = & cmd /c 'py -3.11 -c "import sys; print(sys.executable)" 2>NUL'
+            if ($LASTEXITCODE -eq 0 -and $candidate) {
+              $pythonExe = $candidate.Trim()
+            }
           }
+
           if (-not $pythonExe) {
-            $py = Get-Command py -ErrorAction SilentlyContinue
-            if ($py) {
-              $candidate = & cmd /c 'py -3.11 -c "import sys; print(sys.executable)" 2>NUL'
-              if ($LASTEXITCODE -eq 0 -and $candidate) {
-                $pythonExe = $candidate.Trim()
+            $python = Get-Command python -ErrorAction SilentlyContinue
+            if ($python) {
+              $candidate = $python.Source
+              & $candidate -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)"
+              if ($LASTEXITCODE -eq 0) {
+                $pythonExe = $candidate
               }
             }
           }
+
           if (-not $pythonExe -or -not (Test-Path $pythonExe)) {
-            throw 'No usable Python runtime is available on the self-hosted runner.'
+            throw 'Python 3.11+ is required on the self-hosted runner.'
           }
-          & $pythonExe -c "import sys; assert sys.version_info >= (3, 11), sys.version"
+
           "PYTHON_EXE=$pythonExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           & $pythonExe --version
 
