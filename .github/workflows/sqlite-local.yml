@@ -26,44 +26,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use local Python
+      - name: Use local Python 3.11
         shell: pwsh
         run: |
-          $python = Get-Command python -ErrorAction SilentlyContinue
-          if (-not $python) {
-            $py = Get-Command py -ErrorAction SilentlyContinue
-            if (-not $py) {
-              throw 'Python is not installed or not available in PATH on the self-hosted runner.'
-            }
-            $pythonExe = (& py -3.11 -c "import sys; print(sys.executable)").Trim()
-            if (-not $pythonExe) {
-              throw 'Python 3.11 is not available through the py launcher.'
-            }
-            $pythonDir = Split-Path -Parent $pythonExe
-            $pythonScripts = Join-Path $pythonDir 'Scripts'
-            $pythonDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-            if (Test-Path $pythonScripts) {
-              $pythonScripts | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-            }
+          $py = Get-Command py -ErrorAction SilentlyContinue
+          if (-not $py) {
+            throw 'Python launcher (py.exe) is not available on the self-hosted runner.'
           }
-          python --version
-          python -c "import sys; assert sys.version_info[:2] == (3, 11), sys.version"
+          $pythonExe = (& py -3.11 -c "import sys; print(sys.executable)").Trim()
+          if (-not $pythonExe -or -not (Test-Path $pythonExe)) {
+            throw 'Python 3.11 is not installed or not available through py -3.11.'
+          }
+          "PYTHON_EXE=$pythonExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & $pythonExe --version
+          & $pythonExe -c "import sys; assert sys.version_info[:2] == (3, 11), sys.version"
 
       - name: Install backend test dependencies
         shell: pwsh
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r src/backend/requirements-api.txt
-          python -m pip install pytest pytest-asyncio ruff
+          & $env:PYTHON_EXE -m pip install --upgrade pip
+          & $env:PYTHON_EXE -m pip install -r src/backend/requirements-api.txt
+          & $env:PYTHON_EXE -m pip install pytest pytest-asyncio ruff
 
       - name: Compile backend
-        run: python -m compileall src/backend/config.py src/backend/database src/backend/domain src/backend/api
+        shell: pwsh
+        run: |
+          & $env:PYTHON_EXE -m compileall src/backend/config.py src/backend/database src/backend/domain src/backend/api
 
       - name: Lint backend and SQLite regression
         shell: pwsh
         run: |
-          ruff check src/backend tests/backend/test_sqlite_local_compat.py tests/test_analysis_persistence.py
-          python -m pytest tests/backend/test_sqlite_local_compat.py tests/test_analysis_persistence.py -v --tb=short
+          & $env:PYTHON_EXE -m ruff check src/backend tests/backend/test_sqlite_local_compat.py tests/test_analysis_persistence.py
+          & $env:PYTHON_EXE -m pytest tests/backend/test_sqlite_local_compat.py tests/test_analysis_persistence.py -v --tb=short
 
       - name: Initialize configured local SQLite database
         shell: pwsh
@@ -78,7 +72,7 @@ jobs:
               await close_db()
 
           asyncio.run(main())
-          '@ | python -
+          '@ | & $env:PYTHON_EXE -
 
       - name: Verify local database file
         shell: pwsh
