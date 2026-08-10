@@ -38,7 +38,7 @@ async def test_traceability_chain_survives_sqlite_restart(tmp_path, monkeypatch)
     assert db_session.async_session_factory is not None
     await bootstrap_demo_dataset(db_session.async_session_factory, "data/demo")
 
-    patient_id = _demo_uuid("patient", "PTC-PATIENT-001")
+    patient_id = _demo_uuid("patient", "PTC-DEMO-001")
     case_id = _demo_uuid("case", "CASE-DEMO-001")
     specimen_id = _demo_uuid("specimen", "SPEC-DEMO-001")
     sequencing_id = _demo_uuid("sequencing", "SEQ-DEMO-001")
@@ -120,8 +120,6 @@ async def test_traceability_chain_survives_sqlite_restart(tmp_path, monkeypatch)
         recommendation_pk = recommendation.id
         decision_pk = decision.id
 
-    # Simulate a real process/database restart: dispose all SQLAlchemy state,
-    # then initialize a new engine/session factory against the same file.
     await db_session.close_db()
     assert db_session.async_session_factory is None
     await db_session.init_db(db_url)
