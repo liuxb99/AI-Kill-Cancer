@@ -113,6 +113,24 @@ jobs:
       - name: Pull production environment
         run: vercel pull --yes --environment=production --token=$env:VERCEL_TOKEN
 
+      - name: Preflight production backend environment
+        run: |
+          $envFile = '.vercel/.env.production.local'
+          if (-not (Test-Path $envFile)) {
+            throw 'Vercel production environment file was not pulled.'
+          }
+          $text = Get-Content $envFile -Raw
+          $keys = @('APP_MODE', 'DATABASE_URL', 'DB_HOST', 'JWT_SECRET_KEY')
+          foreach ($key in $keys) {
+            $present = $text -match "(?m)^$([regex]::Escape($key))="
+            Write-Host ("{0}: {1}" -f $key, $(if ($present) { 'PRESENT' } else { 'MISSING' }))
+          }
+          $productionMode = $text -match '(?m)^APP_MODE=["'']?production["'']?$'
+          $hasJwt = $text -match '(?m)^JWT_SECRET_KEY='
+          if ($productionMode -and -not $hasJwt) {
+            throw 'JWT_SECRET_KEY is required because APP_MODE=production.'
+          }
+
       - name: Deploy verified source to production
         id: deploy
         run: |
@@ -144,7 +162,12 @@ jobs:
           )
           foreach ($path in $paths) {
             $uri = "$base$path"
-            $response = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 60
+            try {
+              $response = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 60
+            } catch {
+              $status = $_.Exception.Response.StatusCode.value__
+              throw "API smoke request failed for $path with HTTP $status : $($_.Exception.Message)"
+            }
             $contentType = [string]$response.Headers['Content-Type']
             if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
               throw "API smoke failed for $path with HTTP $($response.StatusCode)"
