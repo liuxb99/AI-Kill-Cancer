@@ -1,183 +1,159 @@
 # AI Kill Cancer
 
-甲狀腺癌患者個人化基因分析、分子機制視覺化、既有藥物再定位與可追溯證據報告平台。
+甲狀腺癌 Precision Oncology 研究平台：管理病例、檢體與分子檢測資料，整理變異、證據、候選藥物、臨床試驗與可追溯決策鏈。
 
-> ⚠️ **重要聲明：本專案目前是研究型軟體，不是醫療產品。**
-> 所有 AI 模型與資料流程仍處於開發或未完成驗證階段。
-> 系統輸出不構成診斷、處方、停藥、換藥或治療建議，任何用藥決策必須由合格醫師結合完整臨床資料判斷。
+> ⚠️ **重要聲明：本專案是研究型軟體，不是醫療產品。**
+> 系統輸出不構成診斷、處方、停藥、換藥、劑量或治療建議。任何臨床決策必須由合格醫療專業人員依完整臨床資料判斷。
 
-## 產品主線
+## 目前版本
 
-目標使用者是已確診甲狀腺癌、並已取得腫瘤 DNA 或其他分子檢測結果的患者、研究人員與醫療專業人員。
+- Product release candidate：**1.0.3**
+- Engineering milestone：**Local-First Research & Demo Showcase（roadmap 代號 v0.3.0）**
+- Product version authority：root `VERSION` + backend `Settings.APP_VERSION`
 
-核心流程：
+> roadmap 代號 v0.3.0 不是產品 SemVer，不再拿來覆蓋既有 1.x release line。
+
+## 架構主線
 
 ```text
-患者建立甲狀腺癌病例
-        ↓
-上傳 VCF / CSV / JSON / 檢測報告
-        ↓
-變異標準化、註釋與品質檢查
-        ↓
-Three.js 染色體、基因、蛋白質與路徑視覺化
-        ↓
-搜尋已核准藥物、其他癌種藥物與舊藥再定位候選
-        ↓
-整理支持證據、反向證據、限制與不確定性
-        ↓
-產生患者版及醫療專業版研究報告
+Local / Research
+  persistent SQLite workspace
+  → integrity / backup / restore
+  → controlled CSV import
+  → Case / Variant / Evidence / Recommendation / Decision traceability
+
+Vercel Demo
+  bundled synthetic CSV
+  → ephemeral SQLite cold-start bootstrap
+  → synthetic demo_case deep-link
+  → multi-route showcase
+
+Optional Scale-out
+  PostgreSQL / external research integrations
 ```
 
-本專案不再以「判斷患者是否罹癌」作為主線，也不以自動治療推薦為產品目標。
+Local SQLite 是目前主要持久化研究工作資料庫；Vercel 僅作 synthetic showcase，不保存正式研究工作資料。
 
-## 目標功能
+## 已完成的核心能力
 
-- 甲狀腺癌患者案例、檢體與分子檢測資料管理。
-- VCF、CSV、TSV、JSON 與檢測報告上傳。
-- SNV、indel、copy-number、fusion、TERT promoter 等變異標準化。
-- BRAF、RAS、RET、NTRK、TERT、TP53、PTEN、PIK3CA 等甲狀腺癌核心基因分析。
-- Three.js 染色體、變異、訊號路徑及 drug-target evidence graph。
-- 已核准、off-label、臨床試驗、前臨床與研究假說分級。
-- 支持證據與反向證據並列的 Evidence Card。
-- 舊藥再定位候選、臨床試驗匹配與可追溯來源。
-- 患者易懂版與醫療專業版報告。
-- Consent、privacy、audit log、分析版本及 provenance。
+- Patient / Cancer Case / Specimen / Sequencing / Variant 資料模型與 SQLite 相容性。
+- SQLite FK、busy timeout、integrity check、backup、atomic restore、restart persistence。
+- Schema upgrade 前自動 timestamp backup。
+- Local CSV Import：`validate → preview → explicit import`，禁止 silent overwrite。
+- Duplicate-aware preview 與 `import-history.jsonl` audit trail。
+- `/workspace-import` 本機 UI，只有 local/research persistent SQLite 可寫入。
+- Traceability Persistence E2E：真實 SQLite close/re-init 後仍保留 Evidence / Recommendation / Decision chain。
+- 三個固定 PTC synthetic showcase cases 與 deterministic UUIDv5 bootstrap。
+- Demo dataset schema / row-shape / enum / broken-reference / JSON-list validation。
+- Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Research、PTC Integrated、PTC Command Center synthetic hydration。
+- Navbar 保留 `demo_case` / `data_mode=synthetic`。
+- Production API JSON smoke 與 multi-route Chromium gate。
+
+最新工程狀態見 [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md)。
+
+## Local Workspace Import
+
+本機 research workspace 可使用：
+
+```text
+GET  /api/v1/workspace/status
+POST /api/v1/workspace/import/csv/preview
+POST /api/v1/workspace/import/csv/commit
+GET  /api/v1/workspace/import/history
+```
+
+UI：
+
+```text
+/workspace-import
+```
+
+Import policy：
+
+```text
+validate
+→ preview validation + duplicates
+→ explicit confirm=IMPORT
+→ idempotent insert
+→ existing deterministic records skipped
+→ append import-history.jsonl
+```
+
+## Demo Showcase
+
+Synthetic deep-link contract：
+
+```text
+?demo_case=PTC-DEMO-001&data_mode=synthetic
+```
+
+主要 showcase routes：
+
+- `/recommendation`
+- `/clinical-decision`
+- `/treatment-plans`
+- `/clinical-graph`
+- `/ptc-research`
+- `/ptc-workbench`
+- `/ptc-command-center`
+
+Vercel synthetic runtime 與 Local research workspace 嚴格分離；demo route 不應執行正式同步或持久化研究操作。
 
 ## 安全邊界
 
-系統可以提供研究型決策支援，但禁止：
+系統禁止：
 
-- 自動診斷癌症。
-- 提供藥物劑量或用藥指令。
-- 將 VUS 直接視為可用藥變異。
-- 將細胞、動物或計算結果宣稱為人體療效。
-- 將舊藥再定位候選包裝成已證實治療。
-- 讓 LLM 自行創造基因—藥物關聯。
+- 自動診斷癌症；
+- 提供藥物劑量或直接用藥指令；
+- 將 VUS 直接視為可用藥變異；
+- 將細胞、動物或計算結果宣稱為人體療效；
+- 將 synthetic showcase 冒充真實患者或真實臨床證據；
+- 讓 LLM 無來源創造基因—藥物關聯。
 
-所有基因、路徑、藥物及證據連線必須由結構化資料來源產生；LLM 僅負責解釋、摘要與衝突整理。
+所有研究結論應保留來源、證據層級、限制、不確定性與 provenance。
 
-## 開源元件整合方向
+## 技術棧
 
-本專案保留現有 FastAPI、React、PostgreSQL 架構作為總控，不直接 Fork 大型癌症平台。優先整合：
-
-```text
-bcftools normalization
-        ↓
-Ensembl VEP：標準功能註釋
-        ↓
-OpenCRAVAT：變異註釋與優先排序
-        ↓
-CIViC：癌症變異臨床證據
-        ↓
-DGIdb：藥物—基因互動
-        ↓
-OncoTree：癌種標準化
-        ↓
-PostgreSQL Evidence Store
-        ↓
-React Force Graph + Three.js
-```
-
-第二階段研究擴充：
-
-- MyVariant.info：快速補充變異資料。
-- cBioPortal API：公開癌症研究資料與資料模型參考。
-- DRKG：舊藥再定位候選生成，不作為療效證明。
-- ClinicalTrials.gov 與 PubMed：臨床試驗、支持證據與反向證據。
-- PharmCAT：獨立的 germline 藥物基因體流程，不與 tumor somatic DNA 混用。
-
-完整選型、整合方式、授權要求與實作順序見 [OPEN_SOURCE_INTEGRATION_PLAN.md](docs/OPEN_SOURCE_INTEGRATION_PLAN.md)。
-
-## 目前狀態
-
-| 階段 | 內容 | 狀態 |
-|------|------|------|
-| Phase 0 | 現有推論、安全與模型契約修正 | 🟡 進行中 |
-| Phase 1 | 甲狀腺癌 Precision Oncology 產品重構 | ⏳ 下一階段 |
-| Phase 2 | DNA 上傳、變異標準化與品質報告 | ❌ 未開始 |
-| Phase 3 | 甲狀腺癌基因、路徑、藥物與證據知識庫 | ❌ 未開始 |
-| Phase 4 | Three.js 互動基因組與證據視覺化 | ❌ 未開始 |
-| Phase 5 | 舊藥再定位、反證與臨床試驗匹配 | ❌ 未開始 |
-| Phase 6 | 患者版、醫師版與腫瘤委員會報告 | ❌ 未開始 |
-
-## 現有工程骨架
-
-- FastAPI RESTful API。
-- React + TypeScript 前端。
-- PostgreSQL 資料庫模型。
-- PyTorch 模型骨架。
-- APP_MODE 三模式：demo / research / production。
-- Health 端點：liveness、readiness、dependencies。
-- 模擬資料 provenance 與醫療免責聲明。
-- pytest 測試套件。
-
-現有 predict、recommend、charts 等功能屬早期原型，不代表真實甲狀腺癌分析或臨床治療能力，後續將依新產品規劃重構。
-
-## 專案結構
-
-```text
-├── src/
-│   ├── frontend/    # React + TypeScript 前端
-│   ├── backend/     # FastAPI API
-│   ├── models/      # AI / 分析模型
-│   └── tools/       # 資料處理與輔助工具
-├── api/             # Vercel Serverless 入口
-├── docs/            # 產品、醫療安全、資料與部署文件
-├── tests/           # pytest 測試
-└── docker/          # Docker 配置
-```
+- Backend：Python / FastAPI / SQLAlchemy
+- Frontend：React / TypeScript / Vite / Tailwind CSS
+- Local database：SQLite + aiosqlite
+- Optional scale-out database：PostgreSQL
+- Visualization：Three.js / graph components
+- Testing：pytest / Vitest / Chromium production smoke
+- Deployment：Vercel demo + local research runtime
 
 ## 快速開始
 
 ```bash
-# 安裝依賴
 pip install -r requirements.txt
 pip install -r requirements-ai.txt
 
-# 啟動 API（demo 模式）
-cd src/backend
-uvicorn main:app --reload
+# Local/research example
+set APP_MODE=local
+set DB_BACKEND=sqlite
+set SQLITE_PATH=./data/ai-kill-cancer.db
+uvicorn src.backend.main:app --reload
 
-# 啟動前端
+# Frontend
 cd src/frontend
 npm install
 npm run dev
 ```
 
-## 主要文件
+## Release 文件
 
-- [THYROID_PRECISION_ONCOLOGY_PRODUCT_PLAN.md](docs/THYROID_PRECISION_ONCOLOGY_PRODUCT_PLAN.md) — 新產品定位、患者流程、Three.js 規劃、舊藥再定位與開發路線。
-- [OPEN_SOURCE_INTEGRATION_PLAN.md](docs/OPEN_SOURCE_INTEGRATION_PLAN.md) — OpenCRAVAT、VEP、CIViC、DGIdb、OncoTree、Three.js 等開源元件選型與整合順序。
-- [CURRENT_STATE.md](docs/CURRENT_STATE.md) — 當前工程狀態。
-- [MEDICAL_SAFETY.md](docs/MEDICAL_SAFETY.md) — 醫療安全聲明。
-- [DATA_PROVENANCE.md](docs/DATA_PROVENANCE.md) — 資料溯源。
-- [MODEL_CARD.md](docs/MODEL_CARD.md) — 模型卡片。
-- [DEPLOYMENT.md](docs/DEPLOYMENT.md) — 部署說明。
-- [AGENTS.md](AGENTS.md) — 開發者指南。
+- [CHANGELOG.md](CHANGELOG.md)
+- [RELEASE_NOTES_v1.0.3.md](RELEASE_NOTES_v1.0.3.md)
+- [docs/RELEASE_CHECKLIST_v1.0.3.md](docs/RELEASE_CHECKLIST_v1.0.3.md)
+- [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md)
+- [docs/V0_3_LOCAL_FIRST_ROADMAP_ZH.md](docs/V0_3_LOCAL_FIRST_ROADMAP_ZH.md)
+- [docs/MEDICAL_SAFETY.md](docs/MEDICAL_SAFETY.md)
+- [docs/DATA_PROVENANCE.md](docs/DATA_PROVENANCE.md)
 
-## 下一個正式任務
+## Release 原則
 
-現有 P0 基礎修正完成並經 Git 審查後，進入：
-
-> **Phase 1：甲狀腺癌 Precision Oncology 產品重構。**
-
-第一輪應先完成領域模型與資料契約，不得用 synthetic 或 mock 結果冒充真實分析：
-
-1. Patient case、specimen、sequencing test、uploaded file schema。
-2. VCF / CSV 上傳 API contract。
-3. Thyroid cancer variant schema 與首批核心基因格式。
-4. Three.js visualization data contract。
-5. Drug Candidate 與 Evidence Card schema。
-6. Analysis manifest、資料來源版本與第三方授權 manifest。
-7. 所有候選強制包含來源、證據層級、限制及反向證據。
-8. 文件、API schema、測試同步更新。
-
-## 技術棧
-
-- **後端**：Python 3.10+ / FastAPI / SQLAlchemy / PyTorch
-- **變異分析**：bcftools / Ensembl VEP / OpenCRAVAT
-- **癌症證據**：CIViC / DGIdb / OncoTree
-- **前端**：TypeScript / React / Vite / Tailwind CSS / Three.js / react-force-graph
-- **資料庫**：PostgreSQL；SQLite 僅供本地 MVP
-- **部署**：Vercel Serverless / Docker workers
-- **測試**：pytest
+1. `VERSION` 與 backend `APP_VERSION` 必須一致。
+2. Local Verification Gate 必須全綠。
+3. Vercel production API JSON smoke 必須全綠。
+4. Synthetic multi-route Chromium gate 必須全綠。
+5. Release 成熟度僅表示軟體工程成熟度，**不表示臨床驗證或醫療有效性**。
