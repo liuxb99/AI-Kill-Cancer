@@ -10,10 +10,16 @@ from sqlalchemy.orm import selectinload
 from src.backend.database.session import get_db
 from src.backend.domain.evidence import EvidenceModel
 from src.backend.domain.ptc_research import PTCResearchCaseModel
+from src.backend.domain.research_depth import (
+    ResearchEventModel,
+    ResearchHypothesisModel,
+    ResearchRunModel,
+)
 from src.backend.research_depth import (
     build_hypotheses,
     cohort_biomarker_stratification,
     evidence_conflict_summary,
+    execute_research_loop,
     outcome_feedback_summary,
 )
 
@@ -41,6 +47,46 @@ async def _load_gene_evidence(db: AsyncSession, gene: str, limit: int = 500) -> 
         .limit(limit)
     )
     return list(result.scalars())
+
+
+def _hypothesis_payload(item: ResearchHypothesisModel) -> dict[str, Any]:
+    return {
+        "id": str(item.id),
+        "hypothesis_key": item.hypothesis_key,
+        "gene_symbol": item.gene_symbol,
+        "protein_change": item.protein_change,
+        "hypothesis_type": item.hypothesis_type,
+        "version": item.version,
+        "status": item.status,
+        "claim": item.claim,
+        "rationale": item.rationale,
+        "supporting_observations": item.supporting_observations,
+        "counter_evidence": item.counter_evidence,
+        "uncertainties": item.uncertainties,
+        "falsification_criteria": item.falsification_criteria,
+        "next_data_needed": item.next_data_needed,
+        "input_fingerprint": item.input_fingerprint,
+        "clinical_use": False,
+        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+    }
+
+
+def _event_payload(item: ResearchEventModel) -> dict[str, Any]:
+    return {
+        "id": str(item.id),
+        "event_key": item.event_key,
+        "event_type": item.event_type,
+        "gene_symbol": item.gene_symbol,
+        "hypothesis_id": str(item.hypothesis_id) if item.hypothesis_id else None,
+        "run_id": str(item.run_id) if item.run_id else None,
+        "observed_at": item.observed_at.isoformat() if item.observed_at else None,
+        "date_semantics": item.date_semantics,
+        "source_type": item.source_type,
+        "source_id": item.source_id,
+        "provenance": item.provenance,
+        "payload": item.payload,
+    }
 
 
 @router.get("/outcomes")
@@ -95,6 +141,93 @@ async def biomarker_research_depth(
             "consensus retains dissent, and no output is a diagnosis, prognosis, treatment "
             "recommendation, or causal conclusion."
         ),
+    }
+
+
+@router.post("/biomarker/{gene}/run")
+async def run_biomarker_research_loop(
+    gene: str,
+    protein_change: str | None = Query(default=None),
+    limit: int = Query(default=1000, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Execute and persist the controlled research loop for a biomarker."""
+    normalized_gene = gene.strip().upper()
+    cases = await _load_cases(db, limit)
+    evidence = await _load_gene_evidence(db, normalized_gene)
+    return await execute_research_loop(
+        db,
+        gene=normalized_gene,
+        protein_change=protein_change,
+        cases=cases,
+        evidence=evidence,
+    )
+
+
+@router.get("/hypotheses")
+async def list_research_hypotheses(
+    gene: str | None = Query(default=None, max_length=32),
+    limit: int = Query(default=100, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    query = select(ResearchHypothesisModel).order_by(ResearchHypothesisModel.created_at.desc()).limit(limit)
+    if gene:
+        query = query.where(ResearchHypothesisModel.gene_symbol == gene.strip().upper())
+    items = list((await db.execute(query)).scalars())
+    return {
+        "count": len(items),
+        "items": [_hypothesis_payload(item) for item in items],
+        "research_only": True,
+        "clinical_use": False,
+    }
+
+
+@router.get("/events")
+async def list_research_events(
+    gene: str | None = Query(default=None, max_length=32),
+    limit: int = Query(default=250, ge=1, le=2000),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    query = select(ResearchEventModel).order_by(ResearchEventModel.observed_at.desc()).limit(limit)
+    if gene:
+        query = query.where(ResearchEventModel.gene_symbol == gene.strip().upper())
+    items = list((await db.execute(query)).scalars())
+    return {
+        "count": len(items),
+        "events": [_event_payload(item) for item in items],
+        "research_only": True,
+        "clinical_use": False,
+    }
+
+
+@router.get("/runs")
+async def list_research_runs(
+    gene: str | None = Query(default=None, max_length=32),
+    limit: int = Query(default=100, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    query = select(ResearchRunModel).order_by(ResearchRunModel.created_at.desc()).limit(limit)
+    if gene:
+        query = query.where(ResearchRunModel.gene_symbol == gene.strip().upper())
+    items = list((await db.execute(query)).scalars())
+    return {
+        "count": len(items),
+        "items": [
+            {
+                "id": str(item.id),
+                "run_key": item.run_key,
+                "gene_symbol": item.gene_symbol,
+                "protein_change": item.protein_change,
+                "input_fingerprint": item.input_fingerprint,
+                "status": item.status,
+                "trace": item.trace,
+                "result_summary": item.result_summary,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+            }
+            for item in items
+        ],
+        "research_only": True,
+        "clinical_use": False,
     }
 
 
