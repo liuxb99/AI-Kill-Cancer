@@ -1,0 +1,4 @@
+demo_drug_key,name,generic_name,drugbank_id,atc_codes,mechanism_of_action,description,approval_status
+drug-braf,Dabrafenib,dabrafenib,DB08912,"[\"L01EC02\"]",BRAF kinase inhibitor,Synthetic demo entry for BRAF V600E pathway targeting,approved
+drug-ret,Selpercatinib,selpercatinib,DB15685,"[\"L01EX22\"]",Selective RET kinase inhibitor,Synthetic demo entry for RET fusion targeting,approved
+drug-ntrk,Larotrectinib,larotrectinib,DB14723,"[\"L01EX12\"]",TRK kinase inhibitor,Synthetic demo entry for NTRK fusion targeting,approved
