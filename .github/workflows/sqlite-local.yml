@@ -61,8 +61,8 @@ jobs:
 
       - name: Lint backend and SQLite regression
         run: |
-          & $env:PYTHON_EXE -m ruff check src/backend tests/backend/test_sqlite_local_compat.py tests/test_analysis_persistence.py
-          & $env:PYTHON_EXE -m pytest tests/backend/test_sqlite_local_compat.py -v --tb=short
+          & $env:PYTHON_EXE -m ruff check src/backend tests/backend/test_sqlite_local_compat.py tests/backend/test_demo_bootstrap.py tests/test_analysis_persistence.py
+          & $env:PYTHON_EXE -m pytest tests/backend/test_sqlite_local_compat.py tests/backend/test_demo_bootstrap.py -v --tb=short
           if ($env:PYTHON_SUPPORTS_PIPELINE -eq 'true') {
             & $env:PYTHON_EXE -m pytest tests/test_analysis_persistence.py -v --tb=short
           } else {
@@ -79,6 +79,36 @@ jobs:
           async def main():
               await init_db(settings.DATABASE_URL)
               await close_db()
+
+          asyncio.run(main())
+          '@ | & $env:PYTHON_EXE -
+
+      - name: Verify demo cold-start bootstrap
+        env:
+          APP_MODE: demo
+          DB_BACKEND: sqlite
+          SQLITE_PATH: ./.ci/demo-cold-start.db
+          DEMO_AUTO_BOOTSTRAP: 'true'
+          DEMO_DATA_DIR: ./data/demo
+        run: |
+          @'
+          import asyncio
+          from sqlalchemy import func, select
+          from src.backend.config import settings
+          from src.backend.database import session as db_session
+          from src.backend.domain.patient import PatientModel
+
+          async def main():
+              await db_session.init_db(settings.DATABASE_URL)
+              try:
+                  assert db_session.async_session_factory is not None
+                  async with db_session.async_session_factory() as session:
+                      count = await session.scalar(select(func.count()).select_from(PatientModel))
+                      if count != 3:
+                          raise RuntimeError(f'Expected 3 bootstrapped demo patients, got {count}')
+                  print(f'Demo cold-start bootstrap passed: {count} patients')
+              finally:
+                  await db_session.close_db()
 
           asyncio.run(main())
           '@ | & $env:PYTHON_EXE -
