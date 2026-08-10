@@ -36,9 +36,9 @@ demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 
 目前已支援：Homepage Demo Case Selector、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Research、PTC Integrated Workbench，以及 PTC Command Center synthetic isolation。所有 synthetic 頁面沿用 `DemoContextBanner` / `useDemoContext()`，保持 provenance 一致。
 
-PTC Research / Integrated 在 synthetic mode 下不再誤查研究資料庫。Integrated Workbench 直接投影 Case、Variant、Evidence、Drug、Publication、Clinical Trial，並停用 dashboard、最近病例、integrated recommendation、similarity、中藥 bootstrap 與 interaction API。
+本批已進一步補上 **App-level synthetic navigation continuity**：只要目前 URL 帶 `demo_case`，navbar 導航會自動保留 `demo_case` 與 `data_mode=synthetic`，因此使用者從 PTC Research 切到 PTC Workbench、PTC Command Center、Clinical Decision、Knowledge Graph 等頁面時，不會掉回 normal/research mode。
 
-PTC Command Center 目前採 **route-level isolation**：帶 `demo_case` 時不 mount 原本的 real command-center component，因此不會觸發 source status、readiness、outcome、complete graph 或 full sync API；沒有 synthetic context 時仍沿用原本真實研究總控台。
+PTC Command Center 採 route-level isolation：帶 `demo_case` 時不 mount real command-center component，因此不觸發 source status、readiness、outcome、complete graph 或 full sync API；沒有 synthetic context 時仍沿用原本真實研究總控台。
 
 ## Demo Dataset Validation
 
@@ -56,27 +56,36 @@ PTC Command Center 目前採 **route-level isolation**：帶 `demo_case` 時不 
 
 ## 本批狀態
 
-第八批新增：
+第九批新增：
 
 ```text
-PTC Command Center synthetic route isolation      IMPLEMENTED
-Synthetic command-center projection               IMPLEMENTED
-External sync API isolation                       IMPLEMENTED
-Real command-center fallback preserved            IMPLEMENTED
-Command-center frontend regression                IMPLEMENTED
-Previous PTC Integrated hydration                 VERIFIED IN PRODUCTION
+Synthetic navbar query propagation                IMPLEMENTED
+App-level demo context continuity                 IMPLEMENTED
+Research → Integrated → Command Center flow       IMPLEMENTED
+Cross-route frontend regression                   IMPLEMENTED
+PTC Command Center isolation                      IMPLEMENTED — production workflow still running
 ```
 
-新增 `src/frontend/src/pages/PTCCommandCenterRoute.tsx`：
+`src/frontend/src/App.tsx` 現在由 navbar 統一保留 synthetic query contract；品牌首頁與所有 navbar links 都共用 `navigateWithContext()`。
 
-- synthetic mode 只讀 `/api/v1/demo/cases`；
-- 顯示 Case → Variant → Evidence → Drug / Publication / Trial；
-- 明確標示 external sync / formal research DB operations disabled；
-- normal mode 才 mount 原本 `PTCCommandCenterPage`。
+`src/frontend/src/test/App.test.tsx` 新增跨路由回歸：
 
-新增 `src/frontend/src/test/PTCCommandCenterRoute.test.tsx`：驗證 synthetic deep-link 不 mount real command center，normal mode 仍保留既有真實總控台。
+```text
+PTC Research (synthetic)
+→ PTC Workbench (synthetic)
+→ PTC Command Center (synthetic)
+→ PTC Research (synthetic)
+```
 
-本批已提交，等待 latest self-hosted gate，因此本批狀態為：
+每次導航都驗證 URL 仍包含：
+
+```text
+?demo_case=PTC-DEMO-001&data_mode=synthetic
+```
+
+並驗證目標頁仍顯示 synthetic UI，而不是掉回 research database 路徑。
+
+本批已提交，等待 latest self-hosted gate，因此狀態為：
 
 **IMPLEMENTED — WAITING FOR LATEST SELF-HOSTED VERIFICATION**
 
@@ -96,11 +105,12 @@ Previous PTC Integrated hydration                 VERIFIED IN PRODUCTION
 - [x] Knowledge Graph hydration；
 - [x] PTC Research hydration；
 - [x] PTC Integrated hydration；
-- [x] PTC Command Center synthetic isolation（待 latest gate）；
+- [x] PTC Command Center synthetic isolation（待 production workflow 完成）；
+- [x] Navbar synthetic query propagation（待 latest gate）；
 - [x] 共用 provenance banner；
 - [x] CSV schema / duplicate / broken-reference validator；
 - [x] CSV row-shape / enum-value validator；
-- [ ] multi-route Chromium E2E。
+- [ ] Browser/Chromium production multi-route E2E。
 
 ### Local SQLite
 - [x] config / schema bootstrap / FK / busy timeout；
@@ -117,8 +127,8 @@ Previous PTC Integrated hydration                 VERIFIED IN PRODUCTION
 
 優先順序：
 
-1. multi-route Chromium E2E：以同一 `demo_case` 驗證 Homepage → Recommendation → Clinical Decision → Treatment Plan → Knowledge Graph → PTC Research → PTC Integrated → PTC Command Center；
-2. 修正 AppNavbar 在 synthetic flow 中的 query propagation，避免使用者從 demo 頁點 navbar 後丟失 `demo_case/data_mode`；
+1. Browser/Chromium production multi-route E2E：以同一 `demo_case` 驗證 Homepage → Recommendation → Clinical Decision → Treatment Plan → Knowledge Graph → PTC Research → PTC Integrated → PTC Command Center；
+2. 把 E2E 納入 production deploy gate，任何一頁白屏、query 丟失或 synthetic banner 不見都阻止標記部署成功；
 3. local CSV import 第一版，採 validate → preview → explicit import，不允許靜默覆寫；
 4. pre-upgrade automatic backup hook；
 5. traceability persistence E2E；
