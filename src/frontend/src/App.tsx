@@ -21,7 +21,7 @@ const TreatmentPlanDetailPage = lazy(() => import('./pages/TreatmentPlanDetailPa
 const TreatmentPlanRevisionPage = lazy(() => import('./pages/TreatmentPlanRevisionPage'))
 const PTC3DExplorerPage = lazy(() => import('./pages/PTC3DExplorerPage'))
 const PTCCohortPage = lazy(() => import('./pages/PTCCohortPage'))
-const PTCCommandCenterPage = lazy(() => import('./pages/PTCCommandCenterPage'))
+const PTCCommandCenterRoute = lazy(() => import('./pages/PTCCommandCenterRoute'))
 const PTCDataQualityPage = lazy(() => import('./pages/PTCDataQualityPage'))
 const PTCEvidenceMatrixPage = lazy(() => import('./pages/PTCEvidenceMatrixPage'))
 const PTCIntegratedPage = lazy(() => import('./pages/PTCIntegratedPage'))
@@ -104,7 +104,7 @@ function App() {
           <Route path="/research-portal" element={<ResearchPortal />} />
           <Route path="/workbench" element={<Workbench />} />
           <Route path="/production-readiness" element={<ProductionReadinessPage />} />
-          <Route path="/ptc-command-center" element={<PTCCommandCenterPage />} />
+          <Route path="/ptc-command-center" element={<PTCCommandCenterRoute />} />
           <Route path="/ptc-data-quality" element={<PTCDataQualityPage />} />
           <Route path="/ptc-snapshots" element={<PTCSnapshotPage />} />
           <Route path="/ptc-3d" element={<PTC3DExplorerPage />} />
