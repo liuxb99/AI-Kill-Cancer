@@ -2,78 +2,87 @@
 
 更新日期：2026-08-10
 
-AI-Kill-Cancer 已進入版本化推進階段。現行架構正式採用「Local-First SQLite + Vercel Demo Showcase」雙模式：
+AI-Kill-Cancer 已進入版本化推進階段。現行架構正式採用 **Local-First SQLite + Vercel Demo Showcase**：
 
 - 本地 SQLite 是主要可用、可持久化、可累積研究資料的工作資料庫；
-- Vercel 僅作線上展示與部署驗證，使用內建示範 CSV 資料集啟動展示流程；
-- Vercel `/tmp` SQLite 僅是由 demo CSV 投影出的暫存 runtime，不承擔正式資料持久化責任；
-- PostgreSQL 降級為未來多人協作／中央伺服器／高併發時的 Optional Scale-out Backend，不阻塞目前版本推進。
+- Vercel 僅作線上展示與部署驗證，使用 bundled synthetic CSV；
+- Vercel `/tmp` SQLite 只作 runtime projection，不承擔正式資料持久化；
+- PostgreSQL 是 Optional Scale-out Backend，不阻塞目前版本主線。
 
-## 已實作／已有永久測試證據
-
-```text
-Drug Recommendation / Clinical Decision contracts     IMPLEMENTED
-Treatment Plan dual-mode UI/API                       IMPLEMENTED
-Clinical Graph deterministic treatment IDs            IMPLEMENTED
-Outbox event_id persistence contract                  IMPLEMENTED
-Recommendation service/API decoupling                 IMPLEMENTED
-Treatment-plan clinical safety readiness gate         IMPLEMENTED
-GDC/TCGA public data adapter                          IMPLEMENTED
-ClinicalTrials.gov adapter                            IMPLEMENTED
-OpenFDA adapter                                       IMPLEMENTED
-PubMed/PMC adapter                                    IMPLEMENTED
-CIViC adapter                                         IMPLEMENTED
-Content-addressed public-data storage / dedup          IMPLEMENTED
-Local SQLite runtime / ORM compatibility              VERIFIED ON SELF-HOSTED RUNNER
-Vercel Python API routing                             VERIFIED
-Vercel static asset routing                           VERIFIED
-Production browser render via Chromium                VERIFIED
-Production alias page/API smoke                       VERIFIED
-```
-
-## 當前版本主線
+## 當前版本
 
 ```text
 v0.3.0 — Local-First Research & Demo Showcase
 ```
 
-v0.3.0 不以新增大量新癌症功能為目標，而是把現有能力整理成兩個可明確驗收的運行模式。
+## v0.3.0 目前完成度
 
-### A. Vercel Demo Showcase
-
-```text
-Bundled demo CSV
-→ bootstrap /tmp demo SQLite
-→ Patient / Case / Variant / Evidence
-→ Recommendation / Clinical Decision
-→ Treatment Plan / Knowledge Graph / Report
-→ Chromium browser E2E
-```
-
-要求：
-
-- demo CSV 是 Vercel 展示資料的 Source of Truth；
-- serverless cold start 或重新部署後可重新由 CSV bootstrap；
-- Vercel 不保存正式研究資料；
-- 所有示範病例與推薦結果必須清楚標示 Demo / Synthetic / Research Only；
-- 頁面需可直接選擇 3～5 個固定示範病例，展示完整流程，而不是只展示空白頁或功能卡。
-
-### B. Local Research Workspace
+### 已驗證底座
 
 ```text
-APP_MODE=local
-DB_BACKEND=sqlite
-SQLITE_PATH=data/ai-kill-cancer.db
+Local SQLite runtime / ORM compatibility          VERIFIED
+SQLite file persistence / FK / memory regression  VERIFIED
+Vercel Python API routing                         VERIFIED
+Vercel static asset filesystem-first routing      VERIFIED
+Production page/API smoke                         VERIFIED
+Production Chromium browser render                VERIFIED
+Demo core CSV → SQLite bootstrap                  VERIFIED — Local Gate #74 PASS
+Demo deterministic UUIDv5 / idempotent reload     VERIFIED — Local Gate #74 PASS
 ```
 
-本地 SQLite 為主要資料庫，要求：
+### Demo Showcase 第一批
 
-- 新建 Patient / Case / Specimen / Variant；
-- 可匯入 CSV / variants；
-- 可執行 evidence / recommendation / treatment plan / graph 流程；
-- 關閉程式、重新啟動電腦或應用後資料仍存在；
-- schema version、migration、FK、integrity、backup/restore 有永久測試；
-- 正式研究資料不得依賴 Vercel `/tmp`。
+已完成：
+
+```text
+data/demo/patients.csv
+data/demo/cancer_cases.csv
+data/demo/specimens.csv
+data/demo/sequencing_tests.csv
+data/demo/variants.csv
+```
+
+3 個固定 synthetic PTC 病例：
+
+- BRAF V600E；
+- RET fusion；
+- NTRK1 fusion / RAI-refractory showcase。
+
+### Demo Showcase 第二批
+
+本批新增：
+
+```text
+data/demo/drugs.csv
+data/demo/publications.csv
+data/demo/clinical_trials.csv
+data/demo/evidence.csv
+/api/v1/demo/status
+/api/v1/demo/cases
+Homepage Demo Case Selector
+Case → Variant → Evidence → Drug UI
+Publication / Clinical Trial trace UI
+Demo showcase API regression tests
+```
+
+首頁現在會直接讀 `/api/v1/demo/cases`，可切換三個 synthetic case，展示：
+
+```text
+Case
+→ Variant
+→ Evidence
+→ Drug
+→ Publication
+→ Clinical Trial
+```
+
+所有新增 Evidence / Drug / Publication / Trial 都是 **synthetic demo data**，只用來展示軟體流程與資料契約，不代表真實醫學證據或患者治療建議。
+
+第二批狀態：
+
+```text
+IMPLEMENTED — WAITING FOR LATEST SELF-HOSTED VERIFICATION
+```
 
 ## Database runtime policy
 
@@ -81,76 +90,76 @@ SQLITE_PATH=data/ai-kill-cancer.db
 Local SQLite
 → 主要／權威工作資料庫
 → local research workspace
-→ patient/case/variant/evidence/recommendation/treatment-plan/graph persistence
+→ 正式研究資料持久化
 
 Vercel Demo SQLite (/tmp)
-→ 僅供 demo CSV runtime projection
+→ synthetic CSV runtime projection
 → ephemeral
-→ 可隨時從 bundled CSV 重建
-→ 不視為正式資料保存
+→ 可從 bundled CSV 重建
 
 PostgreSQL
 → Optional Scale-out Backend
-→ 未來多人協作、中央 Server、高併發或 SaaS 化時再啟用
-→ 不阻塞 v0.3.0～目前版本主線
+→ 未來多人協作、中央 Server、高併發或 SaaS 化再啟用
 ```
-
-SQLite 本地模式現有能力：
-
-- `DB_BACKEND=sqlite` / `SQLITE_PATH=...`；
-- explicit `DATABASE_URL=sqlite+aiosqlite:///...` 優先；
-- SQLite file parent directory 自動建立；
-- `PRAGMA foreign_keys=ON`；
-- `PRAGMA busy_timeout=5000`；
-- in-memory `StaticPool`；
-- ORM metadata local schema bootstrap；
-- file persistence / FK / memory-session regression；
-- Windows self-hosted SQLite Action；
-- DB-backed request lazy initialization guard。
 
 ## Vercel 線上狀態
 
 正式 alias：`https://ai-kill-cancer-zqpi.vercel.app`
 
-2026-08-10 已完成：
+目前永久 deployment gate 已包含：
 
 ```text
-Production page                              PASS
-/api/v1/health                               PASS — 200 JSON
-/api/v1/ptc-readiness                        PASS — 200 JSON
-/api/v1/ptc-completion/status                PASS — 200 JSON
-/api/v1/ptc-data-quality/overview            PASS — 200 JSON
-Chromium browser render                      PASS
-React root rendered                          PASS
-Console fatal errors                         0
-JS/CSS bad responses                         0
+verified SHA only
+→ deploy canonical alias
+→ production page smoke
+→ API JSON smoke
+→ Playwright/Chromium render
+→ React root / body text verification
+→ console error / pageerror capture
+→ JS/CSS bad-response check
+→ screenshot / browser report artifact
 ```
 
-此前白屏根因為 SPA catch-all 將 `/assets/*.js` 也 rewrite 成 `/index.html`，導致瀏覽器收到 `text/html` module；已改成 filesystem-first，再做 SPA fallback，且由真實 Chromium 永久驗證。
+此前白屏根因為 SPA catch-all 把 `/assets/*.js` rewrite 成 `/index.html`；已修成 filesystem-first，Chromium 已驗證正常 render。
 
-## v0.3.0 Acceptance Gate
+## v0.3.0 Acceptance Gate 進度
 
 ### Vercel Demo
 
-- [ ] 標準 demo CSV dataset 已建立；
-- [ ] 至少 3 個可切換示範病例；
-- [ ] cold start 可由 CSV 自動 bootstrap；
-- [ ] 核心頁面可讀到示範資料；
-- [ ] demo banner / provenance / synthetic 標記一致；
-- [ ] Chromium E2E 覆蓋首頁與主要功能 route；
-- [ ] Vercel 不宣稱資料持久化。
+- [x] 標準 core demo CSV dataset；
+- [x] Evidence / Drug / Publication / Trial synthetic CSV；
+- [x] 3 個固定可切換 demo cases；
+- [x] CSV → SQLite idempotent bootstrap；
+- [x] `/api/v1/demo/status`；
+- [x] `/api/v1/demo/cases`；
+- [x] 首頁 Demo Case Selector；
+- [x] Variant / Evidence / Drug / Publication / Trial 基本展示；
+- [ ] Recommendation / Clinical Decision / Treatment Plan 深連結；
+- [ ] Knowledge Graph / Research 頁共用 demo case context；
+- [ ] multi-route Chromium E2E；
+- [ ] CSV schema / broken-link validator。
 
 ### Local SQLite
 
-- [ ] 預設本地工作資料庫路徑標準化；
-- [ ] 初次啟動 bootstrap；
-- [ ] Patient → Case → Variant → Evidence → Recommendation → Treatment Plan 可完整落庫；
-- [ ] 關閉／重啟後資料仍存在；
-- [ ] SQLite integrity check；
-- [ ] upgrade 前自動備份；
+- [x] `DB_BACKEND=sqlite` / `SQLITE_PATH`；
+- [x] `data/ai-kill-cancer.db` 預設路徑能力；
+- [x] schema bootstrap；
+- [x] FK + busy timeout；
+- [x] file persistence regression；
+- [ ] local mode 啟動與 workspace status；
+- [ ] 本地 CSV import；
+- [ ] restart persistence E2E；
+- [ ] `PRAGMA integrity_check` gate；
+- [ ] upgrade-before-backup；
 - [ ] backup/restore smoke；
-- [ ] traceability ID/provenance chain E2E；
-- [ ] Browser E2E + backend/frontend/database tests 全通過。
+- [ ]完整 traceability persistence E2E。
+
+## 下一批
+
+下一批進入兩條主線：
+
+1. **Demo 深連結**：建立 demo case context，讓 Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、Research 共用同一病例；
+2. **Local SQLite Workspace Hardening**：workspace status、integrity check、restart persistence、backup/restore 第一版。
 
 ## 版本路線
 
@@ -161,24 +170,10 @@ v0.5.0  Real Data + Knowledge Graph + AI
 v0.6.0  Clinical Research Workbench
 v0.7.0  Scientific Validation & Evaluation
 v0.8.x  Security / Reliability / Observability Hardening
-v0.9.x  Release Candidate / Data Migration / Compatibility
+v0.9.x  Release Candidate / Compatibility / Migration
 v1.0.0  Research-Grade Stable
 ```
 
-v1.0.0 僅代表軟體達到穩定研究級交付標準，不代表已完成臨床有效性驗證，也不代表可取代醫療專業人員的診斷或治療決策。
-
-## v0.3.0 下一批開發順序
-
-1. 建立標準示範 CSV dataset；
-2. 實作 Demo CSV bootstrap service；
-3. Vercel cold start 自動將 demo CSV 投影到 `/tmp` SQLite；
-4. 建立示範病例選擇／查詢 API 與前端入口；
-5. 本地 SQLite 預設 workspace 路徑與 bootstrap；
-6. local persistence + restart E2E；
-7. SQLite backup/restore + integrity gate；
-8. 擴充 Chromium E2E 到核心功能 route；
-9. 完成 v0.3.0 release checklist / changelog / tag。
-
 ## 安全邊界
 
-本項目屬於研究與臨床決策輔助軟體工程項目。任何推薦、治療計畫、風險評估與示範病例輸出均不得替代合格醫療專業人員的診斷與治療決策。Demo 資料、Synthetic 資料、真實公共研究資料與本地使用者資料必須有明確 provenance，軟體完成度與醫學有效性必須分開評價。
+本項目屬於研究與臨床決策輔助軟體工程項目。任何推薦、治療計畫、風險評估與 synthetic demo 輸出均不得替代合格醫療專業人員的診斷與治療決策。Demo、真實公共研究資料與本地使用者資料必須有明確 provenance；軟體完成度與醫學有效性必須分開評價。
