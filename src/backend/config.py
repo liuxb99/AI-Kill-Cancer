@@ -36,7 +36,7 @@ class Settings:
     APP_VERSION: str = "1.0.2"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
-    # 运行模式: demo / research / production
+    # 运行模式: demo / research / local / production
     APP_MODE: str = os.getenv("APP_MODE", "demo").lower()
 
     CORS_ORIGINS: list[str] = os.getenv("CORS_ORIGINS", "*").split(",")
@@ -53,6 +53,13 @@ class Settings:
     DB_NAME: str = os.getenv("DB_NAME", "cancer_db")
     SQLITE_PATH: str = os.getenv("SQLITE_PATH", "./data/ai-kill-cancer.db")
     DATABASE_URL: str = _database_url_from_environment()
+
+    # Bundled synthetic demo dataset. Enabled by default only in demo mode.
+    DEMO_DATA_DIR: str = os.getenv("DEMO_DATA_DIR", "./data/demo")
+    DEMO_AUTO_BOOTSTRAP: bool = os.getenv(
+        "DEMO_AUTO_BOOTSTRAP",
+        "true" if APP_MODE == "demo" else "false",
+    ).lower() == "true"
 
     MODEL_PATH: str = os.getenv("MODEL_PATH", "./models/cancer_prediction.pkl")
     MODEL_ENABLED: bool = os.getenv("MODEL_ENABLED", "true").lower() == "true"
@@ -71,11 +78,11 @@ class Settings:
         self._validate_jwt_secret()
 
     def _validate_database_mode(self):
-        """SQLite is an explicit local/demo/research backend, not production storage."""
+        """SQLite is the local-first backend and may also back the ephemeral demo runtime."""
         if self.DATABASE_URL.startswith("sqlite") and self.APP_MODE == "production":
             raise ValueError(
                 "SQLite is supported for local/demo/research mode only. "
-                "Production mode requires PostgreSQL."
+                "Production mode requires an explicit scale-out backend."
             )
 
     def _validate_jwt_secret(self):
