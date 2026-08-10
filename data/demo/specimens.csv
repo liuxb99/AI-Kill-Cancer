@@ -1,0 +1,4 @@
+demo_specimen_key,demo_case_key,specimen_type,collection_site,collection_date,tumor_purity,matched_normal_available,storage_reference,data_mode,provenance
+SPEC-DEMO-001,CASE-DEMO-001,FFPE,thyroid_primary,2025-03-14,0.72,false,DEMO-FFPE-001,synthetic,bundled_demo_csv
+SPEC-DEMO-002,CASE-DEMO-002,FFPE,thyroid_primary,2025-06-02,0.68,false,DEMO-FFPE-002,synthetic,bundled_demo_csv
+SPEC-DEMO-003,CASE-DEMO-003,FFPE,lung_metastasis,2025-01-18,0.61,false,DEMO-FFPE-003,synthetic,bundled_demo_csv
