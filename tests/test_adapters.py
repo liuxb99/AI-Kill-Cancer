@@ -32,9 +32,7 @@ class TestNotConfiguredAdapter:
 class TestAdapterResult:
     def test_result_defaults(self):
         result = AdapterResult(
-            source="test", source_version="1.0",
-            retrieved_at="now", request_id="req-1",
-            success=True,
+            source="test", source_version="1.0", retrieved_at="now", request_id="req-1", success=True
         )
         assert result.records == []
         assert result.warnings == []
@@ -43,8 +41,10 @@ class TestAdapterResult:
 
     def test_to_dict(self):
         result = AdapterResult(
-            source="test", source_version="1.0",
-            retrieved_at="now", request_id="req-1",
+            source="test",
+            source_version="1.0",
+            retrieved_at="now",
+            request_id="req-1",
             success=True,
             records=[{"id": 1}],
         )
@@ -103,36 +103,30 @@ class TestAdapterRegistry:
         adapter = NotConfiguredAdapter(name="test")
         registry.register("test", adapter)
         listing = registry.list()
-        assert "test" in listing
         assert listing["test"]["configured"] is False
 
     async def test_health_all_awaits_and_isolates_adapter_failures(self):
         registry = AdapterRegistry()
         registry.register("good", _HealthyAdapter("good"))
         registry.register("bad", _HealthyAdapter("bad", fail=True))
-
         health = await registry.health_all()
-
         assert health["good"]["status"] == "ok"
         assert health["bad"]["status"] == "degraded"
         assert "boom" in health["bad"]["detail"]
 
-    def test_default_registry_has_all_adapters(self):
-        registry = get_registry()
-        listing = registry.list()
+    def test_default_registry_has_all_concrete_adapters(self):
+        listing = get_registry().list()
         expected = [
-            "ensembl_vep", "opencravat", "civic", "dgidb", "oncotree",
-            "myvariant", "drkg", "pharmcat", "bcftools",
+            "ensembl_vep",
+            "opencravat",
+            "civic",
+            "dgidb",
+            "oncotree",
+            "myvariant",
+            "drkg",
+            "pharmcat",
+            "bcftools",
         ]
+        assert list(listing) == expected
         for name in expected:
-            assert name in listing, f"Missing adapter: {name}"
-
-        # Public/implemented adapters must not silently resolve to the generic
-        # NotConfiguredAdapter compatibility placeholder.
-        for name in ["ensembl_vep", "opencravat", "civic", "dgidb", "myvariant", "bcftools"]:
             assert listing[name]["configured"] is True, f"{name} should use a concrete adapter"
-
-        # These integrations intentionally require a local dataset/tool or a
-        # future explicit implementation and therefore stay opt-in.
-        for name in ["oncotree", "drkg", "pharmcat"]:
-            assert listing[name]["configured"] is False, f"{name} should remain explicitly unavailable"
