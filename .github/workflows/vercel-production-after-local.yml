@@ -101,8 +101,17 @@ jobs:
       - name: Deploy verified source to production
         id: deploy
         run: |
-          $url = (vercel deploy --prod --token=$env:VERCEL_TOKEN).Trim()
-          if ([string]::IsNullOrWhiteSpace($url)) { throw 'Vercel CLI returned an empty deployment URL.' }
+          $deployOutput = (& vercel deploy --prod --token=$env:VERCEL_TOKEN 2>&1 | Out-String).Trim()
+          $exitCode = $LASTEXITCODE
+          Write-Host $deployOutput
+          if ($exitCode -ne 0) {
+            if ($deployOutput -match 'api-deployments-free-per-day|Resource is limited - try again in 24 hours') {
+              throw 'VERCEL_DAILY_DEPLOYMENT_QUOTA_EXHAUSTED: free-tier deployment quota reached. Do not retry by pushing no-op commits; wait for quota reset or deploy from a plan with available quota.'
+            }
+            throw "Vercel deployment failed with exit code $exitCode."
+          }
+          $url = ([regex]::Matches($deployOutput, 'https://[^\s]+\.vercel\.app') | Select-Object -Last 1).Value
+          if ([string]::IsNullOrWhiteSpace($url)) { throw 'Vercel CLI completed without a deployment URL.' }
           "url=$url" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Deployment URL: $url"
           Write-Host "Canonical production URL: $env:VERCEL_PRODUCTION_URL"
@@ -167,7 +176,6 @@ jobs:
             const report = { base, routes: [], failures: [] };
             const pageErrors = [];
             page.on('pageerror', err => pageErrors.push(String(err && (err.stack || err.message) || err)));
-
             for (const route of routes) {
               const consoleErrors = [];
               const failedRequests = [];
@@ -192,7 +200,6 @@ jobs:
               await page.screenshot({ path: `route-${route.path.replace(/\//g, '_') || 'home'}.png`, fullPage: true });
               page.off('console', onConsole); page.off('requestfailed', onFailed); page.off('response', onResponse);
             }
-
             report.pageErrors = pageErrors;
             fs.writeFileSync('production-browser-report.json', JSON.stringify(report, null, 2));
             console.log(JSON.stringify(report, null, 2));
