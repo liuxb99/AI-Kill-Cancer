@@ -12,14 +12,36 @@ def _sqlite_database_url(path: str) -> str:
     return f"sqlite+aiosqlite:///{normalized}"
 
 
+def _running_on_vercel() -> bool:
+    """Return True inside a Vercel build/runtime without requiring project env vars.
+
+    Vercel injects VERCEL=1 automatically.  Using that platform signal keeps the
+    demo API serverless-safe even when project-level DATABASE_URL / DB_BACKEND
+    variables are absent or `vercel pull` does not materialize values declared in
+    vercel.json.
+    """
+    return os.getenv("VERCEL", "").strip().lower() in {"1", "true", "yes"}
+
+
 def _database_url_from_environment() -> str:
     explicit = os.getenv("DATABASE_URL", "").strip()
     if explicit:
         return explicit
 
-    backend = os.getenv("DB_BACKEND", "postgresql").strip().lower()
+    backend_env = os.getenv("DB_BACKEND", "").strip().lower()
+    if backend_env:
+        backend = backend_env
+    elif _running_on_vercel():
+        # Vercel demo deployments must never silently fall back to localhost
+        # PostgreSQL.  Serverless instances have a writable /tmp directory, so an
+        # ephemeral SQLite database is the safe zero-configuration default.
+        backend = "sqlite"
+    else:
+        backend = "postgresql"
+
     if backend == "sqlite":
-        return _sqlite_database_url(os.getenv("SQLITE_PATH", "./data/ai-kill-cancer.db"))
+        default_path = "/tmp/ai-kill-cancer.db" if _running_on_vercel() else "./data/ai-kill-cancer.db"
+        return _sqlite_database_url(os.getenv("SQLITE_PATH", default_path))
     if backend != "postgresql":
         raise ValueError("DB_BACKEND must be 'postgresql' or 'sqlite'")
 
@@ -45,13 +67,19 @@ class Settings:
         logging.warning("CORS_ORIGINS=* is not allowed in production mode, falling back to http://localhost:5173")
         CORS_ORIGINS = ["http://localhost:5173"]
 
-    DB_BACKEND: str = os.getenv("DB_BACKEND", "postgresql").strip().lower()
+    DB_BACKEND: str = os.getenv(
+        "DB_BACKEND",
+        "sqlite" if _running_on_vercel() else "postgresql",
+    ).strip().lower()
     DB_HOST: str = os.getenv("DB_HOST", "localhost")
     DB_PORT: int = int(os.getenv("DB_PORT", "5432"))
     DB_USER: str = os.getenv("DB_USER", "postgres")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "postgres")
     DB_NAME: str = os.getenv("DB_NAME", "cancer_db")
-    SQLITE_PATH: str = os.getenv("SQLITE_PATH", "./data/ai-kill-cancer.db")
+    SQLITE_PATH: str = os.getenv(
+        "SQLITE_PATH",
+        "/tmp/ai-kill-cancer.db" if _running_on_vercel() else "./data/ai-kill-cancer.db",
+    )
     DATABASE_URL: str = _database_url_from_environment()
 
     # Bundled synthetic demo dataset. Enabled by default only in demo mode.
