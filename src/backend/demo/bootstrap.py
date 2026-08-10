@@ -77,6 +77,44 @@ async def _exists(session: AsyncSession, model, model_id: uuid.UUID) -> bool:
     return (await session.execute(select(model.id).where(model.id == model_id))).scalar_one_or_none() is not None
 
 
+_IMPORT_ENTITIES = (
+    ("patients", "patients.csv", "demo_patient_key", "patient", PatientModel),
+    ("cancer_cases", "cancer_cases.csv", "demo_case_key", "case", CancerCaseModel),
+    ("specimens", "specimens.csv", "demo_specimen_key", "specimen", SpecimenModel),
+    ("sequencing_tests", "sequencing_tests.csv", "demo_sequencing_key", "sequencing", SequencingTestModel),
+    ("variants", "variants.csv", "demo_variant_key", "variant", VariantModel),
+)
+
+
+async def preview_demo_dataset_duplicates(
+    session_factory: async_sessionmaker[AsyncSession],
+    data_dir: str | Path,
+) -> dict[str, dict[str, object]]:
+    """Return deterministic create/skip counts before an idempotent CSV import."""
+    root = Path(data_dir)
+    preview: dict[str, dict[str, object]] = {}
+    async with session_factory() as session:
+        for entity, filename, key_column, kind, model in _IMPORT_ENTITIES:
+            rows = _read_csv(root / filename)
+            existing_keys: list[str] = []
+            new_keys: list[str] = []
+            for row in rows:
+                key = row[key_column].strip()
+                model_id = _demo_uuid(kind, key)
+                if await _exists(session, model, model_id):
+                    existing_keys.append(key)
+                else:
+                    new_keys.append(key)
+            preview[entity] = {
+                "total": len(rows),
+                "existing": len(existing_keys),
+                "new": len(new_keys),
+                "existing_keys": existing_keys,
+                "new_keys": new_keys,
+            }
+    return preview
+
+
 async def bootstrap_demo_dataset(
     session_factory: async_sessionmaker[AsyncSession],
     data_dir: str | Path,
