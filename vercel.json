@@ -3,7 +3,6 @@
   "outputDirectory": "src/frontend/dist",
   "ignoreCommand": "node scripts/vercel-ignore-git-deploy.js",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "env": {
