@@ -1,4 +1,4 @@
 demo_publication_key,title,authors,journal,year,doi,pmid,abstract,keywords,url,citation_count
-pub-braf,Synthetic BRAF V600E precision-oncology evidence,"[\"Demo Author A\",\"Demo Author B\"]",Demo Oncology Journal,2025,,,Synthetic publication record used only to demonstrate evidence traceability,"[\"PTC\",\"BRAF\",\"V600E\"]",,0
-pub-ret,Synthetic RET fusion targeted-therapy evidence,"[\"Demo Author C\"]",Demo Thyroid Research,2025,,,Synthetic publication record used only to demonstrate RET fusion evidence,"[\"PTC\",\"RET\",\"fusion\"]",,0
-pub-ntrk,Synthetic NTRK fusion targeted-therapy evidence,"[\"Demo Author D\"]",Demo Precision Medicine,2025,,,Synthetic publication record used only to demonstrate NTRK fusion evidence,"[\"PTC\",\"NTRK1\",\"fusion\"]",,0
+pub-braf,Synthetic BRAF V600E precision-oncology evidence,"[""Demo Author A"",""Demo Author B""]",Demo Oncology Journal,2025,,,Synthetic publication record used only to demonstrate evidence traceability,"[""PTC"",""BRAF"",""V600E""]",,0
+pub-ret,Synthetic RET fusion targeted-therapy evidence,"[""Demo Author C""]",Demo Thyroid Research,2025,,,Synthetic publication record used only to demonstrate RET fusion evidence,"[""PTC"",""RET"",""fusion""]",,0
+pub-ntrk,Synthetic NTRK fusion targeted-therapy evidence,"[""Demo Author D""]",Demo Precision Medicine,2025,,,Synthetic publication record used only to demonstrate NTRK fusion evidence,"[""PTC"",""NTRK1"",""fusion""]",,0
