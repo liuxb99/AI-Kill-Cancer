@@ -32,17 +32,17 @@ jobs:
       - name: Select local Python 3.11+
         run: |
           $pythonExe = $null
-          $py = Get-Command py -ErrorAction SilentlyContinue
-          if ($py) {
-            $candidate = & py -3.11 -c "import sys; print(sys.executable)" 2>$null
-            if ($LASTEXITCODE -eq 0 -and $candidate) {
-              $pythonExe = $candidate.Trim()
-            }
+          $python = Get-Command python -ErrorAction SilentlyContinue
+          if ($python) {
+            $pythonExe = $python.Source
           }
           if (-not $pythonExe) {
-            $python = Get-Command python -ErrorAction SilentlyContinue
-            if ($python) {
-              $pythonExe = $python.Source
+            $py = Get-Command py -ErrorAction SilentlyContinue
+            if ($py) {
+              $candidate = & cmd /c 'py -3.11 -c "import sys; print(sys.executable)" 2>NUL'
+              if ($LASTEXITCODE -eq 0 -and $candidate) {
+                $pythonExe = $candidate.Trim()
+              }
             }
           }
           if (-not $pythonExe -or -not (Test-Path $pythonExe)) {
