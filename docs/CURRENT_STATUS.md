@@ -25,77 +25,61 @@ Restart persistence regression                    VERIFIED
 Local CSV Import v1                               VERIFIED
 Pre-upgrade SQLite backup hook                     VERIFIED — Local Gate #140 PASS
 Traceability Persistence E2E                       VERIFIED — Local Gate #142 PASS
-Local CSV Import v2                               IMPLEMENTED
+Local CSV Import v2                               VERIFIED — Local Gate #146 PASS
+Workspace Import local UI                         IMPLEMENTED
 ```
-
-## Local CSV Import v1
-
-受控 Local CSV Import 已完成：`validate → preview → explicit import`。只允許 local/research SQLite；commit 必須 `confirm=IMPORT`；deterministic records 採 idempotent insert，禁止 silent overwrite。
-
-## Traceability Persistence E2E
-
-第十四批已通過 **Local Verification Gate #142**。真實 SQLite file 經 `close_db()` / `init_db()` restart 後，Patient → Case → Specimen → Sequencing → Variant → Evidence → Recommendation/Trace → Clinical Decision/Trace 全鏈保持可追溯。
 
 ## Local CSV Import v2
 
-第十五批新增兩個核心能力：**duplicate preview** 與 **persistent import history**。
+第十五批已通過 **Local Verification Gate #146**。Preview 現在會逐類回報 deterministic records 的 `total / existing / new / existing_keys / new_keys`；confirmed import 會追加 `import-history.jsonl`，並可由 `GET /api/v1/workspace/import/history` 讀回。Import policy 持續固定為 `overwrite_existing=false`。
 
-Preview 現在除了 validator/counts，也會把 deterministic UUID 對應到目前 workspace，逐類回報：
+## Workspace Import local UI
 
-```text
-patients
-cancer_cases
-specimens
-sequencing_tests
-variants
-```
-
-每類包含：
+第十六批新增本機操作介面：
 
 ```text
-total
-existing
-new
-existing_keys[]
-new_keys[]
+/workspace-import
 ```
 
-因此使用者在按下真正 import 前，就能明確知道哪些資料會新增、哪些因 deterministic identity 已存在而跳過。Import policy 仍維持 `overwrite_existing=false`。
-
-新增 history API：
+新增前端 API adapter `src/frontend/src/api/workspace.ts`，統一封裝：
 
 ```text
-GET /api/v1/workspace/import/history?limit=50
+GET  /api/v1/workspace/status
+POST /api/v1/workspace/import/csv/preview
+POST /api/v1/workspace/import/csv/commit
+GET  /api/v1/workspace/import/history
 ```
 
-每次 confirmed import 都會 append 到與 SQLite workspace 同目錄的：
+UI 流程：
 
 ```text
-import-history.jsonl
+Workspace status
+→ CSV dataset directory path
+→ Validate / Preview
+→ validation result
+→ duplicate summary (Existing / Skip vs New / Import)
+→ Explicit Import
+→ import result
+→ history refresh / viewer
 ```
 
-history entry 保存：
+安全邊界：
 
-- UTC timestamp；
-- source_dir；
-- validation result；
-- duplicate preview snapshot；
-- actual imported counts；
-- overwrite_existing=false；
-- app_mode；
-- database_path。
+- 只有 `backend=sqlite`、`persistent=true`、`app_mode=local|research` 顯示可寫入流程；
+- Demo / Vercel / non-persistent runtime 只顯示 read-only guard，不顯示 Validate / Import 控制；
+- UI 不會繞過後端確認契約；真正 commit 仍由 adapter 固定提交 `confirm=IMPORT`；
+- UI 明確顯示 `Overwrite existing: NO`；
+- Browser 目前採 directory path 輸入，不假裝網頁可直接取得本機資料夾絕對路徑；desktop file picker bridge 留到後續版本評估。
 
-`GET /api/v1/workspace/status` 也新增 `import_history_path`，讓本機 UI 可直接顯示 workspace audit location。
+新增 `WorkspaceImportPage.test.tsx` regression：
 
-`tests/test_workspace_status.py` 已擴充 regression：
+- demo/non-persistent mode 不顯示寫入控制；
+- local persistent SQLite 顯示 Preview flow；
+- duplicate summary 顯示 Existing / Skip 與 New / Import；
+- Explicit Import 呼叫 confirmed commit；
+- import 完成後重新載入 history。
 
-- preview 回報 existing/new；
-- confirmed import 保留 duplicate snapshot；
-- commit 寫入 JSONL history；
-- history endpoint 可讀回最新紀錄；
-- malformed history line 被安全忽略；
-- history limit 生效；
-- 原 v1 explicit confirmation / no-overwrite contract 保留。
+`App.tsx` 已加入 `/workspace-import` route 與 navbar 入口。
 
 本批狀態：
 
@@ -145,17 +129,18 @@ demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 - [x] local CSV import v1；
 - [x] pre-upgrade automatic backup hook；
 - [x] traceability persistence E2E；
-- [x] duplicate-aware CSV preview（latest gate 驗證中）；
-- [x] import history JSONL / API（latest gate 驗證中）。
+- [x] duplicate-aware CSV preview；
+- [x] import history JSONL / API；
+- [x] Workspace Import UI（latest gate 驗證中）。
 
 ## 下一批
 
 優先順序：
 
-1. 驗證 Local CSV Import v2 latest self-hosted gate；若 fail，依 job log 修到全綠；
-2. 增加本機 Workspace Import UI：directory path、Validate/Preview、duplicate summary、explicit Import、history viewer；
-3. 對 Import UI 補 frontend regression / local-mode guard；
-4. VERSION / CHANGELOG / release checklist 收斂，評估 v0.3.0 milestone closure。
+1. 驗證 Workspace Import UI latest self-hosted gate；若 fail，依 job log 修到全綠；
+2. 增加 App route/nav regression，確認 `/workspace-import` 可達且 synthetic/demo runtime 只讀；
+3. VERSION / CHANGELOG / release checklist 收斂，評估 v0.3.0 milestone closure；
+4. 若 release gate 全綠，再規劃 desktop file picker bridge / import history filtering，避免在 v0.3.0 收尾前擴 scope。
 
 ## 安全邊界
 
