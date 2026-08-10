@@ -61,8 +61,8 @@ jobs:
 
       - name: Lint backend and SQLite regression
         run: |
-          & $env:PYTHON_EXE -m ruff check src/backend tests/backend/test_sqlite_local_compat.py tests/backend/test_demo_bootstrap.py tests/test_analysis_persistence.py
-          & $env:PYTHON_EXE -m pytest tests/backend/test_sqlite_local_compat.py tests/backend/test_demo_bootstrap.py -v --tb=short
+          & $env:PYTHON_EXE -m ruff check src/backend tests/backend/test_sqlite_local_compat.py tests/backend/test_demo_bootstrap.py tests/test_analysis_persistence.py tests/test_release_metadata.py
+          & $env:PYTHON_EXE -m pytest tests/backend/test_sqlite_local_compat.py tests/backend/test_demo_bootstrap.py tests/test_release_metadata.py -v --tb=short
           if ($env:PYTHON_SUPPORTS_PIPELINE -eq 'true') {
             & $env:PYTHON_EXE -m pytest tests/test_analysis_persistence.py -v --tb=short
           } else {
