@@ -41,10 +41,12 @@ from src.backend.api.v1.upload_vcf import router as upload_vcf_router
 from src.backend.api.v1.uploads import router as uploads_router
 from src.backend.api.v1.variants import router as variants_router
 from src.backend.api.v1.workbench import router as workbench_router
+from src.backend.api.v1.workspace import router as workspace_router
 
 router = APIRouter(prefix="/api/v1")
 
 router.include_router(demo_router)
+router.include_router(workspace_router)
 router.include_router(patients_router)
 router.include_router(cases_router)
 router.include_router(specimens_router)
