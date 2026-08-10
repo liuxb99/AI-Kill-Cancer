@@ -2,178 +2,96 @@
 
 更新日期：2026-08-10
 
-AI-Kill-Cancer 已進入版本化推進階段。現行架構正式採用 **Local-First SQLite + Vercel Demo Showcase**：
+AI-Kill-Cancer 當前主線：**v0.3.0 — Local-First Research & Demo Showcase**。
 
-- 本地 SQLite 是主要可用、可持久化、可累積研究資料的工作資料庫；
-- Vercel 僅作線上展示與部署驗證，使用 bundled synthetic CSV；
-- Vercel `/tmp` SQLite 只作 runtime projection，不承擔正式資料持久化；
-- PostgreSQL 是 Optional Scale-out Backend，不阻塞目前版本主線。
+架構政策不變：Local SQLite 是主要持久化研究工作資料庫；Vercel 使用 bundled synthetic CSV + ephemeral demo runtime；PostgreSQL 是 Optional Scale-out Backend。
 
-## 當前版本
-
-```text
-v0.3.0 — Local-First Research & Demo Showcase
-```
-
-## v0.3.0 目前完成度
-
-### 已驗證底座
+## 已驗證底座
 
 ```text
 Local SQLite runtime / ORM compatibility          VERIFIED
 SQLite file persistence / FK / memory regression  VERIFIED
-Vercel Python API routing                         VERIFIED
-Vercel static asset filesystem-first routing      VERIFIED
-Production page/API smoke                         VERIFIED
-Production Chromium browser render                VERIFIED
-Demo core CSV → SQLite bootstrap                  VERIFIED — Local Gate #74 PASS
-Demo deterministic UUIDv5 / idempotent reload     VERIFIED — Local Gate #74 PASS
+Vercel Python/static routing                      VERIFIED
+Production page/API/Chromium smoke                VERIFIED
+Demo core CSV bootstrap + UUIDv5 idempotency      VERIFIED — Local Gate #74 PASS
 ```
 
-### Demo Showcase 第一批
+## Demo Showcase 已實作
 
-已完成：
+九張 synthetic CSV 與三個固定 PTC showcase case 已完成。API：`/api/v1/demo/status`、`/api/v1/demo/cases`。首頁可切換 BRAF、RET、NTRK1 三病例並查看 Case → Variant → Evidence → Drug → Publication → Clinical Trial。
+
+第三批新增跨頁 context：
 
 ```text
-data/demo/patients.csv
-data/demo/cancer_cases.csv
-data/demo/specimens.csv
-data/demo/sequencing_tests.csv
-data/demo/variants.csv
+demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 ```
 
-3 個固定 synthetic PTC 病例：
+首頁現在提供 Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Workbench 深連結。Recommendation 已正式支援讀取 `demo_case`，自動帶入 synthetic Patient/Case key 與 variant，並顯示 Synthetic Demo Context provenance banner。
 
-- BRAF V600E；
-- RET fusion；
-- NTRK1 fusion / RAI-refractory showcase。
+Clinical Decision / Treatment Plan / Knowledge Graph 目前已有 deep-link 入口，但各目的頁完整 hydrate 同一 context 尚待下一批。
 
-### Demo Showcase 第二批
+## Local SQLite Workspace Hardening
 
-本批新增：
+本批新增 `src/backend/database/sqlite_workspace.py`：
+
+- `check_sqlite_integrity()`：執行 `PRAGMA integrity_check`；
+- `backup_sqlite_database()`：只允許完整 DB 進行 SQLite online backup，備份完成後再次 integrity check；
+- `restore_sqlite_database()`：拒絕損壞 backup，先還原到 staging，再驗證完整性後 atomic replace 正式 DB。
+
+新增 `tests/test_sqlite_workspace.py`，覆蓋：
+
+- 建庫 / 寫入 / 關閉 / 重開後資料仍存在；
+- backup snapshot；
+- backup 後繼續修改正式 DB；
+- restore 後回到 snapshot 狀態；
+- restored DB integrity PASS；
+- missing DB integrity failure；
+- invalid backup restore rejection。
+
+這代表 v0.3.0 的 local persistence / integrity / backup / restore 已從「設計缺口」進入「已有程式與永久 regression，等待 runner 驗證」。
+
+## 驗證狀態
+
+上一批最新 `master` gate：Local Verification Gate #84，head `19d60bbf...`，目前仍是 **pending**，尚無 runner job，因此不能宣告上一批 VERIFIED。本批最新程式與文檔同樣標記：
 
 ```text
-data/demo/drugs.csv
-data/demo/publications.csv
-data/demo/clinical_trials.csv
-data/demo/evidence.csv
-/api/v1/demo/status
-/api/v1/demo/cases
-Homepage Demo Case Selector
-Case → Variant → Evidence → Drug UI
-Publication / Clinical Trial trace UI
-Demo showcase API regression tests
+IMPLEMENTED — WAITING FOR SELF-HOSTED VERIFICATION
 ```
 
-首頁現在會直接讀 `/api/v1/demo/cases`，可切換三個 synthetic case，展示：
+不以 HTTP 200、程式已提交或測試檔存在取代真正 runner PASS。
 
-```text
-Case
-→ Variant
-→ Evidence
-→ Drug
-→ Publication
-→ Clinical Trial
-```
-
-所有新增 Evidence / Drug / Publication / Trial 都是 **synthetic demo data**，只用來展示軟體流程與資料契約，不代表真實醫學證據或患者治療建議。
-
-第二批狀態：
-
-```text
-IMPLEMENTED — WAITING FOR LATEST SELF-HOSTED VERIFICATION
-```
-
-## Database runtime policy
-
-```text
-Local SQLite
-→ 主要／權威工作資料庫
-→ local research workspace
-→ 正式研究資料持久化
-
-Vercel Demo SQLite (/tmp)
-→ synthetic CSV runtime projection
-→ ephemeral
-→ 可從 bundled CSV 重建
-
-PostgreSQL
-→ Optional Scale-out Backend
-→ 未來多人協作、中央 Server、高併發或 SaaS 化再啟用
-```
-
-## Vercel 線上狀態
-
-正式 alias：`https://ai-kill-cancer-zqpi.vercel.app`
-
-目前永久 deployment gate 已包含：
-
-```text
-verified SHA only
-→ deploy canonical alias
-→ production page smoke
-→ API JSON smoke
-→ Playwright/Chromium render
-→ React root / body text verification
-→ console error / pageerror capture
-→ JS/CSS bad-response check
-→ screenshot / browser report artifact
-```
-
-此前白屏根因為 SPA catch-all 把 `/assets/*.js` rewrite 成 `/index.html`；已修成 filesystem-first，Chromium 已驗證正常 render。
-
-## v0.3.0 Acceptance Gate 進度
+## v0.3.0 Acceptance Gate
 
 ### Vercel Demo
-
-- [x] 標準 core demo CSV dataset；
-- [x] Evidence / Drug / Publication / Trial synthetic CSV；
-- [x] 3 個固定可切換 demo cases；
+- [x] 九張標準 synthetic CSV；
+- [x] 3 個固定 demo cases；
 - [x] CSV → SQLite idempotent bootstrap；
-- [x] `/api/v1/demo/status`；
-- [x] `/api/v1/demo/cases`；
-- [x] 首頁 Demo Case Selector；
-- [x] Variant / Evidence / Drug / Publication / Trial 基本展示；
-- [ ] Recommendation / Clinical Decision / Treatment Plan 深連結；
-- [ ] Knowledge Graph / Research 頁共用 demo case context；
+- [x] demo status/cases API；
+- [x] Homepage selector + Evidence/Drug/Publication/Trial 展示；
+- [x] 跨頁 `demo_case` deep-link contract；
+- [x] Recommendation demo hydration；
+- [ ] Clinical Decision / Treatment Plan / Knowledge Graph demo hydration；
+- [ ] 共用 provenance banner；
 - [ ] multi-route Chromium E2E；
 - [ ] CSV schema / broken-link validator。
 
 ### Local SQLite
-
-- [x] `DB_BACKEND=sqlite` / `SQLITE_PATH`；
-- [x] `data/ai-kill-cancer.db` 預設路徑能力；
-- [x] schema bootstrap；
-- [x] FK + busy timeout；
-- [x] file persistence regression；
-- [ ] local mode 啟動與 workspace status；
-- [ ] 本地 CSV import；
-- [ ] restart persistence E2E；
-- [ ] `PRAGMA integrity_check` gate；
-- [ ] upgrade-before-backup；
-- [ ] backup/restore smoke；
-- [ ]完整 traceability persistence E2E。
+- [x] SQLite config / schema bootstrap / FK / busy timeout；
+- [x] file persistence 基礎；
+- [x] integrity utility；
+- [x] backup utility；
+- [x] atomic restore utility；
+- [x] restart + backup/restore regression 已編寫；
+- [ ] 最新 self-hosted runner PASS；
+- [ ] workspace status API / CLI；
+- [ ] local CSV import；
+- [ ] pre-upgrade automatic backup hook；
+- [ ] traceability persistence E2E。
 
 ## 下一批
 
-下一批進入兩條主線：
-
-1. **Demo 深連結**：建立 demo case context，讓 Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、Research 共用同一病例；
-2. **Local SQLite Workspace Hardening**：workspace status、integrity check、restart persistence、backup/restore 第一版。
-
-## 版本路線
-
-```text
-v0.3.0  Local-First Research & Demo Showcase
-v0.4.0  Precision Oncology Traceability
-v0.5.0  Real Data + Knowledge Graph + AI
-v0.6.0  Clinical Research Workbench
-v0.7.0  Scientific Validation & Evaluation
-v0.8.x  Security / Reliability / Observability Hardening
-v0.9.x  Release Candidate / Compatibility / Migration
-v1.0.0  Research-Grade Stable
-```
+下一批繼續完成 Demo context 全鏈與 Local Workspace release integration：Clinical Decision / Treatment Plan / Knowledge Graph hydrate、共用 DemoContextBanner、workspace status、pre-upgrade backup hook、CSV validator、multi-route Chromium E2E。
 
 ## 安全邊界
 
-本項目屬於研究與臨床決策輔助軟體工程項目。任何推薦、治療計畫、風險評估與 synthetic demo 輸出均不得替代合格醫療專業人員的診斷與治療決策。Demo、真實公共研究資料與本地使用者資料必須有明確 provenance；軟體完成度與醫學有效性必須分開評價。
+所有 synthetic demo 輸出只用於研究軟體流程展示，不代表真實醫學證據、患者資料、診斷或治療建議。v1.0 的 Research-Grade Stable 只描述軟體工程成熟度，不等同臨床有效性驗證。
