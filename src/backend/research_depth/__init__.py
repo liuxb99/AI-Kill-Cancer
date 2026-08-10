@@ -8,6 +8,12 @@ from .engine import (
     outcome_feedback_summary,
     primary_conflict_summary,
 )
+from .lifecycle import (
+    ALLOWED_HYPOTHESIS_STATUSES,
+    load_hypothesis_versions,
+    prioritize_research_tasks,
+    transition_hypothesis_status,
+)
 from .orchestrator import execute_research_loop, research_input_fingerprint
 
 __all__ = [
@@ -19,4 +25,8 @@ __all__ = [
     "build_hypotheses",
     "execute_research_loop",
     "research_input_fingerprint",
+    "ALLOWED_HYPOTHESIS_STATUSES",
+    "transition_hypothesis_status",
+    "prioritize_research_tasks",
+    "load_hypothesis_versions",
 ]
