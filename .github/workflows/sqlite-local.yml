@@ -31,31 +31,14 @@ jobs:
 
       - name: Select local Python 3.10+
         run: |
-          $pythonExe = $null
-
-          $py = Get-Command py -ErrorAction SilentlyContinue
-          if ($py) {
-            foreach ($version in @('3.11', '3.10')) {
-              $candidate = & cmd /c "py -$version -c \"import sys; print(sys.executable)\" 2>NUL"
-              if ($LASTEXITCODE -eq 0 -and $candidate) {
-                $pythonExe = $candidate.Trim()
-                break
-              }
-            }
+          $python = Get-Command python -ErrorAction SilentlyContinue
+          if (-not $python) {
+            throw 'Python is not available on the self-hosted runner.'
           }
 
-          if (-not $pythonExe) {
-            $python = Get-Command python -ErrorAction SilentlyContinue
-            if ($python) {
-              $candidate = $python.Source
-              & $candidate -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"
-              if ($LASTEXITCODE -eq 0) {
-                $pythonExe = $candidate
-              }
-            }
-          }
-
-          if (-not $pythonExe -or -not (Test-Path $pythonExe)) {
+          $pythonExe = $python.Source
+          & $pythonExe -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"
+          if ($LASTEXITCODE -ne 0) {
             throw 'Python 3.10+ is required on the self-hosted runner.'
           }
 
