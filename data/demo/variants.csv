@@ -1,0 +1,4 @@
+demo_variant_key,demo_sequencing_key,gene_symbol,chromosome,position,reference,alternate,genome_build,variant_type,transcript,hgvs_g,hgvs_c,hgvs_p,protein_change,consequence,vaf,read_depth,origin,clinical_significance,oncogenicity,driver_status,zygosity,normalization_status,annotation_source,data_mode,provenance
+VAR-DEMO-001,SEQ-DEMO-001,BRAF,7,140753336,A,T,GRCh38,SNV,NM_004333.6,g.140753336A>T,c.1799T>A,p.Val600Glu,p.Val600Glu,missense_variant,0.42,912,somatic,pathogenic,oncogenic,driver,heterozygous,completed,DemoAnnotation,synthetic,bundled_demo_csv
+VAR-DEMO-002,SEQ-DEMO-002,RET,10,43612000,N,<RET-FUSION>,GRCh38,fusion,,,CCDC6::RET,CCDC6::RET,,0.31,744,somatic,oncogenic,oncogenic,driver,unknown,completed,DemoAnnotation,synthetic,bundled_demo_csv
+VAR-DEMO-003,SEQ-DEMO-003,NTRK1,1,156844000,N,<NTRK1-FUSION>,GRCh38,fusion,,,TPM3::NTRK1,TPM3::NTRK1,,0.28,688,somatic,oncogenic,oncogenic,driver,unknown,completed,DemoAnnotation,synthetic,bundled_demo_csv
