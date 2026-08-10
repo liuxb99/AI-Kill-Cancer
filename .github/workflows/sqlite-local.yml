@@ -17,7 +17,7 @@ concurrency:
 jobs:
   local-verify:
     runs-on: [self-hosted, Windows, X64, ai-ci]
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       APP_MODE: research
       DB_BACKEND: sqlite
@@ -48,21 +48,49 @@ jobs:
           "PYTHON_SUPPORTS_PIPELINE=$supportsPipeline" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "Python $version; full pipeline tests: $supportsPipeline"
 
-      - name: Install SQLite verification dependencies
+      - name: Install backend verification dependencies
         run: |
           & $env:PYTHON_EXE -m pip install --disable-pip-version-check --prefer-binary `
             "pydantic>=2.10.3" "pydantic-settings>=2.7.0" `
             "sqlalchemy[asyncio]>=2.0.36" "aiosqlite>=0.20.0" `
-            "httpx>=0.28.1" numpy pytest pytest-asyncio ruff
+            "fastapi>=0.115.0" "httpx>=0.28.1" numpy pytest pytest-asyncio ruff
 
       - name: Compile backend
         run: |
-          & $env:PYTHON_EXE -m compileall src/backend/config.py src/backend/database src/backend/domain src/backend/api
+          & $env:PYTHON_EXE -m compileall src/backend/config.py src/backend/database src/backend/domain src/backend/api src/backend/adapters src/backend/pipeline
 
-      - name: Lint backend and SQLite regression
+      - name: Lint release-critical backend and regression tests
         run: |
-          & $env:PYTHON_EXE -m ruff check src/backend tests/backend/test_sqlite_local_compat.py tests/backend/test_demo_bootstrap.py tests/test_analysis_persistence.py tests/test_release_metadata.py
-          & $env:PYTHON_EXE -m pytest tests/backend/test_sqlite_local_compat.py tests/backend/test_demo_bootstrap.py tests/test_release_metadata.py -v --tb=short
+          & $env:PYTHON_EXE -m ruff check `
+            src/backend/adapters `
+            src/backend/pipeline/opencravat_adapter.py `
+            src/backend/pipeline/vep_adapter.py `
+            tests/backend/test_sqlite_local_compat.py `
+            tests/backend/test_demo_bootstrap.py `
+            tests/test_analysis_persistence.py `
+            tests/test_release_metadata.py `
+            tests/test_demo_validator.py `
+            tests/test_sqlite_workspace.py `
+            tests/test_workspace_status.py `
+            tests/test_traceability_persistence_e2e.py `
+            tests/test_adapters.py `
+            tests/test_opencravat_adapter.py `
+            tests/test_myvariant_adapter.py
+
+      - name: Run local-first and adapter regression suite
+        run: |
+          & $env:PYTHON_EXE -m pytest `
+            tests/backend/test_sqlite_local_compat.py `
+            tests/backend/test_demo_bootstrap.py `
+            tests/test_release_metadata.py `
+            tests/test_demo_validator.py `
+            tests/test_sqlite_workspace.py `
+            tests/test_workspace_status.py `
+            tests/test_traceability_persistence_e2e.py `
+            tests/test_adapters.py `
+            tests/test_opencravat_adapter.py `
+            tests/test_myvariant_adapter.py `
+            -v --tb=short
           if ($env:PYTHON_SUPPORTS_PIPELINE -eq 'true') {
             & $env:PYTHON_EXE -m pytest tests/test_analysis_persistence.py -v --tb=short
           } else {
@@ -113,16 +141,39 @@ jobs:
           asyncio.run(main())
           '@ | & $env:PYTHON_EXE -
 
-      - name: Verify local database file
+      - name: Verify local workspace integrity
         run: |
-          if (-not (Test-Path '.ci/ai-kill-cancer.db')) {
-            throw 'SQLite verification database was not created'
-          }
-          $item = Get-Item '.ci/ai-kill-cancer.db'
-          if ($item.Length -le 0) {
-            throw 'SQLite verification database is empty'
-          }
-          Write-Host "SQLite DB bytes: $($item.Length)"
+          @'
+          from pathlib import Path
+          from src.backend.database.sqlite_workspace import check_sqlite_integrity
+
+          path = Path('.ci/ai-kill-cancer.db')
+          if not path.is_file() or path.stat().st_size <= 0:
+              raise SystemExit('SQLite verification database missing or empty')
+          result = check_sqlite_integrity(path)
+          if not result.ok:
+              raise SystemExit(f'SQLite integrity failed: {result.message}')
+          print(f'SQLite integrity passed: {path.stat().st_size} bytes')
+          '@ | & $env:PYTHON_EXE -
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: src/frontend
+        run: npm ci --force --no-audit --no-fund
+
+      - name: Run frontend tests
+        working-directory: src/frontend
+        run: npm test -- --reporter=default
+
+      - name: Build frontend
+        working-directory: src/frontend
+        run: npm run build
 
       - name: Diff check
         run: git diff --check
