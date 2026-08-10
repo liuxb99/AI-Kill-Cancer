@@ -1,0 +1,4 @@
+demo_sequencing_key,demo_specimen_key,laboratory,assay_name,assay_version,panel_name,genome_build,sequencing_depth,minimum_detectable_vaf,test_date,result_type,limitations,data_mode,provenance
+SEQ-DEMO-001,SPEC-DEMO-001,Demo Molecular Lab,Thyroid Precision Panel,1.0,Thyroid-50,GRCh38,800,0.02,2025-03-20,somatic,Synthetic demonstration assay only,synthetic,bundled_demo_csv
+SEQ-DEMO-002,SPEC-DEMO-002,Demo Molecular Lab,Thyroid Fusion Panel,1.0,Thyroid-Fusion,GRCh38,650,0.03,2025-06-09,RNA,Synthetic demonstration assay only,synthetic,bundled_demo_csv
+SEQ-DEMO-003,SPEC-DEMO-003,Demo Molecular Lab,Pan-Cancer Fusion Panel,1.0,PanCancer-Fusion,GRCh38,700,0.02,2025-01-26,RNA,Synthetic demonstration assay only,synthetic,bundled_demo_csv
