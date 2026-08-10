@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,9 +37,6 @@ _KEY_COLUMNS = {
     "evidence.csv": "demo_evidence_key",
 }
 
-# Demo files are executable fixtures, not loose examples.  Keep the most
-# failure-prone categorical fields constrained so a shifted CSV row or typo is
-# rejected before bootstrap reaches the ORM layer.
 _VALUE_DOMAINS: dict[str, dict[str, set[str]]] = {
     "variants.csv": {
         "variant_type": {"SNV", "indel", "fusion", "CNV", "SV"},
@@ -51,6 +49,13 @@ _VALUE_DOMAINS: dict[str, dict[str, set[str]]] = {
     "evidence.csv": {
         "data_mode": {"synthetic"},
     },
+}
+
+_JSON_LIST_FIELDS: dict[str, set[str]] = {
+    "cancer_cases.csv": {"metastatic_sites", "treatment_history", "current_medications"},
+    "drugs.csv": {"atc_codes"},
+    "publications.csv": {"authors", "keywords"},
+    "clinical_trials.csv": {"conditions", "interventions", "biomarkers", "locations"},
 }
 
 
@@ -90,6 +95,17 @@ def validate_demo_dataset(data_dir: str | Path) -> DemoValidationResult:
                         f"{filename}:{index}: invalid {column}={value!r}; "
                         f"expected one of {', '.join(sorted(allowed))}"
                     )
+            for column in _JSON_LIST_FIELDS.get(filename, set()):
+                value = (row.get(column) or '').strip()
+                if not value:
+                    continue
+                try:
+                    parsed = json.loads(value)
+                except json.JSONDecodeError as exc:
+                    errors.append(f"{filename}:{index}: invalid JSON in {column}: {exc.msg}")
+                    continue
+                if not isinstance(parsed, list):
+                    errors.append(f"{filename}:{index}: {column} must be a JSON list")
 
         key_column = _KEY_COLUMNS[filename]
         values = [(row.get(key_column) or '').strip() for row in file_rows]
