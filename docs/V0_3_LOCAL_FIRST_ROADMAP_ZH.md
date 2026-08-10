@@ -6,82 +6,38 @@
 
 v0.3.0 名稱：**Local-First Research & Demo Showcase**。
 
-本版的核心不是繼續堆疊更多功能，而是把目前已有的 Precision Oncology、PTC Research、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph 與公共資料能力，整理成兩個清楚、可驗收、用途不同的運行模式。
+本版把現有 Precision Oncology、PTC Research、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph 與公共資料能力整理為兩個明確運行模式：
 
-### 模式 A：Vercel Demo Showcase
+- **Vercel Demo Showcase**：bundled synthetic CSV → demo API/UI，僅作公開展示；
+- **Local Research Workspace**：本地 SQLite 為主要可持久化工作資料庫。
 
-用途：公開展示網站功能、UI、完整研究流程與 API 合約。
+PostgreSQL 為 Optional Scale-out Backend，不阻塞 v0.3.0。
 
-資料策略：
+## 2. Demo Dataset 規格與目前成果
 
-```text
-bundled demo CSV
-→ serverless bootstrap
-→ /tmp demo SQLite
-→ API / UI
-```
-
-規則：
-
-1. Demo CSV 是線上展示資料的 Source of Truth。
-2. `/tmp` SQLite 僅是 runtime projection，可隨時丟失並由 CSV 重建。
-3. 不在 Vercel 儲存正式研究資料。
-4. 所有 Demo 病例、推薦、Treatment Plan、Graph 與報告必須標記為 Demo / Synthetic / Research Only。
-5. 至少提供 3～5 個具有不同分子特徵的 PTC 示例病例。
-6. 網站首頁與核心頁面必須開箱即有可看的資料，不得只有空白 state。
-
-### 模式 B：Local Research Workspace
-
-用途：真正研究使用、資料持久化與本地工作空間。
-
-預設：
+目前 `data/demo/` 已有：
 
 ```text
-APP_MODE=local
-DB_BACKEND=sqlite
-SQLITE_PATH=data/ai-kill-cancer.db
+patients.csv                 DONE
+cancer_cases.csv             DONE
+specimens.csv                DONE
+sequencing_tests.csv         DONE
+variants.csv                 DONE
+drugs.csv                    DONE
+publications.csv             DONE
+clinical_trials.csv          DONE
+evidence.csv                 DONE
 ```
 
-規則：
+目前固定 3 個 synthetic PTC showcase case：
 
-1. SQLite 是本地主資料庫與權威工作資料來源。
-2. 本地病例、variant、evidence、recommendation、clinical decision、treatment plan、graph 等均持久化。
-3. 關閉程式、重開電腦、重新啟動服務後資料不得消失。
-4. 版本升級前須有 SQLite backup。
-5. migration、integrity、FK、restart persistence、backup/restore 都必須納入永久測試。
+- `PTC-DEMO-001`：BRAF V600E；
+- `PTC-DEMO-002`：RET fusion；
+- `PTC-DEMO-003`：NTRK1 fusion / RAI-refractory showcase。
 
-PostgreSQL 不再是 v0.3.0 必要條件，改列 Optional Scale-out Backend，待多人協作、中央伺服器、高併發或 SaaS 化再啟用。
+第二批已把每個病例串到 synthetic Drug / Evidence / Publication / Clinical Trial。所有這些資料都只用於展示 UI、API 與 traceability contract，不代表真實醫學證據或患者治療建議。
 
-## 2. Demo Dataset 規格
-
-目錄：
-
-```text
-data/demo/
-  patients.csv
-  cancer_cases.csv
-  specimens.csv
-  sequencing_tests.csv
-  variants.csv
-  evidence.csv
-  drugs.csv
-  publications.csv
-  clinical_trials.csv
-  README_ZH.md
-```
-
-CSV 間必須使用固定 demo key 串聯，不依賴執行時隨機 UUID。bootstrap 時可轉換為 deterministic UUID 或以 mapping table 對應。
-
-### 第一批病例建議
-
-- `PTC-DEMO-001`：BRAF V600E 型 PTC。
-- `PTC-DEMO-002`：RET fusion 型 PTC。
-- `PTC-DEMO-003`：NTRK fusion / RAI-refractory 展示病例。
-- 後續可加入 RAS-like、TERT promoter、高風險復發等案例。
-
-所有資料均為合成展示資料，不代表真實患者，也不得暗示是個案治療建議。
-
-## 3. v0.3.0 開發 Epic
+## 3. v0.3.0 Epic 進度
 
 ### Epic 0 — 文件與版本治理
 
@@ -92,37 +48,42 @@ CSV 間必須使用固定 demo key 串聯，不依賴執行時隨機 UUID。boot
 
 ### Epic 1 — Demo CSV Dataset
 
-- [ ] 建立 patients/cases/specimens/sequencing/variants。
-- [ ] 建立 evidence/drugs/publications/trials。
-- [ ] 固定 demo key 與 provenance。
+- [x] patients/cases/specimens/sequencing/variants。
+- [x] evidence/drugs/publications/trials。
+- [x] 固定 demo key 與 synthetic provenance。
 - [ ] CSV schema validator。
 - [ ] 永久測試：缺欄、重複 key、斷鏈、非法 enum。
 
 ### Epic 2 — Demo Bootstrap Runtime
 
-- [ ] `DemoDatasetLoader`。
-- [ ] deterministic ID mapping。
-- [ ] SQLite idempotent bootstrap。
-- [ ] Vercel cold-start bootstrap guard。
-- [ ] reset / rebuild demo database。
-- [ ] `/api/v1/demo/status`。
-- [ ] `/api/v1/demo/cases`。
+- [x] `DemoDatasetLoader` / bootstrap service。
+- [x] deterministic UUIDv5 ID mapping。
+- [x] SQLite idempotent bootstrap。
+- [x] Vercel demo SQLite bootstrap guard。
+- [ ] reset / rebuild demo database command。
+- [x] `/api/v1/demo/status`。
+- [x] `/api/v1/demo/cases`。
+
+第一批 bootstrap regression 已由 Local Verification Gate #74 驗證 PASS：第一次建立 3 組核心資料，第二次 bootstrap 不重複插入。
 
 ### Epic 3 — Demo UI
 
-- [ ] 首頁 Demo Case Selector。
-- [ ] Case Snapshot。
-- [ ] Variant / Evidence / Drug 展示。
-- [ ] Recommendation / Clinical Decision / Treatment Plan 連結。
+- [x] 首頁 Demo Case Selector。
+- [x] Case Snapshot 基本展示。
+- [x] Variant / Evidence / Drug 展示。
+- [x] Publication / Clinical Trial 展示。
+- [ ] Recommendation / Clinical Decision / Treatment Plan 深連結。
 - [ ] Knowledge Graph / Research 頁帶入同一 demo case。
-- [ ] Demo provenance banner 一致。
+- [ ] Demo provenance banner 跨頁一致。
+
+首頁現在直接呼叫 `/api/v1/demo/cases`，可以切換 BRAF、RET、NTRK1 三個 synthetic showcase case，查看 `Case → Variant → Evidence → Drug → Publication → Trial` 展示鏈。
 
 ### Epic 4 — Local SQLite Workspace
 
-- [ ] 標準資料目錄 `data/`。
-- [ ] 預設 `data/ai-kill-cancer.db`。
-- [ ] 初次啟動 schema bootstrap。
-- [ ] 本地 CSV import。
+- [x] 預設 `data/ai-kill-cancer.db` 路徑能力已存在。
+- [x] SQLite schema bootstrap / FK / busy timeout 基礎已存在。
+- [ ] local mode 預設啟動設定整理。
+- [ ] 本地 CSV import 工作流。
 - [ ] restart persistence E2E。
 - [ ] `PRAGMA integrity_check` gate。
 - [ ] upgrade-before-backup。
@@ -130,7 +91,7 @@ CSV 間必須使用固定 demo key 串聯，不依賴執行時隨機 UUID。boot
 
 ### Epic 5 — Traceability Baseline
 
-需要固定以下鏈：
+目標鏈：
 
 ```text
 patient_id
@@ -144,46 +105,63 @@ patient_id
 → treatment_plan_id
 ```
 
-所有衍生結果統一攜帶：
-
-```text
-source
-provenance
-data_mode
-version
-created_at
-created_by/event_id（適用時）
-```
+目前 Demo Showcase 已先完成前半段展示鏈與固定 demo keys；正式 SQLite domain traceability 仍需在後續批次完成 Evidence → Recommendation → Clinical Decision → Treatment Plan 的持久化 E2E。
 
 ### Epic 6 — Release Gate
 
-v0.3.0 不得只靠 HTTP 200 宣告成功。
+目前已有：
 
-必須通過：
+- [x] Windows self-hosted Local Verification Gate；
+- [x] Vercel deploy gate；
+- [x] HTTP/API smoke；
+- [x] 真實 Chromium browser render；
+- [x] console/pageerror/static-asset 驗證；
+- [x] demo bootstrap regression；
+- [x] demo showcase API contract regression（本批新增，等待最新 gate 完成）；
+- [ ] multi-route demo Chromium E2E；
+- [ ] SQLite integrity + backup/restore release gate。
+
+## 4. 本批開發摘要
+
+第二批完成：
 
 ```text
-backend compile/lint/tests
-SQLite schema/integrity/persistence
-Demo CSV validation/bootstrap
-frontend build
-API smoke
-Chromium browser render
-core route E2E
-console fatal error = 0
-JS/CSS bad response = 0
-backup/restore smoke
+Synthetic Drug CSV                   IMPLEMENTED
+Synthetic Publication CSV            IMPLEMENTED
+Synthetic Clinical Trial CSV         IMPLEMENTED
+Synthetic Evidence CSV               IMPLEMENTED
+/api/v1/demo/status                  IMPLEMENTED
+/api/v1/demo/cases                   IMPLEMENTED
+Homepage Demo Case Selector           IMPLEMENTED
+Case→Variant→Evidence→Drug UI         IMPLEMENTED
+Publication/Trial trace UI            IMPLEMENTED
+Demo API regression                   IMPLEMENTED
 ```
 
-## 4. v0.3.0 完成定義
+狀態：**IMPLEMENTED — WAITING FOR LATEST SELF-HOSTED VERIFICATION**。
+
+## 5. 下一批建議
+
+下一批固定進入 Local SQLite Workspace 與 Demo 深連結：
+
+1. demo case context / route parameter；
+2. Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph 帶入同一 demo case；
+3. local mode 啟動指令與 workspace status API；
+4. SQLite `PRAGMA integrity_check`；
+5. restart persistence E2E；
+6. backup/restore 第一版；
+7. 擴 Chromium E2E 到 demo selector 與核心 route。
+
+## 6. v0.3.0 完成定義
 
 ### Vercel Demo Done
 
-1. 開啟首頁立即能看見示範資料。
-2. 至少 3 個 demo case 可選。
+1. 首頁立即能看見 synthetic showcase data。
+2. 至少 3 個 demo case 可切換。
 3. Case → Variant → Evidence → Recommendation → Treatment Plan → Graph 可導航。
-4. redeploy / cold-start 後 demo 可自行重建。
+4. cold-start 後 demo 可由 bundled CSV 重建。
 5. Demo/Synthetic provenance 清楚。
-6. 真實 Chromium E2E 全通。
+6. 真實 Chromium multi-route E2E 全通。
 
 ### Local Workspace Done
 
@@ -191,11 +169,10 @@ backup/restore smoke
 2. 可新增／匯入研究資料。
 3. 完整核心流程可落庫。
 4. 關閉／重啟後資料持續存在。
-5. 升級前有備份。
-6. restore 可還原。
-7. integrity / FK / traceability 全通。
+5. 升級前有備份，restore 可還原。
+6. integrity / FK / traceability 全通。
 
-## 5. 後續版本
+## 7. 後續版本
 
 ```text
 v0.4.0  Precision Oncology Traceability
@@ -207,6 +184,6 @@ v0.9.x  Release Candidate / Compatibility / Migration
 v1.0.0  Research-Grade Stable
 ```
 
-## 6. 安全界線
+## 8. 安全界線
 
-所有示範資料必須為虛構或合成資料；不得使用可識別真實患者資訊。Demo 推薦與 Treatment Plan 僅用於展示軟體流程。v1.0 的「Research-Grade Stable」只代表軟體工程成熟度，不代表完成臨床有效性驗證或可取代醫療專業判斷。
+所有示範資料必須為虛構或合成資料；不得使用可識別真實患者資訊。Demo Evidence、Drug、Publication、Clinical Trial、Recommendation 與 Treatment Plan 僅用於展示軟體流程。v1.0 的「Research-Grade Stable」只代表軟體工程成熟度，不代表完成臨床有效性驗證或可取代醫療專業判斷。
