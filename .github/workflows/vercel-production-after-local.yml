@@ -81,16 +81,28 @@ jobs:
           }
           $uri = "https://api.vercel.com/v9/projects/$($project.projectId)"
           $current = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-          Write-Host "Current Vercel rootDirectory: $($current.rootDirectory)"
-          if ($null -ne $current.rootDirectory -and -not [string]::IsNullOrWhiteSpace([string]$current.rootDirectory)) {
-            $body = @{ rootDirectory = $null } | ConvertTo-Json -Compress
-            $updated = Invoke-RestMethod -Method Patch -Uri $uri -Headers $headers -Body $body
-            Write-Host "Updated Vercel rootDirectory: $($updated.rootDirectory)"
-          } else {
-            Write-Host 'Vercel rootDirectory already points to repository root.'
-          }
+          Write-Host "Current rootDirectory: $($current.rootDirectory)"
+          Write-Host "Current installCommand: $($current.installCommand)"
+          Write-Host "Current buildCommand: $($current.buildCommand)"
+          Write-Host "Current outputDirectory: $($current.outputDirectory)"
+          Write-Host "Current framework: $($current.framework)"
 
-      - name: Re-link after root-directory correction
+          $body = @{
+            rootDirectory = $null
+            installCommand = $null
+            buildCommand = $null
+            outputDirectory = $null
+            framework = $null
+          } | ConvertTo-Json -Compress
+
+          $updated = Invoke-RestMethod -Method Patch -Uri $uri -Headers $headers -Body $body
+          Write-Host "Updated rootDirectory: $($updated.rootDirectory)"
+          Write-Host "Updated installCommand: $($updated.installCommand)"
+          Write-Host "Updated buildCommand: $($updated.buildCommand)"
+          Write-Host "Updated outputDirectory: $($updated.outputDirectory)"
+          Write-Host "Updated framework: $($updated.framework)"
+
+      - name: Re-link after project correction
         run: |
           if (Test-Path '.vercel') {
             Remove-Item '.vercel' -Recurse -Force
