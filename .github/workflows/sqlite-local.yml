@@ -53,7 +53,8 @@ jobs:
         run: |
           & $env:PYTHON_EXE -m compileall `
             src/backend/config.py src/backend/database src/backend/domain src/backend/api `
-            src/backend/adapters src/backend/pipeline src/backend/demo scripts/demo_dataset.py
+            src/backend/adapters src/backend/pipeline src/backend/demo src/backend/research_depth `
+            scripts/demo_dataset.py
 
       - name: Lint release-critical backend and regression tests
         run: |
@@ -63,6 +64,10 @@ jobs:
             src/backend/pipeline/vep_adapter.py `
             src/backend/demo/bootstrap.py `
             src/backend/demo/maintenance.py `
+            src/backend/research_depth `
+            src/backend/api/v1/ptc_research_depth.py `
+            src/backend/domain/research_depth.py `
+            migrations/versions/030_research_depth_loop.py `
             scripts/demo_dataset.py `
             tests/backend/test_sqlite_local_compat.py `
             tests/backend/test_demo_bootstrap.py `
@@ -74,6 +79,8 @@ jobs:
             tests/test_sqlite_workspace.py `
             tests/test_workspace_status.py `
             tests/test_traceability_persistence_e2e.py `
+            tests/test_research_depth_engine.py `
+            tests/test_research_depth_persistence.py `
             tests/test_adapters.py `
             tests/test_opencravat_adapter.py `
             tests/test_myvariant_adapter.py `
@@ -82,7 +89,7 @@ jobs:
             tests/test_drkg_adapter.py `
             tests/test_pharmcat_adapter.py
 
-      - name: Run local-first, completeness, and adapter regression suite
+      - name: Run local-first, completeness, adapter, and research-depth regression suite
         run: |
           & $env:PYTHON_EXE -m pytest `
             tests/backend/test_sqlite_local_compat.py `
@@ -94,6 +101,8 @@ jobs:
             tests/test_sqlite_workspace.py `
             tests/test_workspace_status.py `
             tests/test_traceability_persistence_e2e.py `
+            tests/test_research_depth_engine.py `
+            tests/test_research_depth_persistence.py `
             tests/test_adapters.py `
             tests/test_opencravat_adapter.py `
             tests/test_myvariant_adapter.py `
