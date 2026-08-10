@@ -31,96 +31,95 @@ Pre-upgrade SQLite backup hook                     VERIFIED — Local Gate #140 
 Traceability Persistence E2E                       VERIFIED — Local Gate #142 PASS
 Local CSV Import v2                               VERIFIED — Local Gate #146 PASS
 Workspace Import local UI                         VERIFIED — Local Gate #152 PASS
+Vercel quota-hardening baseline                   VERIFIED — Local Gate #162 PASS
 ```
 
-## Workspace Import local UI
+## 1.0.3 release convergence
 
-`/workspace-import` 已完成並通過 Local Gate #152。UI 支援：
+版本權威：
 
 ```text
-Workspace status
-→ CSV dataset directory path
-→ Validate / Preview
-→ duplicate summary
-→ Explicit Import
-→ import result
-→ history viewer
+VERSION = 1.0.3
+Settings.APP_VERSION = 1.0.3
 ```
 
-安全邊界：只有 `backend=sqlite`、`persistent=true`、`app_mode=local|research` 顯示可寫入流程；Demo/Vercel/non-persistent runtime 為 read-only guard。Import policy 固定 `overwrite_existing=false`。
+Frontend `package.json/package-lock.json` 為 private package metadata，不是產品 release authority。
 
-`WorkspaceImportRoute.test.tsx` 已補 App routing + navbar entry regression，避免頁面本身測試通過但實際 route 不可達。
+已建立：
 
-## 第十七批：1.0.3 release convergence
+- `CHANGELOG.md`
+- `RELEASE_NOTES_v1.0.3.md`
+- `docs/RELEASE_CHECKLIST_v1.0.3.md`
+- `WorkspaceImportRoute.test.tsx`
 
-已完成：
+README 已刷新為目前 Local-First 架構與 Demo/Research 邊界。
 
-```text
-root VERSION                         1.0.2 → 1.0.3
-backend Settings.APP_VERSION        1.0.2 → 1.0.3
-CHANGELOG.md                        ADDED
-RELEASE_NOTES_v1.0.3.md            ADDED
-docs/RELEASE_CHECKLIST_v1.0.3.md   ADDED
-README.md                           REFRESHED
-Workspace Import App route test     ADDED
-```
+## 第十八批：Vercel quota hardening
 
-版本權威定義：
-
-```text
-Product SemVer authority:
-  VERSION
-  src/backend/config.py::Settings.APP_VERSION
-
-Frontend package.json:
-  private package metadata
-  不作為產品 release authority
-```
-
-## 第十八批：release gate failure triage / Vercel quota hardening
-
-最新 1.0.3 candidate 的 Local Verification Gate 已成功觸發 production workflow，但 production deploy 在 Vercel 建置前被平台 quota 擋下。Actions log 的根因為：
+最新 production workflow 已通過 token、project link、rootDirectory、production env preflight，真正失敗於：
 
 ```text
 Error: Resource is limited - try again in 24 hours
 code: api-deployments-free-per-day
 ```
 
-這不是應用程式 build/test/runtime failure，也不是 VERCEL_TOKEN、project link、rootDirectory 或 production env preflight failure；上述步驟均已通過。因 deploy 沒有建立成功，後續 production page smoke、API JSON smoke、Chromium multi-route gate 被正確跳過。
+此為 Vercel Free plan daily deployment quota，不是 application build/runtime failure。
 
-本批已 harden `.github/workflows/vercel-production-after-local.yml`：
+Production workflow 已修正：
 
-- 不再對失敗 deploy 的 null stdout 直接 `.Trim()`，避免二次 PowerShell null exception 掩蓋真正根因；
-- 捕捉 `api-deployments-free-per-day` / `Resource is limited - try again in 24 hours`；
-- 輸出明確 `VERCEL_DAILY_DEPLOYMENT_QUOTA_EXHAUSTED` 訊息；
-- 明確禁止用 no-op commit 反覆消耗/重試 production deploy；
-- 保持「只有最新通過 Local Gate 的 master SHA 才可 deploy」契約。
+- deploy failure 不再對 null stdout `.Trim()`；
+- 明確辨識 `api-deployments-free-per-day`；
+- 輸出 `VERCEL_DAILY_DEPLOYMENT_QUOTA_EXHAUSTED`；
+- 禁止用 no-op commit 反覆重試；
+- 保持只有最新通過 Local Gate 的 master SHA 可部署。
 
-因此 1.0.3 release 目前的唯一已知外部 blocker 是 **Vercel Free plan daily deployment quota**。在 quota reset 或有可用 deployment quota 前，不建立 `v1.0.3` tag。
+## 第十九批：release metadata consistency gate
+
+本批完成 release-critical metadata 收斂。
+
+新增：
+
+```text
+tests/test_release_metadata.py
+```
+
+Local Verification Gate 現在自動驗證：
+
+- root `VERSION` 必須是 1.0.3；
+- backend `Settings.APP_VERSION` 必須與 root VERSION 完全一致；
+- 對應 `RELEASE_NOTES_v<version>.md` 必須存在；
+- 對應 `docs/RELEASE_CHECKLIST_v<version>.md` 必須存在；
+- `CHANGELOG.md` 必須包含目前產品版本；
+- frontend package 必須保持 private，避免誤當產品版本權威。
+
+倉庫 `1.0.2` 掃描結果：未發現 release-critical runtime authority 仍回報 1.0.2。剩餘命中屬舊測試說明文字或 private frontend/package-lock metadata；auth hardening 測試說明已同步更新至 v1.0.3。
+
+`docs/RELEASE_CHECKLIST_v1.0.3.md` 已把 runtime metadata scan 標為完成，並記錄 Local Gate #162 PASS。
+
+本批狀態：
+
+**IMPLEMENTED — WAITING FOR LATEST METADATA-CONSISTENCY LOCAL GATE**
 
 ## Local SQLite Acceptance Gate
 
 - [x] config / schema bootstrap / FK / busy timeout；
 - [x] file persistence；
-- [x] integrity utility；
-- [x] backup / atomic restore；
-- [x] restart regression；
-- [x] workspace status API / regression；
-- [x] local CSV import v1；
-- [x] duplicate-aware CSV preview；
-- [x] import history JSONL / API；
-- [x] pre-upgrade automatic backup hook；
+- [x] integrity / backup / restore；
+- [x] restart persistence；
+- [x] workspace status API；
+- [x] local CSV import v1/v2；
+- [x] duplicate-aware preview / import history；
+- [x] pre-upgrade backup hook；
 - [x] traceability persistence E2E；
-- [x] Workspace Import UI；
-- [x] Workspace Import App route/nav regression implemented；
-- [ ] latest head after quota-hardening Local Verification Gate PASS。
+- [x] Workspace Import UI + route/nav regression；
+- [x] quota-hardening baseline Local Gate #162 PASS；
+- [ ] latest metadata-consistency Local Verification Gate PASS。
 
 ## Vercel Demo Acceptance Gate
 
 - [x] deterministic synthetic CSV bootstrap；
 - [x] demo status/cases API；
-- [x] synthetic deep-link contract；
-- [x] major-route hydration；
+- [x] synthetic deep-link / major-route hydration；
 - [x] navbar query propagation；
 - [x] dataset validators；
 - [x] previous Production API JSON smoke PASS；
@@ -130,13 +129,11 @@ code: api-deployments-free-per-day
 
 ## 下一批
 
-優先順序：
-
-1. 驗證 quota-hardening commit 的 latest Local Verification Gate；
-2. 不以 no-op commit 反覆重試 Vercel；等待 daily quota reset 後，由下一個真實、已驗證 master SHA 觸發 production deploy；
-3. production deploy 成功後立即跑 page/API JSON/Chromium multi-route gates；
-4. 所有 release checklist 全綠後，再建立 `v1.0.3` tag / release；
-5. release 完成前不擴 scope 到 desktop file picker 或新研究功能。
+1. 驗證 metadata-consistency Local Gate；若 fail 直接修到全綠；
+2. release candidate 期間不再擴功能、不製造 no-op deploy；
+3. Vercel quota reset 後，用下一個真實 verified master SHA 觸發 production deploy；
+4. production page/API/Chromium 全綠後建立 `v1.0.3` tag / release；
+5. tag 完成後才開下一個功能 milestone。
 
 ## 安全邊界
 
