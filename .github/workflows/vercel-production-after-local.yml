@@ -30,9 +30,7 @@ jobs:
     steps:
       - name: Require Vercel token
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:VERCEL_TOKEN)) {
-            throw 'Repository secret VERCEL_TOKEN is required for gated production deployment.'
-          }
+          if ([string]::IsNullOrWhiteSpace($env:VERCEL_TOKEN)) { throw 'Repository secret VERCEL_TOKEN is required for gated production deployment.' }
 
       - name: Checkout exactly verified commit
         uses: actions/checkout@v4
@@ -45,9 +43,7 @@ jobs:
           git fetch origin master
           $verified = '${{ github.event.workflow_run.head_sha }}'
           $latest = (git rev-parse origin/master).Trim()
-          if ($verified -ne $latest) {
-            throw "Verified SHA $verified is stale; current master is $latest. A newer Local Verification Gate must pass first."
-          }
+          if ($verified -ne $latest) { throw "Verified SHA $verified is stale; current master is $latest. A newer Local Verification Gate must pass first." }
           Write-Host "Deploying verified master SHA: $verified"
 
       - name: Set up Node.js
@@ -65,49 +61,24 @@ jobs:
 
       - name: Link Vercel project
         run: |
-          if (Test-Path '.vercel') {
-            Remove-Item '.vercel' -Recurse -Force
-          }
+          if (Test-Path '.vercel') { Remove-Item '.vercel' -Recurse -Force }
           vercel link --yes --project=$env:VERCEL_PROJECT_NAME --token=$env:VERCEL_TOKEN
 
       - name: Enforce repository-root Vercel project
         run: |
           $project = Get-Content '.vercel/project.json' -Raw | ConvertFrom-Json
-          if ([string]::IsNullOrWhiteSpace($project.projectId)) {
-            throw 'Vercel projectId is missing after link.'
-          }
-          $headers = @{
-            Authorization = "Bearer $env:VERCEL_TOKEN"
-            'Content-Type' = 'application/json'
-          }
+          if ([string]::IsNullOrWhiteSpace($project.projectId)) { throw 'Vercel projectId is missing after link.' }
+          $headers = @{ Authorization = "Bearer $env:VERCEL_TOKEN"; 'Content-Type' = 'application/json' }
           $uri = "https://api.vercel.com/v9/projects/$($project.projectId)"
           $current = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
           Write-Host "Current rootDirectory: $($current.rootDirectory)"
-          Write-Host "Current installCommand: $($current.installCommand)"
-          Write-Host "Current buildCommand: $($current.buildCommand)"
-          Write-Host "Current outputDirectory: $($current.outputDirectory)"
-          Write-Host "Current framework: $($current.framework)"
-
-          $body = @{
-            rootDirectory = $null
-            installCommand = $null
-            buildCommand = $null
-            outputDirectory = $null
-            framework = $null
-          } | ConvertTo-Json -Compress
-
+          $body = @{ rootDirectory = $null; installCommand = $null; buildCommand = $null; outputDirectory = $null; framework = $null } | ConvertTo-Json -Compress
           $updated = Invoke-RestMethod -Method Patch -Uri $uri -Headers $headers -Body $body
           Write-Host "Updated rootDirectory: $($updated.rootDirectory)"
-          Write-Host "Updated installCommand: $($updated.installCommand)"
-          Write-Host "Updated buildCommand: $($updated.buildCommand)"
-          Write-Host "Updated outputDirectory: $($updated.outputDirectory)"
-          Write-Host "Updated framework: $($updated.framework)"
 
       - name: Re-link after project correction
         run: |
-          if (Test-Path '.vercel') {
-            Remove-Item '.vercel' -Recurse -Force
-          }
+          if (Test-Path '.vercel') { Remove-Item '.vercel' -Recurse -Force }
           vercel link --yes --project=$env:VERCEL_PROJECT_NAME --token=$env:VERCEL_TOKEN
 
       - name: Pull production environment
@@ -116,9 +87,7 @@ jobs:
       - name: Preflight production backend environment
         run: |
           $envFile = '.vercel/.env.production.local'
-          if (-not (Test-Path $envFile)) {
-            throw 'Vercel production environment file was not pulled.'
-          }
+          if (-not (Test-Path $envFile)) { throw 'Vercel production environment file was not pulled.' }
           $text = Get-Content $envFile -Raw
           $keys = @('APP_MODE', 'DATABASE_URL', 'DB_HOST', 'JWT_SECRET_KEY')
           foreach ($key in $keys) {
@@ -127,73 +96,40 @@ jobs:
           }
           $productionMode = $text -match '(?m)^APP_MODE=["'']?production["'']?$'
           $hasJwt = $text -match '(?m)^JWT_SECRET_KEY='
-          if ($productionMode -and -not $hasJwt) {
-            throw 'JWT_SECRET_KEY is required because APP_MODE=production.'
-          }
+          if ($productionMode -and -not $hasJwt) { throw 'JWT_SECRET_KEY is required because APP_MODE=production.' }
 
       - name: Deploy verified source to production
         id: deploy
         run: |
           $url = (vercel deploy --prod --token=$env:VERCEL_TOKEN).Trim()
-          if ([string]::IsNullOrWhiteSpace($url)) {
-            throw 'Vercel CLI returned an empty deployment URL.'
-          }
+          if ([string]::IsNullOrWhiteSpace($url)) { throw 'Vercel CLI returned an empty deployment URL.' }
           "url=$url" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Deployment URL: $url"
           Write-Host "Canonical production URL: $env:VERCEL_PRODUCTION_URL"
 
       - name: Production page smoke test
         run: |
-          $url = $env:VERCEL_PRODUCTION_URL
-          $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 30
-          if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
-            throw "Production page smoke test failed with HTTP $($response.StatusCode)"
-          }
+          $response = Invoke-WebRequest -Uri $env:VERCEL_PRODUCTION_URL -UseBasicParsing -TimeoutSec 30
+          if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) { throw "Production page smoke test failed with HTTP $($response.StatusCode)" }
           Write-Host "Production page smoke test passed: HTTP $($response.StatusCode)"
 
       - name: Production API JSON smoke tests
         run: |
           $base = $env:VERCEL_PRODUCTION_URL.TrimEnd('/')
-          $paths = @(
-            '/api/v1/health',
-            '/api/v1/ptc-readiness',
-            '/api/v1/ptc-completion/status',
-            '/api/v1/ptc-data-quality/overview'
-          )
+          $paths = @('/api/v1/health','/api/v1/ptc-readiness','/api/v1/ptc-completion/status','/api/v1/ptc-data-quality/overview','/api/v1/demo/status','/api/v1/demo/cases')
           foreach ($path in $paths) {
             $uri = "$base$path"
-            try {
-              $response = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 60
-            } catch {
+            try { $response = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 60 }
+            catch {
               $status = $_.Exception.Response.StatusCode.value__
-              $errorBody = ''
-              try {
-                if ($_.ErrorDetails.Message) {
-                  $errorBody = [string]$_.ErrorDetails.Message
-                } elseif ($_.Exception.Response) {
-                  $stream = $_.Exception.Response.GetResponseStream()
-                  if ($stream) {
-                    $reader = New-Object System.IO.StreamReader($stream)
-                    $errorBody = $reader.ReadToEnd()
-                    $reader.Dispose()
-                  }
-                }
-              } catch {
-                $errorBody = '<unable to read response body>'
-              }
+              $errorBody = if ($_.ErrorDetails.Message) { [string]$_.ErrorDetails.Message } else { '' }
               if ($errorBody.Length -gt 2000) { $errorBody = $errorBody.Substring(0, 2000) }
               Write-Host "API error body for ${path}: $errorBody"
               throw "API smoke request failed for $path with HTTP $status : $($_.Exception.Message)"
             }
             $contentType = [string]$response.Headers['Content-Type']
-            if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
-              throw "API smoke failed for $path with HTTP $($response.StatusCode)"
-            }
-            if ($contentType -notmatch 'application/json|\+json') {
-              $preview = ([string]$response.Content -replace '\s+', ' ').Trim()
-              if ($preview.Length -gt 180) { $preview = $preview.Substring(0, 180) }
-              throw "API smoke returned non-JSON for $path ($contentType): $preview"
-            }
+            if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) { throw "API smoke failed for $path with HTTP $($response.StatusCode)" }
+            if ($contentType -notmatch 'application/json|\+json') { throw "API smoke returned non-JSON for $path ($contentType)" }
             Write-Host "API smoke passed: $path -> HTTP $($response.StatusCode), $contentType"
           }
 
@@ -209,49 +145,59 @@ jobs:
           Pop-Location
           "BROWSER_VERIFY_DIR=$verifyDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Production browser render verification
+      - name: Production multi-route synthetic browser verification
         run: |
           $script = @'
           const { chromium } = require('playwright');
           const fs = require('fs');
           (async () => {
-            const url = process.env.VERCEL_PRODUCTION_URL;
+            const base = process.env.VERCEL_PRODUCTION_URL.replace(/\/$/, '');
+            const query = 'demo_case=PTC-DEMO-001&data_mode=synthetic';
+            const routes = [
+              { path: '/recommendation', label: 'Recommendation' },
+              { path: '/clinical-decision', label: 'Clinical Decision' },
+              { path: '/treatment-plans', label: 'Treatment Plan' },
+              { path: '/clinical-graph', label: 'Knowledge Graph' },
+              { path: '/ptc-research', label: 'PTC Research' },
+              { path: '/ptc-workbench', label: 'PTC Integrated' },
+              { path: '/ptc-command-center', label: 'PTC Command Center' },
+            ];
             const browser = await chromium.launch({ headless: true });
             const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-            const consoleErrors = [];
+            const report = { base, routes: [], failures: [] };
             const pageErrors = [];
-            const failedRequests = [];
-            const badResponses = [];
-            page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
             page.on('pageerror', err => pageErrors.push(String(err && (err.stack || err.message) || err)));
-            page.on('requestfailed', req => failedRequests.push(`${req.method()} ${req.url()} :: ${req.failure()?.errorText || 'failed'}`));
-            page.on('response', res => {
-              if (res.status() >= 400 && /\.(js|css)(\?|$)/i.test(res.url())) badResponses.push(`${res.status()} ${res.url()}`);
-            });
-            const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 90000 });
-            await page.waitForTimeout(1500);
-            const bodyText = (await page.locator('body').innerText()).trim();
-            const rootHtml = await page.locator('#root').innerHTML().catch(() => '');
-            const rootChildCount = await page.locator('#root').evaluate(el => el.childElementCount).catch(() => 0);
-            await page.screenshot({ path: 'production-browser.png', fullPage: true });
-            const report = {
-              url,
-              httpStatus: response?.status() ?? null,
-              title: await page.title(),
-              bodyTextLength: bodyText.length,
-              bodyPreview: bodyText.slice(0, 1000),
-              rootChildCount,
-              rootHtmlPreview: rootHtml.slice(0, 1200),
-              consoleErrors,
-              pageErrors,
-              failedRequests,
-              badResponses,
-            };
+
+            for (const route of routes) {
+              const consoleErrors = [];
+              const failedRequests = [];
+              const badAssets = [];
+              const onConsole = msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); };
+              const onFailed = req => failedRequests.push(`${req.method()} ${req.url()} :: ${req.failure()?.errorText || 'failed'}`);
+              const onResponse = res => { if (res.status() >= 400 && /\.(js|css)(\?|$)/i.test(res.url())) badAssets.push(`${res.status()} ${res.url()}`); };
+              page.on('console', onConsole); page.on('requestfailed', onFailed); page.on('response', onResponse);
+              const url = `${base}${route.path}?${query}`;
+              const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 90000 });
+              await page.waitForTimeout(800);
+              const bodyText = (await page.locator('body').innerText()).trim();
+              const rootChildCount = await page.locator('#root').evaluate(el => el.childElementCount).catch(() => 0);
+              const bannerCount = await page.locator('[data-testid="demo-context-banner"]').count();
+              const current = new URL(page.url());
+              const queryOK = current.searchParams.get('demo_case') === 'PTC-DEMO-001' && current.searchParams.get('data_mode') === 'synthetic';
+              const meaningful = rootChildCount > 0 && bodyText.length > 80;
+              const syntheticVisible = bannerCount > 0 || bodyText.includes('Synthetic') || bodyText.includes('synthetic');
+              const routeResult = { label: route.label, path: route.path, status: response?.status() ?? null, queryOK, meaningful, syntheticVisible, bannerCount, consoleErrors, failedRequests, badAssets, bodyPreview: bodyText.slice(0, 500) };
+              report.routes.push(routeResult);
+              if (!response || response.status() >= 400 || !queryOK || !meaningful || !syntheticVisible || badAssets.length) report.failures.push(routeResult);
+              await page.screenshot({ path: `route-${route.path.replace(/\//g, '_') || 'home'}.png`, fullPage: true });
+              page.off('console', onConsole); page.off('requestfailed', onFailed); page.off('response', onResponse);
+            }
+
+            report.pageErrors = pageErrors;
             fs.writeFileSync('production-browser-report.json', JSON.stringify(report, null, 2));
             console.log(JSON.stringify(report, null, 2));
             await browser.close();
-            const meaningful = rootChildCount > 0 && bodyText.length > 80 && bodyText.includes('AI Kill Cancer');
-            if (!meaningful || pageErrors.length || badResponses.length) process.exit(1);
+            if (report.failures.length || pageErrors.length) process.exit(1);
           })().catch(err => { console.error(err); process.exit(1); });
           '@
           $scriptPath = Join-Path $env:BROWSER_VERIFY_DIR 'verify.cjs'
@@ -266,6 +212,6 @@ jobs:
         with:
           name: production-browser-verification-${{ github.event.workflow_run.head_sha }}
           path: |
-            ${{ runner.temp }}/ai-kill-cancer-browser-verify/production-browser.png
+            ${{ runner.temp }}/ai-kill-cancer-browser-verify/route-*.png
             ${{ runner.temp }}/ai-kill-cancer-browser-verify/production-browser-report.json
           if-no-files-found: warn
