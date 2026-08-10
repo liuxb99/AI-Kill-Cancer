@@ -24,8 +24,7 @@ jobs:
       run:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
     env:
-      VERCEL_ORG_ID: team_QiaVGRjLjPmzkfZmHhEZ2IVv
-      VERCEL_PROJECT_ID: prj_afBg7ytQt8XBPKA4hDOlfcrRJuMy
+      VERCEL_PROJECT_NAME: ai-kill-cancer-zqpi
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - name: Require Vercel token
@@ -63,18 +62,12 @@ jobs:
           vercel whoami --token=$env:VERCEL_TOKEN
           vercel project ls --token=$env:VERCEL_TOKEN
 
-      - name: Bind Vercel project directly
+      - name: Link Vercel project
         run: |
           if (Test-Path '.vercel') {
             Remove-Item '.vercel' -Recurse -Force
           }
-          New-Item -ItemType Directory -Path '.vercel' -Force | Out-Null
-          $project = @{
-            orgId = $env:VERCEL_ORG_ID
-            projectId = $env:VERCEL_PROJECT_ID
-          } | ConvertTo-Json -Compress
-          Set-Content -Path '.vercel/project.json' -Value $project -Encoding UTF8
-          Get-Content '.vercel/project.json'
+          vercel link --yes --project=$env:VERCEL_PROJECT_NAME --token=$env:VERCEL_TOKEN
 
       - name: Pull production environment
         run: vercel pull --yes --environment=production --token=$env:VERCEL_TOKEN
