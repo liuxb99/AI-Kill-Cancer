@@ -10,6 +10,7 @@
     "APP_MODE": "demo",
     "DB_BACKEND": "sqlite",
     "SQLITE_PATH": "/tmp/ai-kill-cancer.db",
+    "PUBLIC_DATA_DIR": "/tmp/ai-kill-cancer-public-data",
     "MODEL_ENABLED": "false"
   }
 }
