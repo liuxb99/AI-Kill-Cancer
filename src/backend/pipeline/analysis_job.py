@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,12 +51,10 @@ class AnalysisJob:
         self.upload_id = upload_id
         self.db_session = db_session
 
-        # Adapters
         self._norm_adapter = normalization_adapter or BcftoolsAdapter()
         self._vep_adapter = vep_adapter or VEPAdapter()
         self._repo = AnalysisRunRepository(db_session)
 
-        # Status tracking
         self.status = AnalysisStatusEnum.PENDING
         self.started_at: datetime | None = None
         self.finished_at: datetime | None = None
@@ -64,12 +62,10 @@ class AnalysisJob:
         self.warnings: list[str] = []
         self.errors: list[str] = []
 
-        # Results
         self.normalized_variants: list[NormalizedVariant] = []
         self.annotation_results: list[dict] = []
         self.annotation_source: str = "not_annotated"
 
-        # Normalization provenance
         self.normalization_method: str = "not_applicable"
         self.normalization_semantics: str = "not_applicable"
 
@@ -116,11 +112,10 @@ class AnalysisJob:
     async def run(self) -> None:
         """Execute the full analysis pipeline."""
         self.status = AnalysisStatusEnum.RUNNING
-        self.started_at = datetime.now(UTC)
+        self.started_at = datetime.now(timezone.utc)
         start_ms = int(time.time() * 1000)
 
         try:
-            # ── Step 1: Normalization ─────────────────────────────────────
             logger.info(f"[Job {self.job_id}] Starting normalization...")
             norm_result = await self._norm_adapter.annotate(
                 [(v["chromosome"], v["position"], v["reference"], v["alternate"])
@@ -139,12 +134,11 @@ class AnalysisJob:
             if not norm_result.success and not norm_result.records:
                 self.errors.extend(norm_result.errors)
                 self.status = AnalysisStatusEnum.FAILED
-                self.finished_at = datetime.now(UTC)
+                self.finished_at = datetime.now(timezone.utc)
                 self.duration_ms = int(time.time() * 1000) - start_ms
                 await self._save_status()
                 return
 
-            # Store normalized variants
             self.normalized_variants = []
             for r in norm_result.records:
                 self.normalized_variants.append(NormalizedVariant(
@@ -161,7 +155,6 @@ class AnalysisJob:
             if norm_result.warnings:
                 self.warnings.extend(norm_result.warnings)
 
-            # ── Step 2: VEP Annotation ────────────────────────────────────
             logger.info(f"[Job {self.job_id}] Starting VEP annotation...")
             vep_payload = {
                 "variants": [
@@ -190,7 +183,7 @@ class AnalysisJob:
             self.status = AnalysisStatusEnum.FAILED
 
         finally:
-            self.finished_at = datetime.now(UTC)
+            self.finished_at = datetime.now(timezone.utc)
             self.duration_ms = int(time.time() * 1000) - start_ms
             await self._save_status()
             logger.info(f"[Job {self.job_id}] Finished status={self.status.value} "
@@ -225,9 +218,6 @@ class AnalysisJob:
         }
 
 
-# ─── Job Manager ──────────────────────────────────────────────────────────────
-
-# In-memory cache only — source of truth is database
 _job_cache: dict[str, AnalysisJob] = {}
 
 
@@ -244,7 +234,6 @@ async def create_and_run_job(
     """Create an analysis run in DB, execute pipeline, return job."""
     job_id = str(uuid.uuid4())
 
-    # Create DB record
     repo = AnalysisRunRepository(db_session)
     await repo.create(
         id=job_id,
@@ -260,7 +249,6 @@ async def create_and_run_job(
         },
     )
 
-    # Create and run job
     job = AnalysisJob(
         job_id=job_id,
         case_id=case_id,
@@ -274,18 +262,15 @@ async def create_and_run_job(
     )
     _job_cache[job_id] = job
 
-    # Run pipeline
     await job.run()
     return job
 
 
 async def load_job_from_db(job_id: str, db_session: AsyncSession) -> AnalysisJob | None:
     """Load a job's status from database (without re-executing)."""
-    # Check cache first
     if job_id in _job_cache:
         return _job_cache[job_id]
 
-    # Load from DB
     repo = AnalysisRunRepository(db_session)
     try:
         record = await repo.get(uuid.UUID(job_id))
@@ -295,7 +280,6 @@ async def load_job_from_db(job_id: str, db_session: AsyncSession) -> AnalysisJob
     if record is None:
         return None
 
-    # Create minimal job representation
     job = AnalysisJob(
         job_id=job_id,
         case_id=str(record.case_id) if record.case_id else "",
