@@ -3,7 +3,9 @@ from __future__ import annotations
 import sqlite3
 
 import pytest
+from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine
 
+from src.backend.database.session import _schema_upgrade_required
 from src.backend.database.sqlite_workspace import (
     backup_sqlite_database,
     check_sqlite_integrity,
@@ -23,7 +25,6 @@ def test_integrity_backup_restore_and_restart_persistence(tmp_path):
     assert backup.is_file()
     assert check_sqlite_integrity(backup).ok is True
 
-    # Simulate continued work after the backup, then a process restart.
     with sqlite3.connect(database) as connection:
         connection.execute("INSERT INTO research_notes(note) VALUES (?)", ("post-backup-change",))
         connection.commit()
@@ -35,6 +36,47 @@ def test_integrity_backup_restore_and_restart_persistence(tmp_path):
         rows = restored.execute("SELECT note FROM research_notes ORDER BY id").fetchall()
     assert rows == [("persistent-local-research",)]
     assert check_sqlite_integrity(database).ok is True
+
+
+def test_schema_upgrade_detection_for_new_table_and_column(tmp_path):
+    database = tmp_path / "upgrade.db"
+    engine = create_engine(f"sqlite:///{database}")
+    existing = MetaData()
+    Table("patients", existing, Column("id", Integer, primary_key=True))
+    existing.create_all(engine)
+
+    same = MetaData()
+    Table("patients", same, Column("id", Integer, primary_key=True))
+    with engine.connect() as connection:
+        assert _schema_upgrade_required(connection, same) is False
+
+    new_column = MetaData()
+    Table(
+        "patients",
+        new_column,
+        Column("id", Integer, primary_key=True),
+        Column("display_name", String),
+    )
+    with engine.connect() as connection:
+        assert _schema_upgrade_required(connection, new_column) is True
+
+    new_table = MetaData()
+    Table("patients", new_table, Column("id", Integer, primary_key=True))
+    Table("variants", new_table, Column("id", Integer, primary_key=True))
+    with engine.connect() as connection:
+        assert _schema_upgrade_required(connection, new_table) is True
+
+    engine.dispose()
+
+
+def test_empty_database_does_not_require_preupgrade_backup(tmp_path):
+    database = tmp_path / "fresh.db"
+    engine = create_engine(f"sqlite:///{database}")
+    metadata = MetaData()
+    Table("patients", metadata, Column("id", Integer, primary_key=True))
+    with engine.connect() as connection:
+        assert _schema_upgrade_required(connection, metadata) is False
+    engine.dispose()
 
 
 def test_missing_database_fails_integrity_gate(tmp_path):
