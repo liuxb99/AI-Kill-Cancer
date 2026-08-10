@@ -7,9 +7,10 @@
 - [x] backend `Settings.APP_VERSION` = `1.0.3`
 - [x] `CHANGELOG.md` includes 1.0.3
 - [x] `RELEASE_NOTES_v1.0.3.md` exists
-- [ ] verify no release-critical runtime metadata still reports 1.0.2
+- [x] release-critical runtime metadata scan completed; no runtime authority still reports 1.0.2
+- [x] automated `tests/test_release_metadata.py` added to Local Verification Gate
 
-> `src/frontend/package.json` is a private frontend package and is not used as the product release authority. Product release authority is root `VERSION` + backend `APP_VERSION`.
+> `src/frontend/package.json` / `package-lock.json` are private frontend package metadata and are not product release authorities. Product release authority is root `VERSION` + backend `APP_VERSION`.
 
 ## Local-first acceptance
 - [x] SQLite schema bootstrap / FK / busy timeout
@@ -25,18 +26,22 @@
 ## Vercel demo acceptance
 - [x] deterministic synthetic CSV bootstrap
 - [x] demo dataset validator
-- [x] production API JSON smoke
-- [x] production multi-route Chromium synthetic gate
+- [x] previous production API JSON smoke
+- [x] previous production multi-route Chromium synthetic gate
 - [x] synthetic query propagation across major routes
 - [x] DB cold-start recovery verified
 
 ## Release gates
 - [x] Workspace Import UI baseline verified — Local Gate #152 PASS
-- [ ] latest release-candidate Local Verification Gate PASS
-- [ ] latest release-candidate CI/build checks PASS
-- [ ] production deployment for release-candidate head PASS
+- [x] quota-hardening baseline verified — Local Gate #162 PASS
+- [ ] latest metadata-consistency release-candidate Local Verification Gate PASS
+- [ ] production deployment for release-candidate head PASS — currently blocked by Vercel daily free-tier deployment quota
 - [ ] production API JSON smoke PASS on release-candidate head
 - [ ] production multi-route Chromium gate PASS on release-candidate head
+
+## External blocker
+
+Latest production workflow reached `vercel deploy --prod` after token/project/environment preflight, then Vercel returned `api-deployments-free-per-day` / `Resource is limited - try again in 24 hours`. This is an external quota blocker, not an application build/runtime failure. Do not create no-op commits to retry deployments.
 
 ## Tagging policy
 Do not create or move a `v1.0.3` tag until all unchecked release gates above are green. A green software release does not imply clinical validation.
