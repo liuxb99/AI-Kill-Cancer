@@ -18,6 +18,7 @@ Demo core CSV bootstrap + UUIDv5 idempotency      VERIFIED
 Demo deep-link / Recommendation hydration         VERIFIED
 PTC Research synthetic hydration                  VERIFIED — production workflow 97cb6a7 PASS
 PTC Integrated synthetic hydration                VERIFIED — production workflow 729e643 PASS
+PTC Command Center + navbar continuity             VERIFIED — production workflow bd30338 PASS
 SQLite integrity / backup / restore               VERIFIED
 Restart persistence regression                    VERIFIED
 ```
@@ -34,9 +35,7 @@ Restart persistence regression                    VERIFIED
 demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 ```
 
-目前已支援：Homepage Demo Case Selector、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Research、PTC Integrated Workbench，以及 PTC Command Center synthetic isolation。所有 synthetic 頁面沿用 `DemoContextBanner` / `useDemoContext()`，保持 provenance 一致。
-
-本批已進一步補上 **App-level synthetic navigation continuity**：只要目前 URL 帶 `demo_case`，navbar 導航會自動保留 `demo_case` 與 `data_mode=synthetic`，因此使用者從 PTC Research 切到 PTC Workbench、PTC Command Center、Clinical Decision、Knowledge Graph 等頁面時，不會掉回 normal/research mode。
+目前已支援：Homepage Demo Case Selector、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Research、PTC Integrated Workbench、PTC Command Center synthetic isolation，以及 App-level synthetic navbar query propagation。
 
 PTC Command Center 採 route-level isolation：帶 `demo_case` 時不 mount real command-center component，因此不觸發 source status、readiness、outcome、complete graph 或 full sync API；沒有 synthetic context 時仍沿用原本真實研究總控台。
 
@@ -46,48 +45,66 @@ PTC Command Center 採 route-level isolation：帶 `demo_case` 時不 mount real
 
 `/api/v1/demo/status` 包含 `validation.ok/errors`；`/api/v1/demo/cases` 在資料集 validation fail 時回 503。
 
-`tests/test_demo_validator.py` 已覆蓋 broken reference、extra CSV field、invalid variant value-domain regression。
-
 ## Local SQLite Workspace
 
 已驗證 SQLite file persistence、FK、busy timeout、integrity、backup、atomic restore、restart persistence。`GET /api/v1/workspace/status` 回報 app mode、backend、local-first/persistent、database path、size、integrity 與 backup directory。
 
-`tests/test_workspace_status.py` 覆蓋 local/research SQLite persistent、demo SQLite ephemeral 與 non-SQLite backend contract。
-
 ## 本批狀態
 
-第九批新增：
+第十批新增：
 
 ```text
-Synthetic navbar query propagation                IMPLEMENTED
-App-level demo context continuity                 IMPLEMENTED
-Research → Integrated → Command Center flow       IMPLEMENTED
-Cross-route frontend regression                   IMPLEMENTED
-PTC Command Center isolation                      IMPLEMENTED — production workflow still running
+Production synthetic multi-route Chromium gate   IMPLEMENTED
+Demo status/cases production API smoke            IMPLEMENTED
+Per-route query continuity assertion              IMPLEMENTED
+Per-route meaningful render assertion             IMPLEMENTED
+Per-route synthetic-context assertion             IMPLEMENTED
+JS/CSS bad-response gate                          IMPLEMENTED
+Per-route screenshot evidence                     IMPLEMENTED
 ```
 
-`src/frontend/src/App.tsx` 現在由 navbar 統一保留 synthetic query contract；品牌首頁與所有 navbar links 都共用 `navigateWithContext()`。
-
-`src/frontend/src/test/App.test.tsx` 新增跨路由回歸：
-
-```text
-PTC Research (synthetic)
-→ PTC Workbench (synthetic)
-→ PTC Command Center (synthetic)
-→ PTC Research (synthetic)
-```
-
-每次導航都驗證 URL 仍包含：
+`.github/workflows/vercel-production-after-local.yml` 已從單一首頁 browser smoke 升級為 production synthetic multi-route gate。部署後 Chromium 會使用固定：
 
 ```text
 ?demo_case=PTC-DEMO-001&data_mode=synthetic
 ```
 
-並驗證目標頁仍顯示 synthetic UI，而不是掉回 research database 路徑。
+逐頁驗證：
 
-本批已提交，等待 latest self-hosted gate，因此狀態為：
+```text
+/recommendation
+/clinical-decision
+/treatment-plans
+/clinical-graph
+/ptc-research
+/ptc-workbench
+/ptc-command-center
+```
 
-**IMPLEMENTED — WAITING FOR LATEST SELF-HOSTED VERIFICATION**
+每一頁都必須同時滿足：
+
+- HTTP < 400；
+- `#root` 有實際內容且 body 非白屏；
+- URL 仍保留 `demo_case=PTC-DEMO-001`；
+- URL 仍保留 `data_mode=synthetic`；
+- 頁面能辨識 synthetic context（banner 或 synthetic 文案）；
+- 不得有 JS/CSS >= 400；
+- 不得有 browser `pageerror`。
+
+失敗時 production workflow 直接失敗，不再把「首頁能開」誤判成整個 Demo Showcase 正常。每條 route 都輸出獨立 screenshot，另輸出 `production-browser-report.json` 作為 workflow artifact。
+
+Production API smoke 同步新增：
+
+```text
+/api/v1/demo/status
+/api/v1/demo/cases
+```
+
+上一批 `bd30338` 已完成 Vercel Production After Local Verification，結論為 success；因此 Command Center synthetic isolation 與 navbar continuity 已升級為 VERIFIED。
+
+本批 workflow 變更已提交，等待 latest self-hosted gate + production workflow 實際跑過，因此本批狀態為：
+
+**IMPLEMENTED — WAITING FOR PRODUCTION MULTI-ROUTE VERIFICATION**
 
 ## v0.3.0 Acceptance Gate
 
@@ -105,12 +122,12 @@ PTC Research (synthetic)
 - [x] Knowledge Graph hydration；
 - [x] PTC Research hydration；
 - [x] PTC Integrated hydration；
-- [x] PTC Command Center synthetic isolation（待 production workflow 完成）；
-- [x] Navbar synthetic query propagation（待 latest gate）；
+- [x] PTC Command Center synthetic isolation；
+- [x] Navbar synthetic query propagation；
 - [x] 共用 provenance banner；
 - [x] CSV schema / duplicate / broken-reference validator；
 - [x] CSV row-shape / enum-value validator；
-- [ ] Browser/Chromium production multi-route E2E。
+- [x] Browser/Chromium production multi-route E2E gate（待 latest production run 驗證）。
 
 ### Local SQLite
 - [x] config / schema bootstrap / FK / busy timeout；
@@ -127,12 +144,11 @@ PTC Research (synthetic)
 
 優先順序：
 
-1. Browser/Chromium production multi-route E2E：以同一 `demo_case` 驗證 Homepage → Recommendation → Clinical Decision → Treatment Plan → Knowledge Graph → PTC Research → PTC Integrated → PTC Command Center；
-2. 把 E2E 納入 production deploy gate，任何一頁白屏、query 丟失或 synthetic banner 不見都阻止標記部署成功；
-3. local CSV import 第一版，採 validate → preview → explicit import，不允許靜默覆寫；
-4. pre-upgrade automatic backup hook；
-5. traceability persistence E2E；
-6. VERSION / CHANGELOG / release checklist 收斂。
+1. 等 latest production multi-route gate 真實跑過；若某一 route fail，直接依 browser report / screenshot 修到全綠；
+2. local CSV import 第一版，採 `validate → preview → explicit import`，不允許靜默覆寫；
+3. pre-upgrade automatic backup hook；
+4. traceability persistence E2E；
+5. VERSION / CHANGELOG / release checklist 收斂。
 
 ## 安全邊界
 
