@@ -1,7 +1,10 @@
-"""
-OpenCRAVAT adapter — placeholder for Phase 2 integration.
-MVP (Phase 1): adapter exists but returns "not_configured" status.
-"""
-from src.backend.adapters.base import NotConfiguredAdapter
+"""Public OpenCRAVAT adapter entrypoint.
 
-OpenCRAVATAdapter = NotConfiguredAdapter
+The runtime implementation lives in :mod:`src.backend.pipeline.opencravat_adapter`.
+The adapter reports unavailable when the local OpenCRAVAT executable is absent
+instead of masquerading as a generic placeholder.
+"""
+
+from src.backend.pipeline.opencravat_adapter import OpenCRAVATAdapter
+
+__all__ = ["OpenCRAVATAdapter"]
