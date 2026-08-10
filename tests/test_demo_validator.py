@@ -3,6 +3,12 @@ from pathlib import Path
 from src.backend.demo.validator import validate_demo_dataset
 
 
+def _copy_demo_dataset(tmp_path: Path) -> None:
+    source = Path('data/demo')
+    for file in source.glob('*.csv'):
+        (tmp_path / file.name).write_text(file.read_text(encoding='utf-8'), encoding='utf-8')
+
+
 def test_bundled_demo_dataset_is_valid():
     result = validate_demo_dataset(Path('data/demo'))
     assert result.ok is True
@@ -14,9 +20,7 @@ def test_bundled_demo_dataset_is_valid():
 
 
 def test_validator_detects_broken_reference(tmp_path):
-    source = Path('data/demo')
-    for file in source.glob('*.csv'):
-        (tmp_path / file.name).write_text(file.read_text(encoding='utf-8'), encoding='utf-8')
+    _copy_demo_dataset(tmp_path)
 
     cases = tmp_path / 'cancer_cases.csv'
     cases.write_text(cases.read_text(encoding='utf-8').replace('PTC-PATIENT-001', 'MISSING-PATIENT', 1), encoding='utf-8')
@@ -24,3 +28,30 @@ def test_validator_detects_broken_reference(tmp_path):
     result = validate_demo_dataset(tmp_path)
     assert result.ok is False
     assert any('broken demo_patient_key' in error for error in result.errors)
+
+
+def test_validator_detects_extra_csv_field(tmp_path):
+    _copy_demo_dataset(tmp_path)
+
+    variants = tmp_path / 'variants.csv'
+    lines = variants.read_text(encoding='utf-8').splitlines()
+    lines[1] = lines[1] + ',SHIFTED'
+    variants.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+    result = validate_demo_dataset(tmp_path)
+    assert result.ok is False
+    assert any('extra CSV fields' in error for error in result.errors)
+
+
+def test_validator_detects_invalid_variant_value_domain(tmp_path):
+    _copy_demo_dataset(tmp_path)
+
+    variants = tmp_path / 'variants.csv'
+    variants.write_text(
+        variants.read_text(encoding='utf-8').replace(',SNV,', ',NOT_A_VARIANT_TYPE,', 1),
+        encoding='utf-8',
+    )
+
+    result = validate_demo_dataset(tmp_path)
+    assert result.ok is False
+    assert any('invalid variant_type' in error for error in result.errors)
