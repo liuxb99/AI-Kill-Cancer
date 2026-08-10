@@ -4,6 +4,7 @@
   "ignoreCommand": "node scripts/vercel-ignore-git-deploy.js",
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.py" },
+    { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ],
   "env": {
