@@ -1,12 +1,12 @@
-"""
-Ensembl VEP adapter — placeholder for Phase 2 integration.
+"""Public Ensembl VEP adapter entrypoint.
 
-This adapter will submit variants to a local or remote Ensembl VEP instance
-for transcript consequence annotation, HGVS notation, and variant classification.
-
-MVP (Phase 1): adapter exists but returns "not_configured" status.
+The production implementation lives in :mod:`src.backend.pipeline.vep_adapter`.
+This compatibility module prevents older imports from silently receiving a
+NotConfiguredAdapter after VEP support became real.
 """
 
-from src.backend.adapters.base import NotConfiguredAdapter
+from src.backend.pipeline.vep_adapter import VEPAdapter
 
-EnsemblVEPAdapter = NotConfiguredAdapter
+EnsemblVEPAdapter = VEPAdapter
+
+__all__ = ["EnsemblVEPAdapter", "VEPAdapter"]
