@@ -4,7 +4,7 @@
 
 AI-Kill-Cancer 當前主線：**v0.3.0 — Local-First Research & Demo Showcase**。
 
-架構政策不變：Local SQLite 是主要持久化研究工作資料庫；Vercel 使用 bundled synthetic CSV + ephemeral demo runtime；PostgreSQL 是 Optional Scale-out Backend。
+架構政策：Local SQLite 是主要持久化研究工作資料庫；Vercel 使用 bundled synthetic CSV + ephemeral demo runtime；PostgreSQL 是 Optional Scale-out Backend。
 
 ## 已驗證底座
 
@@ -14,51 +14,86 @@ SQLite file persistence / FK / memory regression  VERIFIED
 Vercel Python/static routing                      VERIFIED
 Production page/API/Chromium smoke                VERIFIED
 Demo core CSV bootstrap + UUIDv5 idempotency      VERIFIED — Local Gate #74 PASS
+Demo deep-link / Recommendation hydration         VERIFIED — Local Gate #90 PASS
+SQLite integrity / backup / restore               VERIFIED — Local Gate #90 PASS
+Restart persistence regression                    VERIFIED — Local Gate #90 PASS
 ```
 
-## Demo Showcase 已實作
+## Demo Showcase 現況
 
-九張 synthetic CSV 與三個固定 PTC showcase case 已完成。API：`/api/v1/demo/status`、`/api/v1/demo/cases`。首頁可切換 BRAF、RET、NTRK1 三病例並查看 Case → Variant → Evidence → Drug → Publication → Clinical Trial。
+九張 synthetic CSV 與三個固定 PTC showcase case 已完成。`/api/v1/demo/status` 與 `/api/v1/demo/cases` 已存在。
 
-第三批新增跨頁 context：
+跨頁 contract：
 
 ```text
 demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 ```
 
-首頁現在提供 Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Workbench 深連結。Recommendation 已正式支援讀取 `demo_case`，自動帶入 synthetic Patient/Case key 與 variant，並顯示 Synthetic Demo Context provenance banner。
+目前已支援：
 
-Clinical Decision / Treatment Plan / Knowledge Graph 目前已有 deep-link 入口，但各目的頁完整 hydrate 同一 context 尚待下一批。
+- Homepage Demo Case Selector；
+- Recommendation：自動載入同一 demo case / variant；
+- Clinical Decision：synthetic decision workflow preview，不查正式 Patient UUID；
+- Treatment Plan：synthetic treatment workflow preview，不建立正式計畫；
+- Knowledge Graph：由同一 demo case 投影 6 entities / 5 relations；
+- 共用 `DemoContextBanner` / `useDemoContext()`，跨頁 synthetic provenance 一致。
 
-## Local SQLite Workspace Hardening
+## Demo Dataset Validation
 
-本批新增 `src/backend/database/sqlite_workspace.py`：
+新增 `src/backend/demo/validator.py`：
 
-- `check_sqlite_integrity()`：執行 `PRAGMA integrity_check`；
-- `backup_sqlite_database()`：只允許完整 DB 進行 SQLite online backup，備份完成後再次 integrity check；
-- `restore_sqlite_database()`：拒絕損壞 backup，先還原到 staging，再驗證完整性後 atomic replace 正式 DB。
+- 檢查九張必要 CSV 是否存在；
+- 必要欄位；
+- blank key；
+- duplicate key；
+- Patient → Case → Specimen → Sequencing → Variant → Evidence → Drug / Publication / Trial 斷鏈。
 
-新增 `tests/test_sqlite_workspace.py`，覆蓋：
+`/api/v1/demo/status` 現在包含 `validation.ok/errors`；`/api/v1/demo/cases` 在資料集 validation fail 時回 503，避免展示半斷鏈資料。
 
-- 建庫 / 寫入 / 關閉 / 重開後資料仍存在；
-- backup snapshot；
-- backup 後繼續修改正式 DB；
-- restore 後回到 snapshot 狀態；
-- restored DB integrity PASS；
-- missing DB integrity failure；
-- invalid backup restore rejection。
+新增 `tests/test_demo_validator.py`，包含 bundled dataset 正常與 broken patient reference 失敗案例。
 
-這代表 v0.3.0 的 local persistence / integrity / backup / restore 已從「設計缺口」進入「已有程式與永久 regression，等待 runner 驗證」。
+## Local SQLite Workspace
 
-## 驗證狀態
+已驗證：SQLite file persistence、FK、busy timeout、integrity、backup、atomic restore、restart persistence。
 
-上一批最新 `master` gate：Local Verification Gate #84，head `19d60bbf...`，目前仍是 **pending**，尚無 runner job，因此不能宣告上一批 VERIFIED。本批最新程式與文檔同樣標記：
+本批新增：
+
+`GET /api/v1/workspace/status`
+
+回報：
 
 ```text
-IMPLEMENTED — WAITING FOR SELF-HOSTED VERIFICATION
+app_mode
+backend
+local_first
+persistent
+database_path
+exists
+size_bytes
+integrity.ok / message
+backup_directory
 ```
 
-不以 HTTP 200、程式已提交或測試檔存在取代真正 runner PASS。
+此 API 讓本地 UI / CLI / release gate 可判斷目前是否真正運行在持久化 Local SQLite workspace。
+
+## 本批狀態
+
+第四批新增：
+
+```text
+Shared DemoContextBanner/useDemoContext          IMPLEMENTED
+Clinical Decision synthetic hydration            IMPLEMENTED
+Treatment Plan synthetic hydration               IMPLEMENTED
+Knowledge Graph synthetic projection             IMPLEMENTED
+Demo CSV validator                               IMPLEMENTED
+Demo status validation contract                  IMPLEMENTED
+Workspace status API                             IMPLEMENTED
+Demo validator regression                        IMPLEMENTED
+```
+
+最新新增項目尚未由對應最新 head 的 self-hosted gate 完成，因此狀態為：
+
+**IMPLEMENTED — WAITING FOR LATEST SELF-HOSTED VERIFICATION**
 
 ## v0.3.0 Acceptance Gate
 
@@ -67,31 +102,33 @@ IMPLEMENTED — WAITING FOR SELF-HOSTED VERIFICATION
 - [x] 3 個固定 demo cases；
 - [x] CSV → SQLite idempotent bootstrap；
 - [x] demo status/cases API；
-- [x] Homepage selector + Evidence/Drug/Publication/Trial 展示；
-- [x] 跨頁 `demo_case` deep-link contract；
-- [x] Recommendation demo hydration；
-- [ ] Clinical Decision / Treatment Plan / Knowledge Graph demo hydration；
-- [ ] 共用 provenance banner；
-- [ ] multi-route Chromium E2E；
-- [ ] CSV schema / broken-link validator。
+- [x] Homepage selector；
+- [x] demo_case deep-link contract；
+- [x] Recommendation hydration；
+- [x] Clinical Decision hydration；
+- [x] Treatment Plan hydration；
+- [x] Knowledge Graph hydration；
+- [x] 共用 provenance banner；
+- [x] CSV schema / duplicate / broken-reference validator；
+- [ ] PTC Workbench / Research hydrate；
+- [ ] multi-route Chromium E2E。
 
 ### Local SQLite
-- [x] SQLite config / schema bootstrap / FK / busy timeout；
-- [x] file persistence 基礎；
+- [x] config / schema bootstrap / FK / busy timeout；
+- [x] file persistence；
 - [x] integrity utility；
-- [x] backup utility；
-- [x] atomic restore utility；
-- [x] restart + backup/restore regression 已編寫；
-- [ ] 最新 self-hosted runner PASS；
-- [ ] workspace status API / CLI；
+- [x] backup / atomic restore；
+- [x] restart regression；
+- [x] workspace status API；
+- [ ] workspace status regression；
 - [ ] local CSV import；
 - [ ] pre-upgrade automatic backup hook；
 - [ ] traceability persistence E2E。
 
 ## 下一批
 
-下一批繼續完成 Demo context 全鏈與 Local Workspace release integration：Clinical Decision / Treatment Plan / Knowledge Graph hydrate、共用 DemoContextBanner、workspace status、pre-upgrade backup hook、CSV validator、multi-route Chromium E2E。
+PTC Workbench / Research demo hydration、workspace status regression、pre-upgrade backup hook、local CSV import 第一版、enum/value-domain validator、multi-route Chromium E2E，以及 VERSION / CHANGELOG / release checklist。
 
 ## 安全邊界
 
-所有 synthetic demo 輸出只用於研究軟體流程展示，不代表真實醫學證據、患者資料、診斷或治療建議。v1.0 的 Research-Grade Stable 只描述軟體工程成熟度，不等同臨床有效性驗證。
+所有 synthetic demo 輸出只用於研究軟體流程展示，不代表真實醫學證據、患者資料、診斷、臨床決策或治療建議。v1.0 Research-Grade Stable 只描述軟體工程成熟度，不等同臨床有效性驗證。
