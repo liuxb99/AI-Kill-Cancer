@@ -24,8 +24,8 @@ jobs:
       run:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
     env:
-      VERCEL_PROJECT_NAME: ai-kill-cancer
-      VERCEL_PRODUCTION_URL: https://ai-kill-cancer.vercel.app
+      VERCEL_PROJECT_NAME: ai-kill-cancer-zqpi
+      VERCEL_PRODUCTION_URL: https://ai-kill-cancer-zqpi.vercel.app
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - name: Require Vercel token
