@@ -25,6 +25,7 @@ jobs:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
     env:
       VERCEL_PROJECT_NAME: ai-kill-cancer-zqpi
+      VERCEL_PRODUCTION_URL: https://ai-kill-cancer-zqpi.vercel.app
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - name: Require Vercel token
@@ -120,11 +121,12 @@ jobs:
             throw 'Vercel CLI returned an empty deployment URL.'
           }
           "url=$url" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          Write-Host "Production URL: $url"
+          Write-Host "Deployment URL: $url"
+          Write-Host "Canonical production URL: $env:VERCEL_PRODUCTION_URL"
 
       - name: Production page smoke test
         run: |
-          $url = '${{ steps.deploy.outputs.url }}'
+          $url = $env:VERCEL_PRODUCTION_URL
           $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 30
           if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
             throw "Production page smoke test failed with HTTP $($response.StatusCode)"
@@ -133,7 +135,7 @@ jobs:
 
       - name: Production API JSON smoke tests
         run: |
-          $base = '${{ steps.deploy.outputs.url }}'
+          $base = $env:VERCEL_PRODUCTION_URL.TrimEnd('/')
           $paths = @(
             '/api/v1/health',
             '/api/v1/ptc-readiness',
