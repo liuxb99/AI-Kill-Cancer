@@ -9,6 +9,7 @@ from src.backend.api.v1.cases import router as cases_router
 from src.backend.api.v1.clinical import router as clinical_router
 from src.backend.api.v1.clinical_decision import router as clinical_decision_router
 from src.backend.api.v1.clinical_graph import router as clinical_graph_router
+from src.backend.api.v1.demo import router as demo_router
 from src.backend.api.v1.evidence import router as evidence_router
 from src.backend.api.v1.knowledge import router as knowledge_router
 from src.backend.api.v1.patients import router as patients_router
@@ -43,6 +44,7 @@ from src.backend.api.v1.workbench import router as workbench_router
 
 router = APIRouter(prefix="/api/v1")
 
+router.include_router(demo_router)
 router.include_router(patients_router)
 router.include_router(cases_router)
 router.include_router(specimens_router)
