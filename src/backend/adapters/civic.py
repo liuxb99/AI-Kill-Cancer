@@ -1,7 +1,10 @@
-"""
-CIViC adapter — placeholder for Phase 2 integration.
-MVP (Phase 1): adapter exists but returns "not_configured" status.
-"""
-from src.backend.adapters.base import NotConfiguredAdapter
+"""Public CIViC adapter entrypoint.
 
-CIViCAdapter = NotConfiguredAdapter
+The production implementation lives in :mod:`src.backend.pipeline.civic_adapter`.
+This module remains as the stable import path used by the adapter registry and
+older callers.
+"""
+
+from src.backend.pipeline.civic_adapter import CIViCAdapter
+
+__all__ = ["CIViCAdapter"]
