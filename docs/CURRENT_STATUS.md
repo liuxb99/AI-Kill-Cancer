@@ -12,12 +12,13 @@ AI-Kill-Cancer 當前主線：**v0.3.0 — Local-First Research & Demo Showcase*
 Local SQLite runtime / ORM compatibility          VERIFIED
 SQLite file persistence / FK / memory regression  VERIFIED
 Vercel Python/static routing                      VERIFIED
-Production page/API JSON smoke                    VERIFIED — commit 9fe8103
-Demo cold-start bootstrap                         VERIFIED — production API smoke PASS
-Demo core CSV bootstrap + UUIDv5 idempotency      VERIFIED — Local Gate #74 PASS
-Demo deep-link / Recommendation hydration         VERIFIED — Local Gate #90 PASS
-SQLite integrity / backup / restore               VERIFIED — Local Gate #90 PASS
-Restart persistence regression                    VERIFIED — Local Gate #90 PASS
+Production page/API JSON smoke                    VERIFIED
+Demo cold-start bootstrap                         VERIFIED
+Demo core CSV bootstrap + UUIDv5 idempotency      VERIFIED
+Demo deep-link / Recommendation hydration         VERIFIED
+PTC Research synthetic hydration                  VERIFIED — production workflow 97cb6a7 PASS
+SQLite integrity / backup / restore               VERIFIED
+Restart persistence regression                    VERIFIED
 ```
 
 2026-08-10 production incident 已完成根因修復：demo cold-start 曾因 `cancer_cases.csv` JSON/CSV quoting 與 fusion variant 欄位錯位而失敗，導致 DB API 500/503。修正後 Vercel production deploy、page smoke 與 DB/API JSON smoke 已通過，`/api/v1/ptc-data-quality/overview` 已恢復。
@@ -32,15 +33,15 @@ Restart persistence regression                    VERIFIED — Local Gate #90 PA
 demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 ```
 
-目前已支援：Homepage Demo Case Selector、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph，以及 PTC Research 工作台 synthetic hydration。所有頁面沿用 `DemoContextBanner` / `useDemoContext()`，保持 synthetic provenance 一致。
+目前已支援：Homepage Demo Case Selector、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Research，以及 PTC Integrated Workbench synthetic hydration。所有 synthetic 頁面沿用 `DemoContextBanner` / `useDemoContext()`，保持 provenance 一致。
 
-PTC Research 在 synthetic mode 下不再誤查研究資料庫，而是直接投影同一 demo case 的 Case、Variant、Evidence、Drug、Publication、Clinical Trial；沒有 `demo_case` 時仍保留原本公開研究資料查詢路徑。
+PTC Research / Integrated 在 synthetic mode 下不再誤查研究資料庫。Integrated Workbench 直接投影 Case、Variant、Evidence、Drug、Publication、Clinical Trial，並停用 dashboard、最近病例、integrated recommendation、similarity、中藥 bootstrap 與 interaction API；沒有 `demo_case` 時保留原本 research database path。
 
 ## Demo Dataset Validation
 
-`src/backend/demo/validator.py` 現在檢查九張必要 CSV、必要欄位、blank/duplicate key、跨表斷鏈、CSV row shape / 額外欄位、重要 categorical value domains 與 synthetic `data_mode` 邊界。
+`src/backend/demo/validator.py` 檢查九張必要 CSV、必要欄位、blank/duplicate key、跨表斷鏈、CSV row shape / 額外欄位、重要 categorical value domains 與 synthetic `data_mode` 邊界。
 
-`/api/v1/demo/status` 包含 `validation.ok/errors`；`/api/v1/demo/cases` 在資料集 validation fail 時回 503，避免展示半斷鏈資料。
+`/api/v1/demo/status` 包含 `validation.ok/errors`；`/api/v1/demo/cases` 在資料集 validation fail 時回 503。
 
 `tests/test_demo_validator.py` 已覆蓋 broken reference、extra CSV field、invalid variant value-domain regression。
 
@@ -52,19 +53,24 @@ PTC Research 在 synthetic mode 下不再誤查研究資料庫，而是直接投
 
 ## 本批狀態
 
-第六批新增：
+第七批新增：
 
 ```text
-PTC Research synthetic hydration                  IMPLEMENTED
-Synthetic Case → Variant → Evidence projection    IMPLEMENTED
-Synthetic Drug / Publication / Trial projection   IMPLEMENTED
-Research DB / synthetic mode isolation            IMPLEMENTED
-PTC Research frontend regression                  IMPLEMENTED
+PTC Integrated synthetic hydration                IMPLEMENTED
+Integrated synthetic / research API isolation     IMPLEMENTED
+Case → Variant → Evidence → Drug projection       IMPLEMENTED
+Publication / Trial projection                    IMPLEMENTED
+Integrated frontend regression                    IMPLEMENTED
+Previous PTC Research hydration                   VERIFIED IN PRODUCTION
 ```
 
-新增 `src/frontend/src/test/PTCResearchPage.test.tsx`：驗證帶 `demo_case` 時載入 synthetic context 且不呼叫 `listPTCCases/getPTCGraphPath`；沒有 demo context 時仍走既有 research database path。
+`src/frontend/src/test/PTCIntegratedSelectionPage.test.tsx` 現在同時驗證：
 
-本批已提交，等待 latest self-hosted gate，因此狀態為：
+- normal mode 仍只載入最近 100 個 research cases；
+- synthetic mode 載入 `demo_case`；
+- synthetic mode 不呼叫 dashboard / latest cases / herbs / interactions / recommendation / similarity API。
+
+本批 Integrated 變更已提交，等待最新 head self-hosted gate，因此本批狀態為：
 
 **IMPLEMENTED — WAITING FOR LATEST SELF-HOSTED VERIFICATION**
 
@@ -82,11 +88,12 @@ PTC Research frontend regression                  IMPLEMENTED
 - [x] Clinical Decision hydration；
 - [x] Treatment Plan hydration；
 - [x] Knowledge Graph hydration；
-- [x] PTC Research hydration（待 latest gate）；
+- [x] PTC Research hydration；
+- [x] PTC Integrated hydration（待 latest gate）；
 - [x] 共用 provenance banner；
 - [x] CSV schema / duplicate / broken-reference validator；
 - [x] CSV row-shape / enum-value validator；
-- [ ] PTC Workbench 其餘入口 hydration；
+- [ ] PTC Command Center synthetic isolation；
 - [ ] multi-route Chromium E2E。
 
 ### Local SQLite
@@ -104,8 +111,8 @@ PTC Research frontend regression                  IMPLEMENTED
 
 優先順序：
 
-1. 把 synthetic `demo_case` contract 延伸到 PTC Workbench 其餘主要入口，避免 demo showcase 在進入 command/integrated workflow 後掉回空資料；
-2. multi-route Chromium E2E，覆蓋 Homepage → Recommendation → Clinical Decision → Treatment Plan → Knowledge Graph → PTC Research；
+1. PTC Command Center synthetic isolation：demo mode 顯示 bundled dataset readiness / provenance，不啟動正式公開資料同步與 complete graph API；
+2. multi-route Chromium E2E，覆蓋 Homepage → Recommendation → Clinical Decision → Treatment Plan → Knowledge Graph → PTC Research → PTC Integrated；
 3. local CSV import 第一版，採 validate → preview → explicit import，不允許靜默覆寫；
 4. pre-upgrade automatic backup hook；
 5. traceability persistence E2E；
