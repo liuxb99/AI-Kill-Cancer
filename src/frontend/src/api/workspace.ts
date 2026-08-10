@@ -50,6 +50,11 @@ export interface ImportHistoryItem {
   database_path?: string
 }
 
+export interface ImportHistoryResponse {
+  items: ImportHistoryItem[]
+  history_path: string
+}
+
 export async function getWorkspaceStatus(): Promise<WorkspaceStatus> {
   return apiRequest<WorkspaceStatus>('/workspace/status')
 }
@@ -68,6 +73,6 @@ export async function commitWorkspaceImport(sourceDir: string): Promise<ImportCo
   })
 }
 
-export async function getWorkspaceImportHistory(limit = 50): Promise<{ items: ImportHistoryItem[]; history_path: string }> {
-  return apiRequest(withQuery('/workspace/import/history', { limit }))
+export async function getWorkspaceImportHistory(limit = 50): Promise<ImportHistoryResponse> {
+  return apiRequest<ImportHistoryResponse>(withQuery('/workspace/import/history', { limit }))
 }
