@@ -1,8 +1,8 @@
-"""
-Adapter registry — central registry for all third-party data source integrations.
-"""
+"""Adapter registry — central registry for all third-party data source integrations."""
 
 from __future__ import annotations
+
+import asyncio
 
 from src.backend.adapters.base import BaseAdapter, NotConfiguredAdapter
 
@@ -29,9 +29,28 @@ class AdapterRegistry:
             for name, adapter in self._adapters.items()
         }
 
-    def health_all(self) -> dict[str, dict]:
-        """Return health status for all registered adapters."""
-        return {name: adapter.health_check() for name, adapter in self._adapters.items()}
+    async def health_all(self) -> dict[str, dict]:
+        """Return resolved health status for all registered adapters.
+
+        ``BaseAdapter.health_check`` is asynchronous.  The previous registry
+        returned coroutine objects, which made the aggregate health endpoint
+        unusable and could leak un-awaited coroutine warnings.  Health checks
+        now execute concurrently and failures are isolated per adapter.
+        """
+        names = list(self._adapters)
+
+        async def check(name: str) -> dict:
+            try:
+                result = await self._adapters[name].health_check()
+                return result if isinstance(result, dict) else {
+                    "status": "degraded",
+                    "detail": "Adapter returned a non-object health result",
+                }
+            except Exception as exc:  # pragma: no cover - defensive boundary
+                return {"status": "degraded", "detail": str(exc)}
+
+        results = await asyncio.gather(*(check(name) for name in names))
+        return dict(zip(names, results, strict=True))
 
 
 # Global registry instance
@@ -47,7 +66,7 @@ def get_registry() -> AdapterRegistry:
 
 
 def _register_defaults(registry: AdapterRegistry) -> None:
-    """Register all adapters. Phase 2A: VEP is REST API, OpenCRAVAT not_configured."""
+    """Register implemented adapters and explicit optional integrations."""
     from src.backend.adapters.civic import CIViCAdapter
     from src.backend.adapters.dgidb import DGIdbAdapter
     from src.backend.adapters.drkg import DRKGAdapter
@@ -60,10 +79,10 @@ def _register_defaults(registry: AdapterRegistry) -> None:
 
     registry.register("ensembl_vep", VEPAdapter())
     registry.register("opencravat", OpenCRAVATAdapter())
-    registry.register("civic", CIViCAdapter(name="civic"))
-    registry.register("dgidb", DGIdbAdapter(name="dgidb"))
+    registry.register("civic", CIViCAdapter())
+    registry.register("dgidb", DGIdbAdapter())
     registry.register("oncotree", OncoTreeAdapter(name="oncotree"))
-    registry.register("myvariant", MyVariantAdapter(name="myvariant"))
+    registry.register("myvariant", MyVariantAdapter())
     registry.register("drkg", DRKGAdapter(name="drkg"))
     registry.register("pharmcat", PharmCATAdapter(name="pharmcat"))
     registry.register("bcftools", BcftoolsAdapter())
