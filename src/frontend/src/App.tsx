@@ -39,6 +39,14 @@ function AppNavbar() {
   const location = useLocation()
   if (location.pathname === '/') return null
 
+  const params = new URLSearchParams(location.search)
+  const demoCase = params.get('demo_case')
+  const synthetic = params.get('data_mode') === 'synthetic' || Boolean(demoCase)
+  const demoSearch = synthetic && demoCase
+    ? `?demo_case=${encodeURIComponent(demoCase)}&data_mode=synthetic`
+    : ''
+  const navigateWithContext = (path: string) => navigate(`${path}${demoSearch}`)
+
   const links = [
     { label: '生产就绪', path: '/production-readiness' },
     { label: 'PTC 總控台', path: '/ptc-command-center' },
@@ -66,12 +74,12 @@ function AppNavbar() {
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center gap-6 text-sm font-medium text-gray-600 overflow-x-auto">
-        <span className="text-primary-700 font-bold cursor-pointer whitespace-nowrap" onClick={() => navigate('/')}>
+        <span className="text-primary-700 font-bold cursor-pointer whitespace-nowrap" onClick={() => navigateWithContext('/')}>
           AI Kill Cancer
         </span>
         <div className="flex gap-4 whitespace-nowrap">
           {links.map((link) => (
-            <span key={link.path} className="cursor-pointer hover:text-primary-600 transition" onClick={() => navigate(link.path)}>
+            <span key={link.path} className="cursor-pointer hover:text-primary-600 transition" onClick={() => navigateWithContext(link.path)}>
               {link.label}
             </span>
           ))}
