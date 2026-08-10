@@ -1,8 +1,10 @@
 {
   "buildCommand": "cd src/frontend && npm ci && npm run build",
+  "outputDirectory": "src/frontend/dist",
   "ignoreCommand": "node scripts/vercel-ignore-git-deploy.js",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "env": {
     "MODEL_ENABLED": "false"
