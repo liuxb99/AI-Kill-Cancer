@@ -1,4 +1,4 @@
 demo_case_key,demo_patient_key,oncotree_code,cancer_type,histology,stage,diagnosis_date,radioiodine_status,recurrence_status,metastatic_sites,treatment_history,current_medications,clinical_notes,data_mode,provenance
 CASE-DEMO-001,PTC-DEMO-001,THAP,PTC,Classic papillary thyroid carcinoma,II,2025-03-14,RAI-naive,no_evidence_of_recurrence,"[]","[]","[]","Synthetic BRAF V600E demonstration case",synthetic,bundled_demo_csv
 CASE-DEMO-002,PTC-DEMO-002,THAP,PTC,Papillary thyroid carcinoma with RET fusion,I,2025-06-02,RAI-naive,no_evidence_of_recurrence,"[]","[]","[]","Synthetic RET fusion demonstration case",synthetic,bundled_demo_csv
-CASE-DEMO-003,PTC-DEMO-003,THAP,PTC,Metastatic papillary thyroid carcinoma,IVB,2024-11-21,RAI-refractory,persistent_disease,"[\"lung\"]","[]","[]","Synthetic NTRK fusion / RAI-refractory demonstration case",synthetic,bundled_demo_csv
+CASE-DEMO-003,PTC-DEMO-003,THAP,PTC,Metastatic papillary thyroid carcinoma,IVB,2024-11-21,RAI-refractory,persistent_disease,"[""lung""]","[]","[]","Synthetic NTRK fusion / RAI-refractory demonstration case",synthetic,bundled_demo_csv
