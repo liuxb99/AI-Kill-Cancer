@@ -20,13 +20,15 @@ jobs:
       github.event.workflow_run.event == 'push'
     runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
     env:
       VERCEL_ORG_ID: team_QiaVGRjLjPmzkfZmHhEZ2IVv
       VERCEL_PROJECT_ID: prj_afBg7ytQt8XBPKA4hDOlfcrRJuMy
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - name: Require Vercel token
-        shell: pwsh
         run: |
           if ([string]::IsNullOrWhiteSpace($env:VERCEL_TOKEN)) {
             throw 'Repository secret VERCEL_TOKEN is required for gated production deployment.'
@@ -39,7 +41,6 @@ jobs:
           fetch-depth: 0
 
       - name: Reject stale verified commit
-        shell: pwsh
         run: |
           git fetch origin master
           $verified = '${{ github.event.workflow_run.head_sha }}'
@@ -55,20 +56,16 @@ jobs:
           node-version: '20'
 
       - name: Install Vercel CLI
-        shell: pwsh
         run: npm install --global vercel@latest
 
       - name: Pull production environment
-        shell: pwsh
         run: vercel pull --yes --environment=production --token=$env:VERCEL_TOKEN
 
       - name: Build verified production artifact
-        shell: pwsh
         run: vercel build --prod --token=$env:VERCEL_TOKEN
 
       - name: Deploy prebuilt artifact to production
         id: deploy
-        shell: pwsh
         run: |
           $url = (vercel deploy --prebuilt --prod --token=$env:VERCEL_TOKEN).Trim()
           if ([string]::IsNullOrWhiteSpace($url)) {
@@ -78,7 +75,6 @@ jobs:
           Write-Host "Production URL: $url"
 
       - name: Production smoke test
-        shell: pwsh
         run: |
           $url = '${{ steps.deploy.outputs.url }}'
           $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 30
