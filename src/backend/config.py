@@ -55,7 +55,7 @@ def _database_url_from_environment() -> str:
 
 class Settings:
     APP_NAME: str = "AI-Kill-Cancer — Precision Oncology Platform"
-    APP_VERSION: str = "1.0.2"
+    APP_VERSION: str = "1.0.3"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
     # 运行模式: demo / research / local / production
