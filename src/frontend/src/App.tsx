@@ -1,36 +1,38 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import Home from './pages/Home'
-import KnowledgeBase from './pages/KnowledgeBase'
-import Tools from './pages/Tools'
-import Research from './pages/Research'
-import Dashboard from './pages/Dashboard'
-import ResearchPortal from './pages/ResearchPortal'
-import Workbench from './pages/Workbench'
-import RecommendationPage from './pages/RecommendationPage'
-import ClinicalDecisionPage from './pages/ClinicalDecisionPage'
-import ClinicalDecisionListPage from './pages/ClinicalDecisionListPage'
-import TumorBoardConsensusListPage from './pages/TumorBoardConsensusListPage'
-import TumorBoardConsensusPage from './pages/TumorBoardConsensusPage'
-import ClinicalGraphPage from './pages/ClinicalGraphPage'
-import TreatmentPlanListPage from './pages/TreatmentPlanListPage'
-import TreatmentPlanCreatePage from './pages/TreatmentPlanCreatePage'
-import TreatmentPlanDetailPage from './pages/TreatmentPlanDetailPage'
-import TreatmentPlanRevisionPage from './pages/TreatmentPlanRevisionPage'
-import PTC3DExplorerPage from './pages/PTC3DExplorerPage'
-import PTCCohortPage from './pages/PTCCohortPage'
-import PTCCommandCenterPage from './pages/PTCCommandCenterPage'
-import PTCDataQualityPage from './pages/PTCDataQualityPage'
-import PTCEvidenceMatrixPage from './pages/PTCEvidenceMatrixPage'
-import PTCIntegratedPage from './pages/PTCIntegratedPage'
-import PTCKnowledgePage from './pages/PTCKnowledgePage'
-import PTCReportCenterPage from './pages/PTCReportCenterPage'
-import PTCResearchAssistantPage from './pages/PTCResearchAssistantPage'
-import PTCResearchPage from './pages/PTCResearchPage'
-import PTCSnapshotPage from './pages/PTCSnapshotPage'
-import PTCTimelinePage from './pages/PTCTimelinePage'
-import PTCTrialMatchingPage from './pages/PTCTrialMatchingPage'
-import ProductionReadinessPage from './pages/ProductionReadinessPage'
 import StatusBanner from './components/StatusBanner'
+
+const KnowledgeBase = lazy(() => import('./pages/KnowledgeBase'))
+const Tools = lazy(() => import('./pages/Tools'))
+const Research = lazy(() => import('./pages/Research'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const ResearchPortal = lazy(() => import('./pages/ResearchPortal'))
+const Workbench = lazy(() => import('./pages/Workbench'))
+const RecommendationPage = lazy(() => import('./pages/RecommendationPage'))
+const ClinicalDecisionPage = lazy(() => import('./pages/ClinicalDecisionPage'))
+const ClinicalDecisionListPage = lazy(() => import('./pages/ClinicalDecisionListPage'))
+const TumorBoardConsensusListPage = lazy(() => import('./pages/TumorBoardConsensusListPage'))
+const TumorBoardConsensusPage = lazy(() => import('./pages/TumorBoardConsensusPage'))
+const ClinicalGraphPage = lazy(() => import('./pages/ClinicalGraphPage'))
+const TreatmentPlanListPage = lazy(() => import('./pages/TreatmentPlanListPage'))
+const TreatmentPlanCreatePage = lazy(() => import('./pages/TreatmentPlanCreatePage'))
+const TreatmentPlanDetailPage = lazy(() => import('./pages/TreatmentPlanDetailPage'))
+const TreatmentPlanRevisionPage = lazy(() => import('./pages/TreatmentPlanRevisionPage'))
+const PTC3DExplorerPage = lazy(() => import('./pages/PTC3DExplorerPage'))
+const PTCCohortPage = lazy(() => import('./pages/PTCCohortPage'))
+const PTCCommandCenterPage = lazy(() => import('./pages/PTCCommandCenterPage'))
+const PTCDataQualityPage = lazy(() => import('./pages/PTCDataQualityPage'))
+const PTCEvidenceMatrixPage = lazy(() => import('./pages/PTCEvidenceMatrixPage'))
+const PTCIntegratedPage = lazy(() => import('./pages/PTCIntegratedPage'))
+const PTCKnowledgePage = lazy(() => import('./pages/PTCKnowledgePage'))
+const PTCReportCenterPage = lazy(() => import('./pages/PTCReportCenterPage'))
+const PTCResearchAssistantPage = lazy(() => import('./pages/PTCResearchAssistantPage'))
+const PTCResearchPage = lazy(() => import('./pages/PTCResearchPage'))
+const PTCSnapshotPage = lazy(() => import('./pages/PTCSnapshotPage'))
+const PTCTimelinePage = lazy(() => import('./pages/PTCTimelinePage'))
+const PTCTrialMatchingPage = lazy(() => import('./pages/PTCTrialMatchingPage'))
+const ProductionReadinessPage = lazy(() => import('./pages/ProductionReadinessPage'))
 
 function AppNavbar() {
   const navigate = useNavigate()
@@ -79,44 +81,54 @@ function AppNavbar() {
   )
 }
 
+function RouteFallback() {
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center text-sm text-gray-500">
+      功能載入中…
+    </div>
+  )
+}
+
 function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <StatusBanner />
       <AppNavbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/knowledge" element={<KnowledgeBase />} />
-        <Route path="/tools" element={<Tools />} />
-        <Route path="/research" element={<Research />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/research-portal" element={<ResearchPortal />} />
-        <Route path="/workbench" element={<Workbench />} />
-        <Route path="/production-readiness" element={<ProductionReadinessPage />} />
-        <Route path="/ptc-command-center" element={<PTCCommandCenterPage />} />
-        <Route path="/ptc-data-quality" element={<PTCDataQualityPage />} />
-        <Route path="/ptc-snapshots" element={<PTCSnapshotPage />} />
-        <Route path="/ptc-3d" element={<PTC3DExplorerPage />} />
-        <Route path="/ptc-timeline" element={<PTCTimelinePage />} />
-        <Route path="/ptc-trial-matching" element={<PTCTrialMatchingPage />} />
-        <Route path="/ptc-evidence-matrix" element={<PTCEvidenceMatrixPage />} />
-        <Route path="/ptc-cohort" element={<PTCCohortPage />} />
-        <Route path="/ptc-assistant" element={<PTCResearchAssistantPage />} />
-        <Route path="/ptc-reports" element={<PTCReportCenterPage />} />
-        <Route path="/ptc-workbench" element={<PTCIntegratedPage />} />
-        <Route path="/ptc-research" element={<PTCResearchPage />} />
-        <Route path="/ptc-knowledge" element={<PTCKnowledgePage />} />
-        <Route path="/recommendation" element={<RecommendationPage />} />
-        <Route path="/clinical-decision" element={<ClinicalDecisionListPage />} />
-        <Route path="/clinical-decision/:id" element={<ClinicalDecisionPage />} />
-        <Route path="/tumor-board" element={<TumorBoardConsensusListPage />} />
-        <Route path="/tumor-board/:id" element={<TumorBoardConsensusPage />} />
-        <Route path="/clinical-graph" element={<ClinicalGraphPage />} />
-        <Route path="/treatment-plans" element={<TreatmentPlanListPage />} />
-        <Route path="/treatment-plans/new" element={<TreatmentPlanCreatePage />} />
-        <Route path="/treatment-plans/:id" element={<TreatmentPlanDetailPage />} />
-        <Route path="/treatment-plans/:id/revise" element={<TreatmentPlanRevisionPage />} />
-      </Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/knowledge" element={<KnowledgeBase />} />
+          <Route path="/tools" element={<Tools />} />
+          <Route path="/research" element={<Research />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/research-portal" element={<ResearchPortal />} />
+          <Route path="/workbench" element={<Workbench />} />
+          <Route path="/production-readiness" element={<ProductionReadinessPage />} />
+          <Route path="/ptc-command-center" element={<PTCCommandCenterPage />} />
+          <Route path="/ptc-data-quality" element={<PTCDataQualityPage />} />
+          <Route path="/ptc-snapshots" element={<PTCSnapshotPage />} />
+          <Route path="/ptc-3d" element={<PTC3DExplorerPage />} />
+          <Route path="/ptc-timeline" element={<PTCTimelinePage />} />
+          <Route path="/ptc-trial-matching" element={<PTCTrialMatchingPage />} />
+          <Route path="/ptc-evidence-matrix" element={<PTCEvidenceMatrixPage />} />
+          <Route path="/ptc-cohort" element={<PTCCohortPage />} />
+          <Route path="/ptc-assistant" element={<PTCResearchAssistantPage />} />
+          <Route path="/ptc-reports" element={<PTCReportCenterPage />} />
+          <Route path="/ptc-workbench" element={<PTCIntegratedPage />} />
+          <Route path="/ptc-research" element={<PTCResearchPage />} />
+          <Route path="/ptc-knowledge" element={<PTCKnowledgePage />} />
+          <Route path="/recommendation" element={<RecommendationPage />} />
+          <Route path="/clinical-decision" element={<ClinicalDecisionListPage />} />
+          <Route path="/clinical-decision/:id" element={<ClinicalDecisionPage />} />
+          <Route path="/tumor-board" element={<TumorBoardConsensusListPage />} />
+          <Route path="/tumor-board/:id" element={<TumorBoardConsensusPage />} />
+          <Route path="/clinical-graph" element={<ClinicalGraphPage />} />
+          <Route path="/treatment-plans" element={<TreatmentPlanListPage />} />
+          <Route path="/treatment-plans/new" element={<TreatmentPlanCreatePage />} />
+          <Route path="/treatment-plans/:id" element={<TreatmentPlanDetailPage />} />
+          <Route path="/treatment-plans/:id/revise" element={<TreatmentPlanRevisionPage />} />
+        </Routes>
+      </Suspense>
     </div>
   )
 }
