@@ -31,11 +31,29 @@
 - [x] previous production multi-route Chromium synthetic gate
 - [x] synthetic query propagation across major routes
 - [x] DB cold-start recovery verified
+- [x] quota-free `Production Verification Only` workflow added
+
+## Quota-free production verification
+
+`.github/workflows/production-verify-only.yml` can be started manually with `workflow_dispatch`. It does **not** call `vercel deploy`, therefore it consumes no Vercel deployment quota. It verifies the currently deployed canonical production URL with:
+
+- homepage HTTP smoke;
+- `/api/v1/health`;
+- `/api/v1/ptc-readiness`;
+- `/api/v1/ptc-completion/status`;
+- `/api/v1/ptc-data-quality/overview`;
+- `/api/v1/demo/status`;
+- `/api/v1/demo/cases`;
+- Chromium synthetic routes for Recommendation, Clinical Decision, Treatment Plan, Knowledge Graph, PTC Research, PTC Integrated, and PTC Command Center;
+- screenshot + JSON report artifact upload.
+
+This verification proves the **currently deployed production** remains healthy while deployment quota is exhausted. It does **not** prove that the latest master SHA has been deployed, so it cannot replace the final release-candidate deployment gate.
 
 ## Release gates
 - [x] Workspace Import UI baseline verified — Local Gate #152 PASS
 - [x] quota-hardening baseline verified — Local Gate #162 PASS
 - [x] metadata-consistency release-candidate verified — Local Gate #167 PASS
+- [ ] latest quota-free Production Verification Only PASS
 - [ ] production deployment for release-candidate head PASS — currently blocked by Vercel daily free-tier deployment quota
 - [ ] production API JSON smoke PASS on release-candidate head
 - [ ] production multi-route Chromium gate PASS on release-candidate head
@@ -49,4 +67,4 @@ Latest production workflow reached `vercel deploy --prod` after token/project/en
 The 1.0.3 software-side release candidate is locally green. Until Vercel quota becomes available, keep release scope frozen: no new product features, no opportunistic refactors, and no no-op commits intended only to trigger deployment. Only a release-blocking defect or release-gate hardening change may modify the candidate.
 
 ## Tagging policy
-Do not create or move a `v1.0.3` tag until all unchecked release gates above are green. A green software release does not imply clinical validation.
+Do not create or move a `v1.0.3` tag until all unchecked final release gates above are green. A green software release does not imply clinical validation.
