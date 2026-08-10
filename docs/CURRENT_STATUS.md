@@ -67,20 +67,31 @@ code: api-deployments-free-per-day
 
 ## 第二十批：local release-candidate closure
 
-Local Verification Gate #167 已完成且 **PASS**。這代表第十九批新增的 metadata consistency regression 已在 self-hosted Windows runner 真實通過，而不只是靜態實作完成。
+Local Verification Gate #167 已完成且 **PASS**。因此 1.0.3 candidate 的軟體本地側 release gates 已全部收斂為綠色：Local-first persistence/import/traceability、Workspace Import UI/routing、Vercel quota error hardening、release metadata consistency 均已通過。
 
-因此目前 1.0.3 candidate 的**軟體本地側 release gates 已全部收斂為綠色**：
+## 第二十一批：quota-free production verification gate
+
+Release freeze 期間新增 `.github/workflows/production-verify-only.yml`。此 workflow 只允許手動 `workflow_dispatch`，**不呼叫 `vercel deploy`，因此不消耗 Vercel deployment quota**。
+
+它直接驗證 canonical production：
 
 ```text
-Local-first persistence / import / traceability   PASS
-Workspace Import UI / routing                     PASS
-Vercel quota error hardening                      PASS
-Release metadata consistency                      PASS — Gate #167
+Homepage HTTP smoke
+6 個 production API JSON smoke
+7 個 synthetic Chromium routes
+Screenshot evidence
+production-browser-report.json artifact
 ```
 
-本批同步更新 release checklist，並進入 release freeze：在 production gate 尚未恢復前，不新增產品功能、不做非必要重構、不製造 no-op deploy。只有 release-blocking defect 或 release-gate hardening 可以修改 candidate。
+API 範圍：health、PTC readiness、PTC completion、PTC data quality overview、demo status、demo cases。
 
-目前剩餘 release blocker 不再是本地程式碼，而是 Vercel daily deployment quota。quota 可用後，仍必須以當時最新 verified master SHA 完成 production deploy + API JSON smoke + Chromium multi-route gate，才可建立 `v1.0.3` tag。
+Browser 範圍：Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Research、PTC Integrated、PTC Command Center，全部帶同一 `demo_case=PTC-DEMO-001&data_mode=synthetic` contract。
+
+重要邊界：Verification-Only Gate 只能證明**目前已部署 production**仍健康；它不證明 latest master 已經部署，因此不能取代最終的 release-candidate production deploy gate。這個設計讓 Vercel quota 被擋住期間仍能檢查線上服務，而不靠 no-op commit 或重複部署。
+
+本批狀態：
+
+**IMPLEMENTED — WAITING FOR LATEST LOCAL GATE / MANUAL PRODUCTION VERIFY**
 
 ## Local SQLite Acceptance Gate
 
@@ -106,16 +117,18 @@ Release metadata consistency                      PASS — Gate #167
 - [x] dataset validators；
 - [x] previous Production API JSON smoke PASS；
 - [x] previous multi-route Chromium gate PASS；
+- [x] quota-free Production Verification Only workflow implemented；
+- [ ] latest manual Production Verification Only PASS；
 - [ ] 1.0.3 candidate production deploy — BLOCKED BY VERCEL DAILY QUOTA；
-- [ ] latest API JSON smoke / Chromium gate — waiting for successful deployment。
+- [ ] latest-head API JSON smoke / Chromium gate — waiting for successful deployment。
 
 ## 下一批
 
-1. 保持 1.0.3 release freeze，不再扩 scope；
-2. 等 Vercel daily quota 恢复后，用最新 verified master SHA 完成 production deploy；
-3. production API JSON smoke 与 Chromium multi-route gate 必须同时 PASS；
-4. 全部 release checklist 变绿后建立 `v1.0.3` tag / GitHub Release；
-5. release 完成后才进入下一功能 milestone。
+1. 驗證第二十一批 latest Local Verification Gate；
+2. 手動執行 `Production Verification Only`，確認目前 canonical production 的 page/API/Chromium 仍全綠；
+3. 保持 1.0.3 release freeze，不擴產品 scope；
+4. Vercel quota 恢復後，以最新 verified master SHA 完成真正 production deploy；
+5. latest-head production API/Chromium 全綠後建立 `v1.0.3` tag / GitHub Release。
 
 ## 安全邊界
 
