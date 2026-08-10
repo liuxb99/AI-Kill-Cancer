@@ -20,86 +20,94 @@ v0.3.0：**Local-First Research & Demo Showcase**。Vercel 使用 bundled synthe
 ### Epic 1 — Demo CSV Dataset
 - [x] 九張標準 synthetic CSV。
 - [x] 固定 demo key / provenance。
-- [ ] CSV schema / broken-link / enum validator。
+- [x] CSV schema / duplicate-key / broken-reference validator。
+- [ ] enum/value-domain validator 擴充。
 
 ### Epic 2 — Demo Bootstrap Runtime
-- [x] bootstrap service。
-- [x] deterministic UUIDv5。
-- [x] idempotent SQLite bootstrap。
+- [x] bootstrap service / deterministic UUIDv5 / idempotent SQLite bootstrap。
 - [x] Vercel demo bootstrap guard。
-- [x] `/api/v1/demo/status`。
-- [x] `/api/v1/demo/cases`。
+- [x] `/api/v1/demo/status`，現在包含 validation.ok/errors。
+- [x] `/api/v1/demo/cases`，資料集驗證失敗時拒絕提供 showcase payload。
 - [ ] reset / rebuild command。
-
-第一批 bootstrap regression 已由 Local Verification Gate #74 PASS。
 
 ### Epic 3 — Demo UI / Context
 - [x] Homepage Demo Case Selector。
 - [x] Case → Variant → Evidence → Drug → Publication → Trial 展示。
 - [x] `demo_case` + `data_mode=synthetic` deep-link contract。
-- [x] 首頁 Recommendation / Clinical Decision / Treatment Plan / Knowledge Graph / PTC Workbench 深連結入口。
-- [x] Recommendation 頁可由 `demo_case` 自動載入 synthetic case 與 variant，並顯示 provenance banner。
-- [ ] Clinical Decision / Treatment Plan / Knowledge Graph 各頁完整 hydrate 同一 demo context。
-- [ ] Demo provenance banner 抽成跨頁共用元件。
+- [x] 共用 `DemoContextBanner` + `useDemoContext()`。
+- [x] Recommendation hydrate 同一 demo case。
+- [x] Clinical Decision hydrate 同一 demo case，僅展示 synthetic decision workflow preview，不冒充正式 Patient UUID。
+- [x] Treatment Plan hydrate 同一 demo case，僅展示 synthetic treatment workflow preview，不寫入正式計畫。
+- [x] Knowledge Graph hydrate 同一 demo case，由 CSV 投影 6 entities / 5 relations synthetic graph。
+- [ ] PTC Workbench / Research 頁完整 hydrate 同一 context。
 - [ ] multi-route Chromium E2E。
 
 ### Epic 4 — Local SQLite Workspace
 - [x] `data/ai-kill-cancer.db` 預設路徑能力。
-- [x] schema bootstrap / FK / busy timeout。
-- [x] file persistence 基礎 regression。
+- [x] schema bootstrap / FK / busy timeout / file persistence。
 - [x] `PRAGMA integrity_check` utility。
-- [x] timestamped SQLite backup utility，備份前後均做 integrity gate。
-- [x] atomic restore utility，restore 前驗證 backup、replace 前驗證 staging DB。
-- [x] restart persistence + backup/restore regression 第一版。
-- [ ] local mode workspace status API / CLI。
-- [ ] 本地 CSV import 工作流。
-- [ ] upgrade 流程自動呼叫 pre-upgrade backup。
-- [ ] 將 integrity + backup/restore 納入正式 release gate。
+- [x] verified SQLite backup / atomic restore。
+- [x] restart persistence + backup/restore regression。
+- [x] `/api/v1/workspace/status`：回報 app mode、backend、persistent、DB path、size、integrity、backup directory。
+- [ ] local CSV import 工作流。
+- [ ] upgrade 流程自動 pre-upgrade backup。
+- [ ] 將 workspace status / integrity / backup smoke 接入 release gate。
 
 ### Epic 5 — Traceability Baseline
-目標仍為 patient → case → specimen → sequencing → variant → evidence → recommendation → clinical decision → treatment plan。Demo 已建立跨頁 `demo_case` context；正式 domain persistence E2E 尚待後續批次。
+Demo context 已能保持同一 `demo_case` 穿越 Recommendation / Clinical Decision / Treatment Plan / Knowledge Graph，且 synthetic provenance 不再遺失。正式 domain persistence E2E 仍待後續批次。
 
 ### Epic 6 — Release Gate
 - [x] Windows self-hosted Local Verification Gate。
 - [x] Vercel deploy + API smoke + Chromium render。
-- [x] demo bootstrap regression。
-- [x] demo showcase API contract regression。
-- [x] SQLite workspace integrity / backup / restore regression 已加入測試套件，等待最新 gate 驗證。
+- [x] Demo bootstrap regression。
+- [x] Demo API contract regression。
+- [x] SQLite integrity / backup / restore regression — **Local Gate #90 PASS**。
+- [x] Demo deep-link / Recommendation hydration — **Local Gate #90 PASS**。
+- [x] Demo CSV validator regression 已加入，等待最新 gate。
 - [ ] multi-route demo Chromium E2E。
-- [ ] CSV validator gate。
 - [ ] pre-upgrade backup release gate。
 
-## 4. 本批開發摘要
+## 4. 驗證紀錄
 
-第三批完成：
+Local Verification Gate #90，head `899e143f...`：**PASS**。
+
+因此上一批正式升格 VERIFIED：
 
 ```text
-Homepage demo deep-link contract                 IMPLEMENTED
-Recommendation demo_case hydration               IMPLEMENTED
-Synthetic provenance banner on Recommendation    IMPLEMENTED
-SQLite PRAGMA integrity utility                  IMPLEMENTED
-SQLite verified backup utility                   IMPLEMENTED
-SQLite atomic restore utility                    IMPLEMENTED
-Restart persistence regression                   IMPLEMENTED
-Backup / restore regression                      IMPLEMENTED
+Homepage demo deep-link contract                 VERIFIED
+Recommendation demo_case hydration               VERIFIED
+SQLite PRAGMA integrity utility                  VERIFIED
+SQLite verified backup / atomic restore          VERIFIED
+Restart persistence regression                   VERIFIED
 ```
 
-上一批最新 Local Verification Gate #84 仍顯示 pending，沒有 runner job；因此上一批與本批新增項目均不得標記 VERIFIED，狀態維持 **IMPLEMENTED — WAITING FOR SELF-HOSTED VERIFICATION**。
+## 5. 本批開發摘要
 
-## 5. 下一批
+第四批完成：
 
-1. Clinical Decision / Treatment Plan / Knowledge Graph hydrate `demo_case`；
-2. 共用 `DemoContextBanner` / route helper，避免各頁重複邏輯；
-3. local workspace status API / CLI；
-4. pre-upgrade backup hook；
-5. CSV schema + referential validator；
-6. multi-route Chromium E2E；
-7. gate 通過後再更新 VERIFIED 狀態。
+```text
+Shared DemoContextBanner/useDemoContext          IMPLEMENTED
+Clinical Decision synthetic hydration            IMPLEMENTED
+Treatment Plan synthetic hydration               IMPLEMENTED
+Knowledge Graph synthetic projection             IMPLEMENTED
+Demo CSV schema/reference validator              IMPLEMENTED
+Demo status validation contract                  IMPLEMENTED
+/api/v1/workspace/status                         IMPLEMENTED
+Demo validator regression                        IMPLEMENTED
+```
 
-## 6. v0.3.0 完成定義
+狀態：**IMPLEMENTED — WAITING FOR LATEST SELF-HOSTED VERIFICATION**。
 
-Vercel Demo 必須可從首頁固定病例一路導航到 Evidence / Recommendation / Treatment Plan / Graph，且 synthetic provenance 跨頁不丟失；Local Workspace 必須能持久化、restart 後存在、integrity PASS、upgrade 前備份並可 restore。
+## 6. 下一批
+
+1. PTC Workbench / Research hydrate `demo_case`；
+2. workspace status regression；
+3. pre-upgrade backup hook / command；
+4. local CSV import 第一版；
+5. enum/value-domain validator；
+6. multi-route Chromium E2E 驗證首頁 → Recommendation → Clinical Decision → Treatment Plan → Graph；
+7. VERSION / CHANGELOG / v0.3.0 release checklist。
 
 ## 7. 安全界線
 
-所有 demo 病例、Evidence、Drug、Publication、Clinical Trial、Recommendation 與 Treatment Plan 均為 synthetic / research-only 展示資料，不代表真實患者或臨床有效性；軟體工程成熟度與醫學有效性必須分開評價。
+所有 demo 病例、Evidence、Drug、Publication、Clinical Trial、Recommendation、Clinical Decision 與 Treatment Plan 都是 synthetic / research-only 展示資料。Demo 頁不得把 synthetic preview 宣稱為真實診斷、臨床決策或治療計畫。
