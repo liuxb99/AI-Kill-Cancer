@@ -166,6 +166,23 @@ jobs:
               $response = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 60
             } catch {
               $status = $_.Exception.Response.StatusCode.value__
+              $errorBody = ''
+              try {
+                if ($_.ErrorDetails.Message) {
+                  $errorBody = [string]$_.ErrorDetails.Message
+                } elseif ($_.Exception.Response) {
+                  $stream = $_.Exception.Response.GetResponseStream()
+                  if ($stream) {
+                    $reader = New-Object System.IO.StreamReader($stream)
+                    $errorBody = $reader.ReadToEnd()
+                    $reader.Dispose()
+                  }
+                }
+              } catch {
+                $errorBody = '<unable to read response body>'
+              }
+              if ($errorBody.Length -gt 2000) { $errorBody = $errorBody.Substring(0, 2000) }
+              Write-Host "API error body for ${path}: $errorBody"
               throw "API smoke request failed for $path with HTTP $status : $($_.Exception.Message)"
             }
             $contentType = [string]$response.Headers['Content-Type']
