@@ -80,6 +80,7 @@ jobs:
             tests/test_workspace_status.py `
             tests/test_traceability_persistence_e2e.py `
             tests/test_research_depth_engine.py `
+            tests/test_research_depth_lifecycle.py `
             tests/test_research_depth_persistence.py `
             tests/test_adapters.py `
             tests/test_opencravat_adapter.py `
@@ -102,6 +103,7 @@ jobs:
             tests/test_workspace_status.py `
             tests/test_traceability_persistence_e2e.py `
             tests/test_research_depth_engine.py `
+            tests/test_research_depth_lifecycle.py `
             tests/test_research_depth_persistence.py `
             tests/test_adapters.py `
             tests/test_opencravat_adapter.py `
