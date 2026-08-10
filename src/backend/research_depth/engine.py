@@ -19,11 +19,7 @@ def _norm(value: str | None) -> str:
 
 
 def _event_like(value: str | None) -> bool | None:
-    """Map common research outcome strings to descriptive event/no-event/unknown.
-
-    This intentionally does not infer prognosis or treatment response. Unknown
-    vocabulary remains unknown instead of being forced into a binary label.
-    """
+    """Map common research outcome strings to descriptive event/no-event/unknown."""
     text = _norm(value)
     if not text:
         return None
@@ -53,6 +49,10 @@ def _event_like(value: str | None) -> bool | None:
     if text in negatives:
         return False
     return None
+
+
+def _mean(values: Sequence[int]) -> float | None:
+    return round(sum(values) / len(values), 2) if values else None
 
 
 def outcome_feedback_summary(cases: Sequence[Any]) -> dict[str, Any]:
@@ -107,11 +107,26 @@ def outcome_feedback_summary(cases: Sequence[Any]) -> dict[str, Any]:
     if total_cases >= 100 and coverage >= 0.8:
         confidence = "descriptive_high_coverage"
 
+    follow_up = [
+        int(value)
+        for case in cases
+        if (value := getattr(case, "days_to_last_follow_up", None)) is not None
+    ]
+    days_to_death = [
+        int(value)
+        for case in cases
+        if (value := getattr(case, "days_to_death", None)) is not None
+    ]
+
     return {
         "cohort_size": total_cases,
         "cases_with_outcomes": cases_with_outcomes,
         "outcome_coverage": coverage,
         "outcomes": summaries,
+        "mean_follow_up_days": _mean(follow_up),
+        "follow_up_available": len(follow_up),
+        "mean_days_to_death": _mean(days_to_death),
+        "days_to_death_available": len(days_to_death),
         "research_confidence": confidence,
         "selection_boundary": "outcome_blind_selection_required",
         "interpretation": "descriptive_association_only",
@@ -134,6 +149,25 @@ def _case_has_biomarker(case: Any, gene: str, protein_change: str | None = None)
     return False
 
 
+def _distribution(cases: Sequence[Any], field: str) -> dict[str, int]:
+    return dict(Counter(str(getattr(case, field, None) or "unknown") for case in cases))
+
+
+def _distribution_delta(left: dict[str, int], right: dict[str, int]) -> float:
+    left_total = sum(left.values())
+    right_total = sum(right.values())
+    if not left_total or not right_total:
+        return 0.0
+    keys = set(left) | set(right)
+    return round(
+        max(
+            abs(left.get(key, 0) / left_total - right.get(key, 0) / right_total)
+            for key in keys
+        ),
+        4,
+    )
+
+
 def cohort_biomarker_stratification(
     cases: Sequence[Any],
     gene: str,
@@ -144,6 +178,21 @@ def cohort_biomarker_stratification(
     negative = [case for case in cases if case not in positive]
     positive_outcomes = outcome_feedback_summary(positive)
     negative_outcomes = outcome_feedback_summary(negative)
+
+    balance_fields = ["pathologic_stage", "sex", "age_range"]
+    baseline_balance: dict[str, Any] = {}
+    confounding_warnings: list[str] = []
+    for field in balance_fields:
+        positive_distribution = _distribution(positive, field)
+        negative_distribution = _distribution(negative, field)
+        max_delta = _distribution_delta(positive_distribution, negative_distribution)
+        baseline_balance[field] = {
+            "positive": positive_distribution,
+            "negative": negative_distribution,
+            "max_absolute_fraction_difference": max_delta,
+        }
+        if max_delta >= 0.25:
+            confounding_warnings.append(f"baseline_imbalance:{field}")
 
     return {
         "biomarker": {
@@ -161,6 +210,8 @@ def cohort_biomarker_stratification(
             "fraction": round(len(negative) / len(cases), 4) if cases else 0.0,
             "outcome_feedback": negative_outcomes,
         },
+        "baseline_balance": baseline_balance,
+        "confounding_warnings": confounding_warnings,
         "small_sample_warning": len(positive) < 20 or len(negative) < 20,
         "analysis_type": "descriptive_cohort_stratification",
         "causal_inference": False,
@@ -203,8 +254,14 @@ def evidence_conflict_summary(evidence_items: Iterable[Any]) -> dict[str, Any]:
 
     support_weight = sum(_level_weight(getattr(item, "evidence_level", None)) for item in supporting)
     conflict_weight = sum(_level_weight(getattr(item, "evidence_level", None)) for item in conflicting)
-    strongest_support = max((_level_weight(getattr(item, "evidence_level", None)) for item in supporting), default=0.0)
-    strongest_conflict = max((_level_weight(getattr(item, "evidence_level", None)) for item in conflicting), default=0.0)
+    strongest_support = max(
+        (_level_weight(getattr(item, "evidence_level", None)) for item in supporting),
+        default=0.0,
+    )
+    strongest_conflict = max(
+        (_level_weight(getattr(item, "evidence_level", None)) for item in conflicting),
+        default=0.0,
+    )
 
     if supporting and conflicting:
         severity = "high" if strongest_support >= 4.0 and strongest_conflict >= 4.0 else "moderate"
@@ -222,6 +279,10 @@ def evidence_conflict_summary(evidence_items: Iterable[Any]) -> dict[str, Any]:
                 "source_name": getattr(item, "source_name", None),
                 "source_record_id": getattr(item, "source_record_id", None),
                 "evidence_level": _enum_value(getattr(item, "evidence_level", "not_assessed")),
+                "cancer_type": getattr(item, "cancer_type", None),
+                "drug_id": str(getattr(item, "drug_id", "") or "") or None,
+                "variant_id": str(getattr(item, "variant_id", "") or "") or None,
+                "evidence_type": _enum_value(getattr(item, "evidence_type", "other")),
                 "summary": getattr(item, "summary", None),
                 "limitations": getattr(item, "limitations", None),
             }
@@ -257,6 +318,64 @@ def evidence_conflict_summary(evidence_items: Iterable[Any]) -> dict[str, Any]:
         "unresolved_reasons": unresolved,
         "consensus_method": "direction_counts_plus_evidence_level_weighting",
         "majority_vote_only": False,
+    }
+
+
+def _evidence_context(item: Any) -> tuple[str, str, str, str, str]:
+    return (
+        _norm(getattr(item, "gene_symbol", None)) or "UNKNOWN_GENE",
+        _norm(getattr(item, "cancer_type", None)) or "UNKNOWN_CANCER",
+        str(getattr(item, "drug_id", "") or "NO_DRUG"),
+        str(getattr(item, "variant_id", "") or "NO_VARIANT"),
+        _enum_value(getattr(item, "evidence_type", "other")),
+    )
+
+
+def evidence_conflict_groups(evidence_items: Iterable[Any]) -> list[dict[str, Any]]:
+    """Resolve conflicts only inside matched scientific contexts.
+
+    Evidence from different cancer, drug, variant, or evidence-type contexts is
+    not treated as direct dissent. This prevents false conflicts caused by
+    collapsing biologically different claims into a gene-only bucket.
+    """
+    grouped: dict[tuple[str, str, str, str, str], list[Any]] = defaultdict(list)
+    for item in evidence_items:
+        grouped[_evidence_context(item)].append(item)
+
+    severity_rank = {"high": 4, "moderate": 3, "none_detected": 2, "insufficient": 1}
+    results: list[dict[str, Any]] = []
+    for context, rows in grouped.items():
+        gene, cancer_type, drug_id, variant_id, evidence_type = context
+        summary = evidence_conflict_summary(rows)
+        results.append(
+            {
+                "context": {
+                    "gene_symbol": gene,
+                    "cancer_type": cancer_type,
+                    "drug_id": None if drug_id == "NO_DRUG" else drug_id,
+                    "variant_id": None if variant_id == "NO_VARIANT" else variant_id,
+                    "evidence_type": evidence_type,
+                },
+                **summary,
+            }
+        )
+    results.sort(
+        key=lambda item: (
+            -severity_rank.get(item["conflict_severity"], 0),
+            -item["total"],
+            str(item["context"]),
+        )
+    )
+    return results
+
+
+def primary_conflict_summary(evidence_items: Iterable[Any]) -> dict[str, Any]:
+    groups = evidence_conflict_groups(evidence_items)
+    if groups:
+        return groups[0]
+    return {
+        "context": None,
+        **evidence_conflict_summary([]),
     }
 
 
@@ -300,17 +419,25 @@ def build_hypotheses(
                     f"{outcome_type} event proportion than biomarker-negative cases."
                 ),
                 "rationale": {
+                    "outcome_type": outcome_type,
                     "positive_event_proportion": p,
                     "negative_event_proportion": n,
                     "absolute_difference": delta,
+                    "baseline_balance": stratification.get("baseline_balance", {}),
                 },
-                "supporting_observations": ["outcome_blind_biomarker_stratification", "post_selection_outcome_summary"],
+                "supporting_observations": [
+                    "outcome_blind_biomarker_stratification",
+                    "post_selection_outcome_summary",
+                ],
                 "counter_evidence": conflict.get("opposes", []),
                 "uncertainties": [
                     "observational_association",
                     "possible_confounding",
                     "missing_outcome_data",
-                    "small_sample" if stratification.get("small_sample_warning") else "sample_size_not_flagged_small",
+                    *stratification.get("confounding_warnings", []),
+                    "small_sample"
+                    if stratification.get("small_sample_warning")
+                    else "sample_size_not_flagged_small",
                 ],
                 "falsification_criteria": (
                     "In an independent, pre-specified cohort using outcome-blind selection, "
@@ -328,14 +455,17 @@ def build_hypotheses(
         )
 
     if conflict.get("conflict_severity") in {"moderate", "high"}:
+        context = conflict.get("context")
         hypotheses.append(
             {
                 "type": "evidence_conflict_resolution",
                 "claim": (
                     f"The research evidence associated with {biomarker['gene']} may be "
-                    "context-dependent because both supporting and conflicting evidence are present."
+                    "context-dependent because both supporting and conflicting evidence are present "
+                    f"within the matched context {context or 'unspecified'}."
                 ),
                 "rationale": {
+                    "conflict_context": context,
                     "conflict_severity": conflict.get("conflict_severity"),
                     "weighted_support": conflict.get("weighted_support"),
                     "weighted_conflict": conflict.get("weighted_conflict"),
