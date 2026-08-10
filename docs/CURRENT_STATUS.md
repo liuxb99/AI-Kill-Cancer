@@ -32,70 +32,39 @@ Restart persistence regression                    VERIFIED — Local Gate #90 PA
 demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 ```
 
-目前已支援：
+目前已支援：Homepage Demo Case Selector、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph，以及 PTC Research 工作台 synthetic hydration。所有頁面沿用 `DemoContextBanner` / `useDemoContext()`，保持 synthetic provenance 一致。
 
-- Homepage Demo Case Selector；
-- Recommendation：自動載入同一 demo case / variant；
-- Clinical Decision：synthetic decision workflow preview，不查正式 Patient UUID；
-- Treatment Plan：synthetic treatment workflow preview，不建立正式計畫；
-- Knowledge Graph：由同一 demo case 投影 6 entities / 5 relations；
-- 共用 `DemoContextBanner` / `useDemoContext()`，跨頁 synthetic provenance 一致。
+PTC Research 在 synthetic mode 下不再誤查研究資料庫，而是直接投影同一 demo case 的 Case、Variant、Evidence、Drug、Publication、Clinical Trial；沒有 `demo_case` 時仍保留原本公開研究資料查詢路徑。
 
 ## Demo Dataset Validation
 
-`src/backend/demo/validator.py` 現在檢查：
-
-- 九張必要 CSV 是否存在；
-- 必要欄位；
-- blank key；
-- duplicate key；
-- Patient → Case → Specimen → Sequencing → Variant → Evidence → Drug / Publication / Trial 斷鏈；
-- CSV row shape / 額外欄位，避免欄位右移直到 ORM 才爆炸；
-- 重要 variant categorical value domains；
-- synthetic `data_mode` 邊界。
+`src/backend/demo/validator.py` 現在檢查九張必要 CSV、必要欄位、blank/duplicate key、跨表斷鏈、CSV row shape / 額外欄位、重要 categorical value domains 與 synthetic `data_mode` 邊界。
 
 `/api/v1/demo/status` 包含 `validation.ok/errors`；`/api/v1/demo/cases` 在資料集 validation fail 時回 503，避免展示半斷鏈資料。
 
-`tests/test_demo_validator.py` 已增加 broken reference、extra CSV field、invalid variant value-domain regression。
+`tests/test_demo_validator.py` 已覆蓋 broken reference、extra CSV field、invalid variant value-domain regression。
 
 ## Local SQLite Workspace
 
-已驗證：SQLite file persistence、FK、busy timeout、integrity、backup、atomic restore、restart persistence。
+已驗證 SQLite file persistence、FK、busy timeout、integrity、backup、atomic restore、restart persistence。`GET /api/v1/workspace/status` 回報 app mode、backend、local-first/persistent、database path、size、integrity 與 backup directory。
 
-`GET /api/v1/workspace/status` 回報：
-
-```text
-app_mode
-backend
-local_first
-persistent
-database_path
-exists
-size_bytes
-integrity.ok / message
-backup_directory
-```
-
-本批新增 `tests/test_workspace_status.py`，覆蓋：
-
-- local/research SQLite persistent workspace contract；
-- demo SQLite ephemeral contract；
-- non-SQLite backend contract。
+`tests/test_workspace_status.py` 覆蓋 local/research SQLite persistent、demo SQLite ephemeral 與 non-SQLite backend contract。
 
 ## 本批狀態
 
-第五批新增／修復：
+第六批新增：
 
 ```text
-Vercel demo cold-start root-cause fixes           VERIFIED IN PRODUCTION
-Production API JSON smoke                         VERIFIED
-Demo CSV row-shape validation                     IMPLEMENTED
-Demo categorical value-domain validation          IMPLEMENTED
-Workspace status regression                       IMPLEMENTED
-Validator failure regression                      IMPLEMENTED
+PTC Research synthetic hydration                  IMPLEMENTED
+Synthetic Case → Variant → Evidence projection    IMPLEMENTED
+Synthetic Drug / Publication / Trial projection   IMPLEMENTED
+Research DB / synthetic mode isolation            IMPLEMENTED
+PTC Research frontend regression                  IMPLEMENTED
 ```
 
-本批新增的 validator/workspace regression 已提交，等待最新 head 的 self-hosted gate；因此新增項目狀態為：
+新增 `src/frontend/src/test/PTCResearchPage.test.tsx`：驗證帶 `demo_case` 時載入 synthetic context 且不呼叫 `listPTCCases/getPTCGraphPath`；沒有 demo context 時仍走既有 research database path。
+
+本批已提交，等待 latest self-hosted gate，因此狀態為：
 
 **IMPLEMENTED — WAITING FOR LATEST SELF-HOSTED VERIFICATION**
 
@@ -113,10 +82,11 @@ Validator failure regression                      IMPLEMENTED
 - [x] Clinical Decision hydration；
 - [x] Treatment Plan hydration；
 - [x] Knowledge Graph hydration；
+- [x] PTC Research hydration（待 latest gate）；
 - [x] 共用 provenance banner；
 - [x] CSV schema / duplicate / broken-reference validator；
-- [x] CSV row-shape / enum-value validator（待 latest gate）；
-- [ ] PTC Workbench / Research hydrate；
+- [x] CSV row-shape / enum-value validator；
+- [ ] PTC Workbench 其餘入口 hydration；
 - [ ] multi-route Chromium E2E。
 
 ### Local SQLite
@@ -125,8 +95,7 @@ Validator failure regression                      IMPLEMENTED
 - [x] integrity utility；
 - [x] backup / atomic restore；
 - [x] restart regression；
-- [x] workspace status API；
-- [x] workspace status regression（待 latest gate）；
+- [x] workspace status API / regression；
 - [ ] local CSV import；
 - [ ] pre-upgrade automatic backup hook；
 - [ ] traceability persistence E2E。
@@ -135,7 +104,7 @@ Validator failure regression                      IMPLEMENTED
 
 優先順序：
 
-1. PTC Workbench / Research demo hydration，讓三個 showcase case 可沿同一 `demo_case` contract 進入研究工作台；
+1. 把 synthetic `demo_case` contract 延伸到 PTC Workbench 其餘主要入口，避免 demo showcase 在進入 command/integrated workflow 後掉回空資料；
 2. multi-route Chromium E2E，覆蓋 Homepage → Recommendation → Clinical Decision → Treatment Plan → Knowledge Graph → PTC Research；
 3. local CSV import 第一版，採 validate → preview → explicit import，不允許靜默覆寫；
 4. pre-upgrade automatic backup hook；
