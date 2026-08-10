@@ -52,11 +52,12 @@ jobs:
           "PYTHON_EXE=$pythonExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           & $pythonExe --version
 
-      - name: Install backend test dependencies
+      - name: Install SQLite verification dependencies
         run: |
-          & $env:PYTHON_EXE -m pip install --upgrade pip
-          & $env:PYTHON_EXE -m pip install -r src/backend/requirements-api.txt
-          & $env:PYTHON_EXE -m pip install pytest pytest-asyncio ruff
+          & $env:PYTHON_EXE -m pip install --disable-pip-version-check --prefer-binary `
+            "pydantic>=2.10.3" "pydantic-settings>=2.7.0" `
+            "sqlalchemy[asyncio]>=2.0.36" "aiosqlite>=0.20.0" `
+            "httpx>=0.28.1" numpy pytest pytest-asyncio ruff
 
       - name: Compile backend
         run: |
