@@ -23,11 +23,13 @@ jobs:
       DB_BACKEND: sqlite
       SQLITE_PATH: ./.ci/ai-kill-cancer.db
       MODEL_ENABLED: 'false'
+    defaults:
+      run:
+        shell: powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
     steps:
       - uses: actions/checkout@v4
 
       - name: Use local Python 3.11
-        shell: powershell
         run: |
           $py = Get-Command py -ErrorAction SilentlyContinue
           if (-not $py) {
@@ -42,25 +44,21 @@ jobs:
           & $pythonExe -c "import sys; assert sys.version_info[:2] == (3, 11), sys.version"
 
       - name: Install backend test dependencies
-        shell: powershell
         run: |
           & $env:PYTHON_EXE -m pip install --upgrade pip
           & $env:PYTHON_EXE -m pip install -r src/backend/requirements-api.txt
           & $env:PYTHON_EXE -m pip install pytest pytest-asyncio ruff
 
       - name: Compile backend
-        shell: powershell
         run: |
           & $env:PYTHON_EXE -m compileall src/backend/config.py src/backend/database src/backend/domain src/backend/api
 
       - name: Lint backend and SQLite regression
-        shell: powershell
         run: |
           & $env:PYTHON_EXE -m ruff check src/backend tests/backend/test_sqlite_local_compat.py tests/test_analysis_persistence.py
           & $env:PYTHON_EXE -m pytest tests/backend/test_sqlite_local_compat.py tests/test_analysis_persistence.py -v --tb=short
 
       - name: Initialize configured local SQLite database
-        shell: powershell
         run: |
           @'
           import asyncio
@@ -75,7 +73,6 @@ jobs:
           '@ | & $env:PYTHON_EXE -
 
       - name: Verify local database file
-        shell: powershell
         run: |
           if (-not (Test-Path '.ci/ai-kill-cancer.db')) {
             throw 'SQLite verification database was not created'
@@ -87,5 +84,4 @@ jobs:
           Write-Host "SQLite DB bytes: $($item.Length)"
 
       - name: Diff check
-        shell: powershell
         run: git diff --check
