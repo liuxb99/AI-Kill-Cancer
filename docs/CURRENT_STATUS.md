@@ -16,7 +16,7 @@ AI-Kill-Cancer 當前產品 release line：**1.0.3 candidate**。
 Local SQLite runtime / ORM compatibility          VERIFIED
 SQLite file persistence / FK / memory regression  VERIFIED
 Vercel Python/static routing                      VERIFIED
-Production page/API JSON smoke                    VERIFIED
+Production page/API JSON smoke                    VERIFIED (previous gate)
 Demo cold-start bootstrap                         VERIFIED
 Demo core CSV bootstrap + UUIDv5 idempotency      VERIFIED
 Demo deep-link / Recommendation hydration         VERIFIED
@@ -49,11 +49,11 @@ Workspace status
 
 安全邊界：只有 `backend=sqlite`、`persistent=true`、`app_mode=local|research` 顯示可寫入流程；Demo/Vercel/non-persistent runtime 為 read-only guard。Import policy 固定 `overwrite_existing=false`。
 
-本批新增 `WorkspaceImportRoute.test.tsx`，補 App routing + navbar entry regression，避免頁面本身測試通過但實際 route 不可達。
+`WorkspaceImportRoute.test.tsx` 已補 App routing + navbar entry regression，避免頁面本身測試通過但實際 route 不可達。
 
 ## 第十七批：1.0.3 release convergence
 
-本批已完成：
+已完成：
 
 ```text
 root VERSION                         1.0.2 → 1.0.3
@@ -77,21 +77,26 @@ Frontend package.json:
   不作為產品 release authority
 ```
 
-Release checklist 明確禁止在 release-candidate latest gates 尚未全綠前建立或移動 `v1.0.3` tag。
+## 第十八批：release gate failure triage / Vercel quota hardening
 
-本批狀態：
-
-**IMPLEMENTED — WAITING FOR LATEST RELEASE-CANDIDATE VERIFICATION**
-
-## Demo Showcase 現況
-
-九張 synthetic CSV 與三個固定 PTC showcase case 已建立。跨頁 contract：
+最新 1.0.3 candidate 的 Local Verification Gate 已成功觸發 production workflow，但 production deploy 在 Vercel 建置前被平台 quota 擋下。Actions log 的根因為：
 
 ```text
-demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
+Error: Resource is limited - try again in 24 hours
+code: api-deployments-free-per-day
 ```
 
-目前已支援 Homepage、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Research、PTC Integrated Workbench、PTC Command Center，以及 synthetic navbar query propagation。
+這不是應用程式 build/test/runtime failure，也不是 VERCEL_TOKEN、project link、rootDirectory 或 production env preflight failure；上述步驟均已通過。因 deploy 沒有建立成功，後續 production page smoke、API JSON smoke、Chromium multi-route gate 被正確跳過。
+
+本批已 harden `.github/workflows/vercel-production-after-local.yml`：
+
+- 不再對失敗 deploy 的 null stdout 直接 `.Trim()`，避免二次 PowerShell null exception 掩蓋真正根因；
+- 捕捉 `api-deployments-free-per-day` / `Resource is limited - try again in 24 hours`；
+- 輸出明確 `VERCEL_DAILY_DEPLOYMENT_QUOTA_EXHAUSTED` 訊息；
+- 明確禁止用 no-op commit 反覆消耗/重試 production deploy；
+- 保持「只有最新通過 Local Gate 的 master SHA 才可 deploy」契約。
+
+因此 1.0.3 release 目前的唯一已知外部 blocker 是 **Vercel Free plan daily deployment quota**。在 quota reset 或有可用 deployment quota 前，不建立 `v1.0.3` tag。
 
 ## Local SQLite Acceptance Gate
 
@@ -108,7 +113,7 @@ demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 - [x] traceability persistence E2E；
 - [x] Workspace Import UI；
 - [x] Workspace Import App route/nav regression implemented；
-- [ ] latest 1.0.3 release-candidate Local Verification Gate PASS。
+- [ ] latest head after quota-hardening Local Verification Gate PASS。
 
 ## Vercel Demo Acceptance Gate
 
@@ -120,17 +125,18 @@ demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 - [x] dataset validators；
 - [x] previous Production API JSON smoke PASS；
 - [x] previous multi-route Chromium gate PASS；
-- [ ] latest 1.0.3 release-candidate production deploy / smoke PASS。
+- [ ] 1.0.3 candidate production deploy — BLOCKED BY VERCEL DAILY QUOTA；
+- [ ] latest API JSON smoke / Chromium gate — waiting for successful deployment。
 
 ## 下一批
 
 優先順序：
 
-1. 驗證 1.0.3 release-candidate latest Local Verification Gate；若 fail，依 job log 修到全綠；
-2. 驗證 latest production deploy、API JSON smoke、multi-route Chromium gate；
-3. 搜尋 release-critical runtime metadata 是否仍誤報 1.0.2；
+1. 驗證 quota-hardening commit 的 latest Local Verification Gate；
+2. 不以 no-op commit 反覆重試 Vercel；等待 daily quota reset 後，由下一個真實、已驗證 master SHA 觸發 production deploy；
+3. production deploy 成功後立即跑 page/API JSON/Chromium multi-route gates；
 4. 所有 release checklist 全綠後，再建立 `v1.0.3` tag / release；
-5. release 完成前不再擴 scope 到 desktop file picker 或新研究功能。
+5. release 完成前不擴 scope 到 desktop file picker 或新研究功能。
 
 ## 安全邊界
 
