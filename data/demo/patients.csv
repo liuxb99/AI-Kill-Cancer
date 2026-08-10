@@ -1,0 +1,4 @@
+demo_patient_key,external_id,display_name,birth_year,age_range,sex,consent_status,data_mode,provenance
+PTC-DEMO-001,DEMO-P001,PTC Demo 001,1978,45-54,F,granted,synthetic,bundled_demo_csv
+PTC-DEMO-002,DEMO-P002,PTC Demo 002,1986,35-44,M,granted,synthetic,bundled_demo_csv
+PTC-DEMO-003,DEMO-P003,PTC Demo 003,1967,55-64,F,granted,synthetic,bundled_demo_csv
