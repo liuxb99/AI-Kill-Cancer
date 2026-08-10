@@ -22,82 +22,58 @@ PTC Command Center + navbar continuity             VERIFIED
 Production multi-route synthetic browser gate     VERIFIED — workflow #130 PASS
 SQLite integrity / backup / restore               VERIFIED
 Restart persistence regression                    VERIFIED
+Local CSV Import v1                               IMPLEMENTED
+Pre-upgrade SQLite backup hook                     IMPLEMENTED
 ```
 
 ## Production multi-route gate
 
-第十批加入的 production gate 已完成實戰驗證。第一次 run #123 因 `/api/v1/demo/cases` 發現 publications CSV quoting 與 evidence→variant key 斷鏈而失敗；第十一批修正九張 showcase CSV contract 並擴充 JSON-list validator 後，最新 commit `18c357f` 對應 **Vercel Production workflow #130 已 completed / success**。
-
-因此目前 production gate 已實際驗證：
-
-```text
-/api/v1/health
-/api/v1/ptc-readiness
-/api/v1/ptc-completion/status
-/api/v1/ptc-data-quality/overview
-/api/v1/demo/status
-/api/v1/demo/cases
-```
-
-以及 Chromium synthetic multi-route：
-
-```text
-/recommendation
-/clinical-decision
-/treatment-plans
-/clinical-graph
-/ptc-research
-/ptc-workbench
-/ptc-command-center
-```
+Production synthetic browser gate 已完成實戰驗證。九張 showcase CSV contract 修復後，commit `18c357f` 對應 **Vercel Production workflow #130 completed / success**。API smoke 與 Chromium multi-route 均已全綠。
 
 ## Local CSV Import v1
 
-第十二批已實作第一版 **Local CSV Import**，定位是本機 research workspace 的受控資料匯入入口，不提供 Vercel/demo runtime 寫入。
-
-API：
+第十二批已完成受控 Local CSV Import：
 
 ```text
 POST /api/v1/workspace/import/csv/preview
 POST /api/v1/workspace/import/csv/commit
 ```
 
-request：
+契約維持：`validate → preview → explicit import`；只允許 local/research SQLite；commit 必須 `confirm=IMPORT`；deterministic records 採 idempotent insert，禁止 silent overwrite。
 
-```json
-{
-  "source_dir": "D:/research/ptc-dataset"
-}
+Local Verification Gate #137 已由最新 master 觸發；進度文檔更新時仍在執行中，因此不把尚未完成的 run 宣告為 PASS。
+
+## Pre-upgrade automatic backup hook
+
+第十三批新增 persistent Local SQLite 的 schema-change 防護。
+
+`src/backend/database/session.py` 在 ORM `create_all()` 前會先檢查現有 SQLite schema 與 `Base.metadata`：
+
+```text
+existing database empty                 → fresh bootstrap，不備份
+schema identical                        → 不備份
+expected table missing                  → upgrade_required
+expected column missing                 → upgrade_required
 ```
 
-commit 必須顯式提交：
+當 `upgrade_required=true` 且 `APP_MODE=local|research` 時，啟動流程會在 schema mutation 前呼叫既有 `backup_sqlite_database()`：
 
-```json
-{
-  "source_dir": "D:/research/ptc-dataset",
-  "confirm": "IMPORT"
-}
+```text
+integrity_check(source)
+→ timestamped online SQLite backup
+→ integrity_check(backup)
+→ create_all / schema bootstrap
 ```
 
-安全契約：
+因此現在 local research workspace 的 schema 擴充不再直接碰原始 DB；先留下可恢復 snapshot。Demo/Vercel ephemeral SQLite、`:memory:` SQLite、全新空資料庫均不產生無意義備份。
 
-- 只允許 `DB_BACKEND=sqlite`；
-- 只允許 `APP_MODE=local|research`；
-- preview 僅執行 validator，不寫資料庫；
-- validation fail 時 commit 回 422；
-- 未提供 `confirm=IMPORT` 時 commit 回 409；
-- v1 import scope：Patient → Cancer Case → Specimen → Sequencing Test → Variant；
-- 使用 deterministic UUIDv5 / idempotent bootstrap；
-- existing deterministic records 保留，不 silent overwrite；
-- response 明確回報 `overwrite_existing=false`。
+`tests/test_sqlite_workspace.py` 新增 regression：
 
-`tests/test_workspace_status.py` 已新增 regression，覆蓋：
-
-- demo/non-persistent mode 禁止 local CSV import；
-- preview validation 不寫庫；
-- explicit confirmation guard；
-- confirmed commit 呼叫 idempotent bootstrap；
-- overwrite contract 固定為 false。
+- identical schema 不觸發 upgrade；
+- missing column 觸發 upgrade；
+- missing table 觸發 upgrade；
+- fresh/empty DB 不要求 pre-upgrade backup；
+- 原有 integrity / backup / restore / restart persistence regression 保留。
 
 本批狀態：
 
@@ -144,19 +120,18 @@ demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 - [x] backup / atomic restore；
 - [x] restart regression；
 - [x] workspace status API / regression；
-- [x] local CSV import v1（待 latest gate）；
-- [ ] pre-upgrade automatic backup hook；
+- [x] local CSV import v1（latest gate 驗證中）；
+- [x] pre-upgrade automatic backup hook（latest gate 驗證中）；
 - [ ] traceability persistence E2E。
 
 ## 下一批
 
 優先順序：
 
-1. 驗證 Local CSV Import v1 最新 self-hosted gate；若 fail 直接修到全綠；
-2. pre-upgrade automatic backup hook：任何 schema/migration/upgrade 前先建立帶 timestamp 的 SQLite backup；
-3. traceability persistence E2E：跨 restart 驗證 Case → Variant → Evidence / Recommendation / Decision chain；
-4. Local CSV Import v2：增加 UI / file picker、duplicate preview、import history；
-5. VERSION / CHANGELOG / release checklist 收斂。
+1. 驗證第十三批 self-hosted gate；若 fail，依 job log 修到全綠；
+2. traceability persistence E2E：跨 process/database restart 驗證 Case → Specimen → Sequencing → Variant → Evidence / Recommendation / Decision chain；
+3. Local CSV Import v2：duplicate preview、import history，再評估 UI / file picker；
+4. VERSION / CHANGELOG / release checklist 收斂。
 
 ## 安全邊界
 
