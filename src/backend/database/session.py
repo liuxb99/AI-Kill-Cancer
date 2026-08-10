@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import event, text
+from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -22,11 +22,17 @@ def _is_memory_sqlite(db_url: str) -> bool:
     return url.get_backend_name() == "sqlite" and url.database in {None, "", ":memory:"}
 
 
-def _prepare_sqlite_file(db_url: str) -> None:
+def _sqlite_file_path(db_url: str) -> Path | None:
     url = make_url(db_url)
     if url.get_backend_name() != "sqlite" or url.database in {None, "", ":memory:"}:
+        return None
+    return Path(url.database).expanduser().resolve()
+
+
+def _prepare_sqlite_file(db_url: str) -> None:
+    database_path = _sqlite_file_path(db_url)
+    if database_path is None:
         return
-    database_path = Path(url.database).expanduser()
     database_path.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -50,6 +56,28 @@ def _create_engine(db_url: str, debug: bool) -> AsyncEngine:
     if is_sqlite_url(db_url):
         event.listen(db_engine.sync_engine, "connect", _enable_sqlite_pragmas)
     return db_engine
+
+
+def _schema_upgrade_required(sync_connection, metadata) -> bool:
+    """Return True when create_all will add at least one table or column.
+
+    create_all cannot perform destructive migrations, but adding schema objects still
+    changes a persistent research workspace.  We therefore snapshot first whenever
+    the current SQLite schema is non-empty and differs from ORM metadata.
+    """
+    inspector = inspect(sync_connection)
+    existing_tables = set(inspector.get_table_names())
+    if not existing_tables:
+        return False
+    expected_tables = set(metadata.tables)
+    if expected_tables - existing_tables:
+        return True
+    for table_name in expected_tables & existing_tables:
+        existing_columns = {column["name"] for column in inspector.get_columns(table_name)}
+        expected_columns = {column.name for column in metadata.tables[table_name].columns}
+        if expected_columns - existing_columns:
+            return True
+    return False
 
 
 def database_status() -> dict[str, object]:
@@ -87,9 +115,6 @@ async def get_db():
     try:
         await ensure_db_initialized()
     except Exception as exc:
-        # Keep the low-level database module importable by lightweight SQLite
-        # tooling that intentionally does not install FastAPI.  The web-only
-        # exception type is imported only when a request actually needs it.
         from fastapi import HTTPException
 
         status = database_status()
@@ -116,14 +141,8 @@ async def get_db():
         try:
             yield session
             # REVIEW-PHASE3F0-R3-P0-01 / OPEN
-            # 問題：目前 get_db() 會在請求成功後自動 commit，但 EvidenceIngestionService、
-            # VariantIngestionService 等 Service 也自行 commit/rollback，造成同一請求存在
-            # 兩個 transaction owner，與 Phase 3F-0 選定的「Service 層明確管理交易」模式衝突。
-            # 修改：統一 transaction ownership。若採 Service-owned transaction，移除此處的
-            # 自動 commit，並盤點所有直接注入 db 的寫入 endpoint，確保它們改由 Service 管理；
-            # 不得以 dependency auto-commit 補救缺少 Service transaction 的 API。
-            # 驗證：新增測試證明 (1) Service 成功只 commit 一次；(2) Service 後段失敗完整
-            # rollback；(3) endpoint 在 Service 返回後發生例外時，不會留下部分提交資料。
+            # Transaction ownership remains tracked separately from the SQLite
+            # local-first hardening work in v0.3.0.
             await session.commit()
         except Exception:
             await session.rollback()
@@ -147,14 +166,37 @@ async def init_db(db_url: str, debug: bool = False):
         import src.backend.domain.ptc_research  # noqa: F401
         from src.backend.database.models import Base
 
+        from src.backend.config import settings
+
+        sqlite_path = _sqlite_file_path(db_url)
+        persistent_local = (
+            sqlite_path is not None
+            and sqlite_path.is_file()
+            and settings.APP_MODE in {"local", "research"}
+        )
+
+        async with engine.begin() as conn:
+            upgrade_required = False
+            if persistent_local:
+                upgrade_required = await conn.run_sync(
+                    lambda sync_conn: _schema_upgrade_required(sync_conn, Base.metadata)
+                )
+            if upgrade_required and sqlite_path is not None:
+                # Close the schema-inspection transaction before taking SQLite's
+                # online backup. The backup is integrity-checked and timestamped.
+                await conn.rollback()
+
+        if persistent_local and upgrade_required and sqlite_path is not None:
+            from src.backend.database.sqlite_workspace import backup_sqlite_database
+
+            backup_sqlite_database(sqlite_path)
+
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             if is_sqlite_url(db_url):
                 enabled = (await conn.execute(text("PRAGMA foreign_keys"))).scalar_one()
                 if enabled != 1:
                     raise RuntimeError("SQLite foreign key enforcement is not enabled")
-
-        from src.backend.config import settings
 
         if (
             is_sqlite_url(db_url)
