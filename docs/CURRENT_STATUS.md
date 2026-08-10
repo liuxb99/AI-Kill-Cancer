@@ -16,60 +16,80 @@ Production page/API JSON smoke                    VERIFIED
 Demo cold-start bootstrap                         VERIFIED
 Demo core CSV bootstrap + UUIDv5 idempotency      VERIFIED
 Demo deep-link / Recommendation hydration         VERIFIED
-PTC Research synthetic hydration                  VERIFIED — production workflow 97cb6a7 PASS
-PTC Integrated synthetic hydration                VERIFIED — production workflow 729e643 PASS
-PTC Command Center + navbar continuity             VERIFIED — production workflow bd30338 PASS
+PTC Research synthetic hydration                  VERIFIED
+PTC Integrated synthetic hydration                VERIFIED
+PTC Command Center + navbar continuity             VERIFIED
 SQLite integrity / backup / restore               VERIFIED
 Restart persistence regression                    VERIFIED
 ```
 
-2026-08-10 production incident 已完成根因修復：demo cold-start 曾因 `cancer_cases.csv` JSON/CSV quoting 與 fusion variant 欄位錯位而失敗，導致 DB API 500/503。修正後 Vercel production deploy、page smoke 與 DB/API JSON smoke 已通過，`/api/v1/ptc-data-quality/overview` 已恢復。
+## Production multi-route gate 實際發現
+
+第十批新增的 production gate 已真正發揮作用。Local Verification #127 成功，但 Vercel Production run #123 失敗；失敗發生在 browser verification 之前的 `/api/v1/demo/cases` API smoke，而不是首頁、health、PTC readiness、completion 或 data-quality。
+
+Production 回報兩類 demo dataset contract 錯誤：
+
+```text
+publications.csv CSV quoting / extra fields
+evidence.csv demo_variant_key 與 variants.csv 不一致
+```
+
+這代表之前的 demo cold-start / API smoke 雖能驗證核心五張 bootstrap CSV，但九張 showcase CSV 的完整關聯仍存在資料契約缺口。新 gate 已把這個缺口從 production 中攔下。
+
+## 本批修復
+
+第十一批已修正：
+
+```text
+publications.csv RFC4180 JSON quoting              FIXED
+drugs.csv RFC4180 JSON quoting                     FIXED
+clinical_trials.csv RFC4180 JSON quoting           FIXED
+evidence → variants foreign-key contract           FIXED
+JSON-list field validation                         IMPLEMENTED
+Malformed JSON-list regression                     IMPLEMENTED
+```
+
+`evidence.csv` 現在使用 `VAR-DEMO-001/002/003`，與 `variants.csv.demo_variant_key` 完全一致。
+
+為避免同類問題再次只在 Vercel 才暴露，`src/backend/demo/validator.py` 現在除了 schema、row-shape、enum domain 與 cross-file reference 外，也會對以下 CSV 欄位做真正 `json.loads()` + list type 驗證：
+
+```text
+cancer_cases.csv:
+  metastatic_sites
+  treatment_history
+  current_medications
+
+drugs.csv:
+  atc_codes
+
+publications.csv:
+  authors
+  keywords
+
+clinical_trials.csv:
+  conditions
+  interventions
+  biomarkers
+  locations
+```
+
+`tests/test_demo_validator.py` 同步新增 malformed JSON list regression。
+
+本批狀態：
+
+**FIXED / IMPLEMENTED — WAITING FOR LATEST SELF-HOSTED + PRODUCTION GATE**
 
 ## Demo Showcase 現況
 
-九張 synthetic CSV 與三個固定 PTC showcase case 已完成。`/api/v1/demo/status` 與 `/api/v1/demo/cases` 已存在。
-
-跨頁 contract：
+九張 synthetic CSV 與三個固定 PTC showcase case已建立。跨頁 contract：
 
 ```text
 demo_case=<PTC-DEMO-xxx>&data_mode=synthetic
 ```
 
-目前已支援：Homepage Demo Case Selector、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Research、PTC Integrated Workbench、PTC Command Center synthetic isolation，以及 App-level synthetic navbar query propagation。
+目前已支援 Homepage、Recommendation、Clinical Decision、Treatment Plan、Knowledge Graph、PTC Research、PTC Integrated Workbench、PTC Command Center，以及 synthetic navbar query propagation。
 
-PTC Command Center 採 route-level isolation：帶 `demo_case` 時不 mount real command-center component，因此不觸發 source status、readiness、outcome、complete graph 或 full sync API；沒有 synthetic context 時仍沿用原本真實研究總控台。
-
-## Demo Dataset Validation
-
-`src/backend/demo/validator.py` 檢查九張必要 CSV、必要欄位、blank/duplicate key、跨表斷鏈、CSV row shape / 額外欄位、重要 categorical value domains 與 synthetic `data_mode` 邊界。
-
-`/api/v1/demo/status` 包含 `validation.ok/errors`；`/api/v1/demo/cases` 在資料集 validation fail 時回 503。
-
-## Local SQLite Workspace
-
-已驗證 SQLite file persistence、FK、busy timeout、integrity、backup、atomic restore、restart persistence。`GET /api/v1/workspace/status` 回報 app mode、backend、local-first/persistent、database path、size、integrity 與 backup directory。
-
-## 本批狀態
-
-第十批新增：
-
-```text
-Production synthetic multi-route Chromium gate   IMPLEMENTED
-Demo status/cases production API smoke            IMPLEMENTED
-Per-route query continuity assertion              IMPLEMENTED
-Per-route meaningful render assertion             IMPLEMENTED
-Per-route synthetic-context assertion             IMPLEMENTED
-JS/CSS bad-response gate                          IMPLEMENTED
-Per-route screenshot evidence                     IMPLEMENTED
-```
-
-`.github/workflows/vercel-production-after-local.yml` 已從單一首頁 browser smoke 升級為 production synthetic multi-route gate。部署後 Chromium 會使用固定：
-
-```text
-?demo_case=PTC-DEMO-001&data_mode=synthetic
-```
-
-逐頁驗證：
+Production multi-route gate 會在 `/api/v1/demo/status`、`/api/v1/demo/cases` 通過後，以 Chromium 真正驗證：
 
 ```text
 /recommendation
@@ -81,30 +101,7 @@ Per-route screenshot evidence                     IMPLEMENTED
 /ptc-command-center
 ```
 
-每一頁都必須同時滿足：
-
-- HTTP < 400；
-- `#root` 有實際內容且 body 非白屏；
-- URL 仍保留 `demo_case=PTC-DEMO-001`；
-- URL 仍保留 `data_mode=synthetic`；
-- 頁面能辨識 synthetic context（banner 或 synthetic 文案）；
-- 不得有 JS/CSS >= 400；
-- 不得有 browser `pageerror`。
-
-失敗時 production workflow 直接失敗，不再把「首頁能開」誤判成整個 Demo Showcase 正常。每條 route 都輸出獨立 screenshot，另輸出 `production-browser-report.json` 作為 workflow artifact。
-
-Production API smoke 同步新增：
-
-```text
-/api/v1/demo/status
-/api/v1/demo/cases
-```
-
-上一批 `bd30338` 已完成 Vercel Production After Local Verification，結論為 success；因此 Command Center synthetic isolation 與 navbar continuity 已升級為 VERIFIED。
-
-本批 workflow 變更已提交，等待 latest self-hosted gate + production workflow 實際跑過，因此本批狀態為：
-
-**IMPLEMENTED — WAITING FOR PRODUCTION MULTI-ROUTE VERIFICATION**
+並檢查白屏、query continuity、synthetic context、pageerror 與 JS/CSS bad responses。
 
 ## v0.3.0 Acceptance Gate
 
@@ -113,7 +110,7 @@ Production API smoke 同步新增：
 - [x] 3 個固定 demo cases；
 - [x] CSV → SQLite idempotent bootstrap；
 - [x] demo cold-start production recovery；
-- [x] demo status/cases API；
+- [x] demo status/cases API contract；
 - [x] Homepage selector；
 - [x] demo_case deep-link contract；
 - [x] Recommendation hydration；
@@ -127,7 +124,9 @@ Production API smoke 同步新增：
 - [x] 共用 provenance banner；
 - [x] CSV schema / duplicate / broken-reference validator；
 - [x] CSV row-shape / enum-value validator；
-- [x] Browser/Chromium production multi-route E2E gate（待 latest production run 驗證）。
+- [x] JSON-list payload validator；
+- [x] Production multi-route E2E gate implemented；
+- [ ] Production multi-route E2E latest run PASS。
 
 ### Local SQLite
 - [x] config / schema bootstrap / FK / busy timeout；
@@ -144,8 +143,8 @@ Production API smoke 同步新增：
 
 優先順序：
 
-1. 等 latest production multi-route gate 真實跑過；若某一 route fail，直接依 browser report / screenshot 修到全綠；
-2. local CSV import 第一版，採 `validate → preview → explicit import`，不允許靜默覆寫；
+1. 让 latest self-hosted gate + production API/demo + Chromium multi-route gate 全綠；若仍 fail，依精確 route/report 立即修復；
+2. Local CSV Import v1：`validate → preview → explicit import`，禁止 silent overwrite；
 3. pre-upgrade automatic backup hook；
 4. traceability persistence E2E；
 5. VERSION / CHANGELOG / release checklist 收斂。
