@@ -55,3 +55,17 @@ def test_validator_detects_invalid_variant_value_domain(tmp_path):
     result = validate_demo_dataset(tmp_path)
     assert result.ok is False
     assert any('invalid variant_type' in error for error in result.errors)
+
+
+def test_validator_detects_invalid_json_list(tmp_path):
+    _copy_demo_dataset(tmp_path)
+
+    cases = tmp_path / 'cancer_cases.csv'
+    cases.write_text(
+        cases.read_text(encoding='utf-8').replace('"[]","[]","[]"', '"not-json","[]","[]"', 1),
+        encoding='utf-8',
+    )
+
+    result = validate_demo_dataset(tmp_path)
+    assert result.ok is False
+    assert any('invalid JSON in metastatic_sites' in error for error in result.errors)
