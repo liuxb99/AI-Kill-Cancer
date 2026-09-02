@@ -1,1 +1,0 @@
-this drive is owner
